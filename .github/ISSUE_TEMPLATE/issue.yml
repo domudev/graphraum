@@ -1,0 +1,22 @@
+name: Work item
+description: Propose a bug fix, feature, or measured improvement.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is happening, or what is missing?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be true when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Proof
+      description: Add a reproduction, benchmark, trace, example, or acceptance check when useful.
