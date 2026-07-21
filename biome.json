@@ -1,0 +1,16 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+	"files": {
+		"includes": ["**", "!dist"]
+	},
+	"formatter": {
+		"indentStyle": "tab",
+		"lineWidth": 120
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"semicolons": "always"
+		}
+	}
+}
