@@ -50,6 +50,7 @@ export class Graphraum {
 	private controls: OrbitControls;
 	private data: GraphraumData = { nodes: [], edges: [] };
 	private nodeIds: readonly string[] = [];
+	private nodeIndices = new Map<string, number>();
 	private nodeMesh: InstancedMesh | null = null;
 	private edgeLines: LineSegments | null = null;
 	private selectedNodeIds = new Set<string>();
@@ -80,6 +81,7 @@ export class Graphraum {
 		this.disposeGraphObjects();
 		this.data = data;
 		this.nodeIds = compiled.nodeIds;
+		this.nodeIndices = new Map(compiled.nodeIds.map((id, index) => [id, index]));
 
 		const nodeGeometry = new SphereGeometry(1, 8, 6);
 		const nodeMaterial = new MeshBasicMaterial({ color: "#ffffff" });
@@ -90,7 +92,10 @@ export class Graphraum {
 			matrix.makeScale(size, size, size);
 			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
 			nodeMesh.setMatrixAt(index, matrix);
-			nodeMesh.setColorAt(index, new Color(node.color ?? this.theme.node));
+			nodeMesh.setColorAt(
+				index,
+				new Color(this.selectedNodeIds.has(node.id) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
+			);
 		}
 		nodeMesh.instanceMatrix.needsUpdate = true;
 		if (nodeMesh.instanceColor) nodeMesh.instanceColor.needsUpdate = true;
@@ -106,13 +111,23 @@ export class Graphraum {
 		this.edgeLines = edgeLines;
 		this.scene.add(edgeLines);
 
-		this.applySelectionColors();
 		this.fitView();
 	}
 
 	setSelection(nodeIds: Iterable<string>) {
-		this.selectedNodeIds = new Set(nodeIds);
-		this.applySelectionColors();
+		const nextSelection = new Set(nodeIds);
+		const changedNodeIds = new Set(
+			[...this.selectedNodeIds, ...nextSelection].filter(
+				(nodeId) => this.selectedNodeIds.has(nodeId) !== nextSelection.has(nodeId),
+			),
+		);
+		this.selectedNodeIds = nextSelection;
+		this.applySelectionColors(changedNodeIds);
+		this.requestRender();
+	}
+
+	/** Schedules one render on the next animation frame. Repeated calls in one frame are coalesced. */
+	render() {
 		this.requestRender();
 	}
 
@@ -226,12 +241,16 @@ export class Graphraum {
 		return controls;
 	}
 
-	private applySelectionColors() {
+	private applySelectionColors(nodeIds: Iterable<string>) {
 		if (!this.nodeMesh) return;
-		for (const [index, node] of this.data.nodes.entries()) {
+		for (const nodeId of nodeIds) {
+			const index = this.nodeIndices.get(nodeId);
+			if (index === undefined) continue;
+			const node = this.data.nodes[index];
+			if (!node) continue;
 			this.nodeMesh.setColorAt(
 				index,
-				new Color(this.selectedNodeIds.has(node.id) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
+				new Color(this.selectedNodeIds.has(nodeId) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
 			);
 		}
 		if (this.nodeMesh.instanceColor) this.nodeMesh.instanceColor.needsUpdate = true;

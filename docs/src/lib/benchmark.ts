@@ -19,6 +19,13 @@ export function summarize(samples: readonly number[]): BenchmarkStatistics {
 	};
 }
 
+export function effectivePixelRatio(devicePixelRatio: number, maxPixelRatio: number) {
+	if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 0)
+		throw new Error("Device pixel ratio must be positive.");
+	if (!Number.isFinite(maxPixelRatio) || maxPixelRatio <= 0) throw new Error("Maximum pixel ratio must be positive.");
+	return Math.min(devicePixelRatio, maxPixelRatio);
+}
+
 export function createFixture(nodeCount: number): GraphraumData {
 	if (!Number.isSafeInteger(nodeCount) || nodeCount < 2)
 		throw new Error("A benchmark fixture needs at least two nodes.");
