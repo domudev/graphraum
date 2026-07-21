@@ -1,0 +1,25 @@
+---
+title: Live benchmark
+description: Run Graphraum against deterministic 1k and 10k fixtures in this browser.
+tableOfContents: false
+---
+
+import LiveBenchmark from "../../components/LiveBenchmark.astro";
+
+The benchmark below is executable evidence, not a screenshot of one favorable machine. It generates a deterministic graph locally, measures the engine on this browser, and exposes the full result as JSON.
+
+<LiveBenchmark />
+
+## What it measures
+
+- **First meaningful frame:** construction, data upload, camera fitting, and the first scheduled WebGL render.
+- **Frame times:** 120 consecutive fit-and-render frames, reported as p50, p95, and max.
+- **Long tasks:** browser Performance Observer entries over 50ms during the run.
+- **Selection feedback:** 20 selection changes measured through the following animation frame.
+- **Update:** replacement with a graph containing 1% more nodes and three edges per node.
+- **GPU draw calls:** Three.js renderer calls from the final frame.
+- **Heap growth:** Chrome's non-standard precise heap counter when available; `null` elsewhere.
+
+## Interpret honestly
+
+This is a rendering microbenchmark. It does not measure network loading, force-layout convergence, label rendering, application state, accessibility overlays, or a production Graph Explorer. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated runs on the same browser and pixel ratio.

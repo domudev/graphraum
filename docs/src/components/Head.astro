@@ -1,0 +1,10 @@
+---
+import Default from "@astrojs/starlight/components/Head.astro";
+import type { StarlightPageProps } from "@astrojs/starlight/props";
+import MermaidBootstrap from "./MermaidBootstrap.astro";
+
+const props = Astro.props as StarlightPageProps;
+---
+
+<Default {...props} />
+<MermaidBootstrap />

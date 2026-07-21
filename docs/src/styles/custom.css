@@ -1,0 +1,127 @@
+:root {
+	--sl-color-accent-low: #172554;
+	--sl-color-accent: #38bdf8;
+	--sl-color-accent-high: #e0f2fe;
+	--sl-color-white: #fafafa;
+	--sl-color-gray-1: #f4f4f5;
+	--sl-color-gray-2: #d4d4d8;
+	--sl-color-gray-3: #a1a1aa;
+	--sl-color-gray-4: #71717a;
+	--sl-color-gray-5: #3f3f46;
+	--sl-color-gray-6: #27272a;
+	--sl-color-black: #09090b;
+}
+
+.hero h1 {
+	background: linear-gradient(120deg, #f59e0b, #38bdf8 70%);
+	background-clip: text;
+	color: transparent;
+}
+
+.benchmark-shell {
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 0.75rem;
+	box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 24%);
+	display: grid;
+	overflow: hidden;
+}
+
+.benchmark-controls,
+.benchmark-report {
+	align-items: end;
+	background: var(--sl-color-gray-6);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.8rem;
+	justify-content: space-between;
+	padding: 1rem;
+}
+
+.benchmark-controls h2,
+.benchmark-controls p,
+.benchmark-report p {
+	margin: 0;
+}
+
+.benchmark-controls label {
+	color: var(--sl-color-gray-2);
+	display: grid;
+	font-size: 0.78rem;
+	font-weight: 650;
+	gap: 0.25rem;
+}
+
+.benchmark-controls select,
+.benchmark-controls button,
+.benchmark-secondary {
+	background: var(--sl-color-black);
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 0.45rem;
+	color: var(--sl-color-white);
+	cursor: pointer;
+	font: inherit;
+	padding: 0.55rem 0.7rem;
+}
+
+.benchmark-controls button {
+	background: var(--sl-color-accent);
+	border-color: var(--sl-color-accent);
+	color: #082f49;
+	font-weight: 750;
+}
+
+.benchmark-controls button:disabled,
+.benchmark-secondary:disabled {
+	cursor: wait;
+	opacity: 0.55;
+}
+
+.benchmark-eyebrow {
+	color: var(--sl-color-accent);
+	font-size: 0.72rem;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.benchmark-graph {
+	background: #09090b;
+	height: min(60vh, 34rem);
+	min-height: 24rem;
+	position: relative;
+}
+
+.benchmark-report {
+	align-items: center;
+	border-top: 1px solid var(--sl-color-gray-5);
+}
+
+.benchmark-status {
+	color: var(--sl-color-white);
+	font-weight: 700;
+}
+
+.benchmark-note {
+	color: var(--sl-color-gray-3);
+	font-size: 0.8rem;
+}
+
+.benchmark-output {
+	border-radius: 0;
+	font-size: 0.75rem;
+	margin: 0;
+	max-height: 28rem;
+	overflow: auto;
+	padding: 1rem;
+}
+
+@media (max-width: 50rem) {
+	.benchmark-controls {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.benchmark-graph {
+		height: 28rem;
+	}
+}

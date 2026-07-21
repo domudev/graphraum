@@ -1,0 +1,37 @@
+---
+title: Graphraum
+description: An opinionated WebGL engine for interactive graphs in 2D and 3D.
+template: splash
+hero:
+  tagline: A small, explicit graph renderer built around batched edges, instanced nodes, and measurements you can run yourself.
+  actions:
+    - text: Get started
+      link: ./get-started/
+      icon: right-arrow
+    - text: Run the benchmark
+      link: ./benchmark/
+      variant: minimal
+      icon: rocket
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+Graphraum is deliberately graph-shaped. It accepts nodes, edges, and positions; renders them with Three.js; and keeps application state outside the engine.
+
+<CardGrid>
+  <Card title="Native 2D, 3D on demand" icon="seti:3d">
+    Start with an orthographic 2D camera. Switch to perspective 3D without changing the graph contract.
+  </Card>
+  <Card title="Two draw calls" icon="performance">
+    One instanced node mesh and one batched edge geometry keep the dense baseline explicit and inspectable.
+  </Card>
+  <Card title="Proof over claims" icon="chart">
+    The benchmark page runs on your browser, your GPU, and your pixel ratio, then gives you the raw JSON.
+  </Card>
+</CardGrid>
+
+## Current boundary
+
+Graphraum owns the WebGL scene, camera, controls, picking, selection colors, resizing, and resource disposal. Your application owns graph meaning, layout policy, labels, accessibility, and product interactions.
+
+That boundary keeps the engine small enough to reason about and makes performance regressions visible instead of hiding them behind a broad framework API.

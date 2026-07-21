@@ -20,3 +20,6 @@ jobs:
       - run: bun run check
       - run: bun run test
       - run: bun run build
+      - run: bun install --cwd docs --frozen-lockfile
+      - run: bun run docs:check
+      - run: bun run docs:build
