@@ -23,6 +23,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
 import { prepareNodeUpdates } from "./node-updates";
+import { SpatialGrid2D } from "./spatial-grid-2d";
 import type {
 	GraphraumData,
 	GraphraumDiagnostics,
@@ -61,6 +62,7 @@ export class Graphraum {
 	private nodeIndices = new Map<string, number>();
 	private edgeNodeIndices: Uint32Array = new Uint32Array();
 	private incidentEdgeIndices: readonly (readonly number[])[] = [];
+	private spatialGrid2d = new SpatialGrid2D();
 	private nodeMesh: InstancedMesh | null = null;
 	private edgeLines: LineSegments | null = null;
 	private selectedNodeIds = new Set<string>();
@@ -97,6 +99,8 @@ export class Graphraum {
 		this.nodeIndices = new Map(compiled.nodeIndices);
 		this.edgeNodeIndices = compiled.edgeNodeIndices;
 		this.incidentEdgeIndices = compiled.incidentEdgeIndices;
+		this.spatialGrid2d = new SpatialGrid2D();
+		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
 
 		const nodeGeometry = new SphereGeometry(1, 8, 6);
 		const nodeMaterial = new MeshBasicMaterial({ color: "#ffffff" });
@@ -140,6 +144,7 @@ export class Graphraum {
 
 		for (const update of prepared) {
 			nodes[update.index] = update.next;
+			if (update.positionChanged || update.sizeChanged) this.spatialGrid2d.set(update.index, update.next);
 			if (update.positionChanged || update.sizeChanged) {
 				const size = update.next.size ?? 4;
 				matrix.makeScale(size, size, size);
@@ -204,7 +209,10 @@ export class Graphraum {
 	}
 
 	getDiagnostics(): GraphraumDiagnostics {
-		return { gpuDrawCalls: this.renderer.info.render.calls };
+		return {
+			gpuDrawCalls: this.renderer.info.render.calls,
+			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
+		};
 	}
 
 	pick(clientX: number, clientY: number): string | null {
@@ -214,6 +222,11 @@ export class Graphraum {
 			((clientX - bounds.left) / bounds.width) * 2 - 1,
 			-((clientY - bounds.top) / bounds.height) * 2 + 1,
 		);
+		if (this.camera instanceof OrthographicCamera) {
+			const world = new Vector3(this.pointer.x, this.pointer.y, 0).unproject(this.camera);
+			const index = this.spatialGrid2d.pick(world.x, world.y);
+			return index === null ? null : (this.nodeIds[index] ?? null);
+		}
 		this.raycaster.setFromCamera(this.pointer, this.camera);
 		const hit = this.raycaster.intersectObject(this.nodeMesh, false)[0];
 		return hit?.instanceId === undefined ? null : (this.nodeIds[hit.instanceId] ?? null);

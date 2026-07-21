@@ -157,6 +157,7 @@
 			await nextFrame();
 			observer?.disconnect();
 			const heapAfter = (performance as MemoryPerformance).memory?.usedJSHeapSize;
+			const diagnostics = graph.getDiagnostics();
 
 			result = JSON.stringify(
 				{
@@ -180,7 +181,8 @@
 					incrementalNodeUpdate: { count: incrementalNodeCount, milliseconds: incrementalNodeUpdateMilliseconds },
 					heapGrowthBytes: heapBefore === undefined || heapAfter === undefined ? null : heapAfter - heapBefore,
 					updateMilliseconds,
-					gpuDrawCalls: graph.getDiagnostics().gpuDrawCalls,
+					gpuDrawCalls: diagnostics.gpuDrawCalls,
+					pickingStrategy: diagnostics.pickingStrategy,
 					userAgent: navigator.userAgent,
 					timestamp: new Date().toISOString(),
 				},
