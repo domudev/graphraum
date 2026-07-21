@@ -1,4 +1,5 @@
 export { Graphraum } from "./graphraum";
+export { graphraumTheme } from "./theme";
 export type {
 	GraphraumColor,
 	GraphraumData,

@@ -55,7 +55,7 @@
 }
 
 .hero {
-	padding-block: clamp(4rem, 10vw, 8rem);
+	padding-block: clamp(3rem, 7vw, 6rem);
 }
 
 .hero h1 {
@@ -109,6 +109,17 @@
 	margin: 0 auto 3rem;
 	max-width: 60rem;
 	text-align: center;
+}
+
+@media (min-width: 50rem) {
+	.home-intro + .card-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.home-intro + .card-grid .card {
+	--sl-card-bg: color-mix(in oklab, var(--graphraum-primary) 10%, var(--graphraum-background));
+	--sl-card-border: var(--graphraum-primary);
 }
 
 .home-cta {
@@ -208,6 +219,108 @@
 	margin: 0.65rem auto 3rem;
 	max-width: 76rem;
 	text-align: center;
+}
+
+.palette-grid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(3, 1fr);
+	margin-block: 1.5rem 2.5rem;
+}
+
+.palette-swatch {
+	border: 1px solid var(--graphraum-border);
+	border-radius: 0.7rem;
+	display: grid;
+	gap: 0.3rem;
+	min-height: 10rem;
+	padding: 1rem;
+}
+
+.palette-swatch strong {
+	font-size: 1.05rem;
+}
+
+.palette-swatch code {
+	background: transparent;
+	font-size: 0.75rem;
+	padding: 0;
+}
+
+.palette-swatch span {
+	font-size: 0.72rem;
+	margin-top: auto;
+	text-transform: uppercase;
+}
+
+.palette-ink {
+	background: #040f0f;
+	color: #fcfffc;
+}
+
+.palette-turf {
+	background: #226f54;
+	color: #fcfffc;
+}
+
+.palette-porcelain {
+	background: #fcfffc;
+	color: #040f0f;
+}
+
+.node-state-grid {
+	display: grid;
+	gap: 0;
+	grid-template-columns: repeat(2, 1fr);
+	margin-block: 1.25rem 1.75rem;
+}
+
+.node-state-grid > div {
+	border: 1px solid var(--graphraum-border);
+	display: grid;
+	gap: 0.35rem;
+	margin: -1px 0 0 -1px;
+	padding: 1rem;
+}
+
+.node-state-grid span {
+	color: var(--graphraum-primary);
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.node-state-grid p {
+	color: var(--graphraum-muted-foreground);
+	font-size: 0.85rem;
+	margin: 0;
+}
+
+.api-grid {
+	display: grid;
+	gap: 0;
+	grid-template-columns: repeat(2, 1fr);
+	margin-block: 1.25rem 2rem;
+}
+
+.api-grid > div {
+	border: 1px solid var(--graphraum-border);
+	display: grid;
+	gap: 0.55rem;
+	margin: -1px 0 0 -1px;
+	padding: 1rem;
+}
+
+.api-grid > div > code {
+	color: var(--graphraum-primary);
+	font-weight: 750;
+}
+
+.api-grid p {
+	color: var(--graphraum-muted-foreground);
+	font-size: 0.85rem;
+	margin: 0;
 }
 
 .benchmark-shell {
@@ -564,7 +677,8 @@
 
 @media (max-width: 50rem) {
 	.home-proof,
-	.reference-run {
+	.reference-run,
+	.palette-grid {
 		grid-template-columns: repeat(2, 1fr);
 	}
 
@@ -603,6 +717,14 @@
 	.benchmark-graph {
 		height: 65vh;
 		min-height: 25rem;
+	}
+}
+
+@media (max-width: 36rem) {
+	.palette-grid,
+	.node-state-grid,
+	.api-grid {
+		grid-template-columns: 1fr;
 	}
 }
 
