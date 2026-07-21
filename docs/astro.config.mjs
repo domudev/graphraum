@@ -10,11 +10,14 @@ export default defineConfig({
 	base: "/graphraum",
 	integrations: [
 		starlight({
-			title: "Graphraum",
+			title: "graphraum",
 			description: "An opinionated WebGL engine for interactive graphs in 2D and 3D.",
 			customCss: ["./src/styles/custom.css"],
-			components: { Head: "./src/components/Head.astro" },
-			social: [{ icon: "github", label: "Graphraum on GitHub", href: "https://github.com/domudev/graphraum" }],
+			components: {
+				Head: "./src/components/Head.astro",
+				PageTitle: "./src/components/PageTitle.astro",
+			},
+			social: [{ icon: "github", label: "graphraum on GitHub", href: "https://github.com/domudev/graphraum" }],
 			sidebar: [
 				{ label: "Overview", link: "/" },
 				{ label: "Get started", link: "/get-started/" },

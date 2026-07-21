@@ -1,14 +1,14 @@
 <p align="center">
-  <strong>Graphraum</strong>
+  <strong>graphraum</strong>
   <br>
   <sub>Nodes. Edges. Space.</sub>
 </p>
 
-# Graphraum
+# graphraum
 
 An opinionated WebGL engine for interactive node-edge graphs in 2D and 3D.
 
-Graphraum is deliberately narrow: it renders graphs, accepts positions from any layout engine, and keeps the hot path outside a component framework. Nodes use one instanced mesh, edges use one batched geometry, and rendering happens on demand.
+graphraum is deliberately narrow: it renders graphs, accepts positions from any layout engine, and keeps the hot path outside a component framework. Nodes use one instanced mesh, edges use one batched geometry, and rendering happens on demand.
 
 > Early development. The API will change before the first release.
 
@@ -39,7 +39,7 @@ bun run build
 
 ## Install
 
-Graphraum is currently published to the GitHub Packages npm registry. Configure the `@domudev` scope and authenticate with a classic GitHub token that has `read:packages` permission:
+graphraum is currently published to the GitHub Packages npm registry. Configure the `@domudev` scope and authenticate with a classic GitHub token that has `read:packages` permission:
 
 ```ini
 # .npmrc

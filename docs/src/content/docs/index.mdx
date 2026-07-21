@@ -1,9 +1,9 @@
 ---
-title: Graphraum
+title: graphraum
 description: An opinionated WebGL engine for interactive graphs in 2D and 3D.
 template: splash
 hero:
-  tagline: A small, explicit graph renderer built around batched edges, instanced nodes, and measurements you can run yourself.
+  tagline: A graph-native WebGL engine for dense, interactive networks in 2D and 3D.
   actions:
     - text: Get started
       link: ./get-started/
@@ -16,22 +16,38 @@ hero:
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
 
-Graphraum is deliberately graph-shaped. It accepts nodes, edges, and positions; renders them with Three.js; and keeps application state outside the engine.
+<div class="home-proof" aria-label="graphraum performance summary">
+  <div><strong>100k</strong><span>nodes</span></div>
+  <div><strong>300k</strong><span>edges</span></div>
+  <div><strong>2</strong><span>draw calls</span></div>
+  <div><strong>8.3 ms</strong><span>reference p50</span></div>
+</div>
+
+<p class="home-intro">graphraum is deliberately graph-shaped. Give it nodes, edges, and positions; it handles the WebGL scene while your application keeps ownership of meaning, layout, labels, and interaction policy.</p>
 
 <CardGrid>
-  <Card title="Native 2D, 3D on demand" icon="seti:3d">
+  <Card title="2D first. 3D when it earns its place." icon="seti:3d">
     Start with an orthographic 2D camera. Switch to perspective 3D without changing the graph contract.
   </Card>
-  <Card title="Two draw calls" icon="performance">
-    One instanced node mesh and one batched edge geometry keep the dense baseline explicit and inspectable.
+  <Card title="Dense by construction" icon="performance">
+    Instanced nodes, batched edges, viewport materialization, and a bounded overview tier keep the rendering cost explicit.
   </Card>
   <Card title="Proof over claims" icon="chart">
-    The benchmark page runs on your browser, your GPU, and your pixel ratio, then gives you the raw JSON.
+    The benchmark runs on your browser and GPU, breaks the work into phases, and gives you the complete JSON.
   </Card>
 </CardGrid>
 
-## Current boundary
+## A narrow engine boundary
 
-Graphraum owns the WebGL scene, camera, controls, picking, selection colors, resizing, and resource disposal. Your application owns graph meaning, layout policy, labels, accessibility, and product interactions.
+graphraum owns the WebGL scene, camera, controls, picking, selection colors, resizing, and resource disposal. Your application owns graph meaning, layout policy, labels, accessibility, and product interactions.
 
 That boundary keeps the engine small enough to reason about and makes performance regressions visible instead of hiding them behind a broad framework API.
+
+<div class="home-cta">
+  <div>
+    <p class="proof-kicker">No benchmark theater</p>
+    <h2>Run 100,000 nodes in this tab.</h2>
+    <p>The live proof lab measures first paint, frame cadence, selection, incremental updates, full snapshots, memory, LOD, picking, and GPU calls.</p>
+  </div>
+  <a href="./benchmark/">Open the proof lab <span aria-hidden="true">→</span></a>
+</div>

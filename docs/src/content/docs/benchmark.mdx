@@ -1,16 +1,46 @@
 ---
 title: Live benchmark
-description: Run Graphraum against deterministic 1k, 10k, and 100k fixtures in this browser.
+description: Run graphraum against deterministic 1k, 10k, and 100k fixtures in this browser.
+template: splash
 tableOfContents: false
 ---
 
 import LiveBenchmark from "../../components/LiveBenchmark.astro";
 
-The benchmark below is executable evidence, not a screenshot of one favorable machine. It generates a deterministic graph locally, measures the engine on this browser, and exposes the full result as JSON.
+<div class="proof-intro">
+  <p class="proof-kicker">Executable evidence</p>
+  <h1>Make the renderer prove it.</h1>
+  <p class="proof-lede">Generate a deterministic graph locally, exercise graphraum on this browser, and inspect every measurement. No uploaded traces. No favorable-machine screenshot.</p>
+</div>
+
+<div class="reference-run" aria-label="Reference result from a 100,000 node benchmark">
+  <div>
+    <span class="reference-label">Reference run · 100k nodes / 300k edges</span>
+    <strong>8.3 ms</strong>
+    <span>median frame cadence · 2D and 3D</span>
+  </div>
+  <div>
+    <span class="reference-label">First meaningful frame</span>
+    <strong>395 / 305 ms</strong>
+    <span>2D / 3D</span>
+  </div>
+  <div>
+    <span class="reference-label">1% incremental update</span>
+    <strong>9.1 / 10.2 ms</strong>
+    <span>2D / 3D · 1,000 nodes</span>
+  </div>
+  <div>
+    <span class="reference-label">GPU work</span>
+    <strong>2 calls</strong>
+    <span>100k visible edge budget</span>
+  </div>
+</div>
+
+<p class="reference-context">Chrome 150 on macOS, DPR 2 capped to 1, captured 21 July 2026. Treat it as a reference, not a universal score—run the same protocol below on your device.</p>
 
 <LiveBenchmark />
 
-## What it measures
+## Read the result
 
 - **Phases:** fixture generation, renderer construction, synchronous `setData`, and the first visible frame are reported separately.
 - **First meaningful frame:** the complete fixture-through-first-frame path for compatibility with earlier results.

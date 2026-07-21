@@ -1,49 +1,109 @@
 <section class="benchmark-shell" aria-labelledby="benchmark-title">
-	<div class="benchmark-controls">
+	<header class="benchmark-header">
 		<div>
-			<p class="benchmark-eyebrow">Runs on this device</p>
-			<h2 id="benchmark-title">Live Graphraum benchmark</h2>
+			<p class="benchmark-eyebrow"><span aria-hidden="true"></span> Runs locally on this device</p>
+			<h2 id="benchmark-title">graphraum proof lab</h2>
 		</div>
-		<label>
-			Fixture
+		<p>Deterministic fixture · complete result · no telemetry</p>
+	</header>
+
+	<div class="benchmark-controls" aria-label="Benchmark configuration">
+		<label class="benchmark-fixture">
+			<span>Graph size</span>
 			<select id="benchmark-size">
-				<option value="1000">1,000 nodes / 3,000 edges</option>
-				<option value="10000">10,000 nodes / 30,000 edges</option>
-				<option value="100000">100,000 nodes / 300,000 edges</option>
+				<option value="1000">1,000 nodes · 3,000 edges</option>
+				<option value="10000">10,000 nodes · 30,000 edges</option>
+				<option value="100000">100,000 nodes · 300,000 edges</option>
 			</select>
 		</label>
 		<label>
-			Mode
+			<span>Dimension</span>
 			<select id="benchmark-mode">
 				<option value="2d">2D</option>
 				<option value="3d">3D</option>
 			</select>
 		</label>
 		<label>
-			Pixel ratio
+			<span>Pixel ratio</span>
 			<select id="benchmark-pixel-ratio">
 				<option value="1">1× controlled</option>
 				<option value="2">Up to 2× native</option>
 			</select>
 		</label>
-		<button id="benchmark-run" type="button">Run benchmark</button>
+		<button id="benchmark-run" type="button"><span>Run benchmark</span><span aria-hidden="true">→</span></button>
 	</div>
 
-	<div id="benchmark-graph" class="benchmark-graph" aria-label="Interactive benchmark graph"></div>
+	<div class="benchmark-stage">
+		<div class="benchmark-stage-bar">
+			<span><i aria-hidden="true"></i> Live viewport</span>
+			<span id="benchmark-stage-mode">2D · ready</span>
+		</div>
+		<div id="benchmark-graph" class="benchmark-graph" aria-label="Interactive benchmark graph"></div>
+		<p class="benchmark-interaction">Drag to pan · scroll to zoom · select a node</p>
+	</div>
+
+	<div class="benchmark-metrics" aria-label="Benchmark headline measurements">
+		<div><span>First meaningful frame</span><strong id="metric-fmf">—</strong><small>fixture to visible graph</small></div>
+		<div><span>Rendered frame p95</span><strong id="metric-frame">—</strong><small>scheduled render cadence</small></div>
+		<div><span>1% node update</span><strong id="metric-incremental">—</strong><small>positions + incident edges</small></div>
+		<div><span>Full snapshot +1%</span><strong id="metric-snapshot">—</strong><small>complete graph replacement</small></div>
+		<div><span>Visible materialization</span><strong id="metric-visible">—</strong><small id="metric-lod">LOD and edge budget</small></div>
+		<div><span>GPU draw calls</span><strong id="metric-draw-calls">—</strong><small id="metric-picking">per rendered frame</small></div>
+	</div>
+
+	<section class="benchmark-history" aria-labelledby="benchmark-history-title">
+		<header>
+			<div>
+				<p class="benchmark-eyebrow">Browser-local evidence</p>
+				<h3 id="benchmark-history-title">Run history</h3>
+				<p id="benchmark-history-count">Runs are saved in this browser after they complete.</p>
+			</div>
+			<div class="benchmark-history-actions">
+				<label>
+					<span>Metric</span>
+					<select id="benchmark-history-metric">
+						<option value="frameP95Milliseconds">Rendered frame p95</option>
+						<option value="firstMeaningfulFrameMilliseconds">First meaningful frame</option>
+						<option value="selectionP95Milliseconds">Selection p95</option>
+						<option value="incrementalUpdateMilliseconds">1% node update</option>
+						<option value="fullSnapshotUpdateMilliseconds">Full snapshot +1%</option>
+					</select>
+				</label>
+				<button id="benchmark-history-clear" class="benchmark-secondary" type="button">Clear local history</button>
+			</div>
+		</header>
+		<div class="benchmark-chart-wrap">
+			<svg id="benchmark-history-chart" viewBox="0 0 800 260" role="img" aria-label="Saved benchmark runs plotted over time"></svg>
+			<p id="benchmark-history-empty">Complete a run to start the comparison.</p>
+		</div>
+		<div id="benchmark-history-legend" class="benchmark-history-legend" aria-label="Chart series"></div>
+		<p class="benchmark-history-note">History stays in this browser. The selected graph size filters the chart so unlike fixtures are never compared as peers.</p>
+	</section>
 
 	<div class="benchmark-report">
 		<div>
 			<p id="benchmark-status" class="benchmark-status" aria-live="polite">Ready. Nothing has been measured yet.</p>
-			<p class="benchmark-note">Drag to pan, scroll to zoom, and click a node to select it after the run.</p>
+			<p class="benchmark-note">Keep this tab visible and avoid DevTools throttling for a representative run.</p>
 		</div>
 		<button id="benchmark-copy" class="benchmark-secondary" type="button" disabled>Copy JSON</button>
 	</div>
-	<pre id="benchmark-output" class="benchmark-output" tabindex="0">Run the benchmark to produce a result.</pre>
+	<details class="benchmark-details">
+		<summary>Complete benchmark JSON</summary>
+		<pre id="benchmark-output" class="benchmark-output" tabindex="0">Run the benchmark to produce a result.</pre>
+	</details>
 </section>
 
 <script>
 	import { Graphraum, type GraphraumMode } from "@domudev/graphraum";
 	import { createFixture, effectivePixelRatio, summarize } from "../lib/benchmark";
+	import {
+		appendHistory,
+		BENCHMARK_HISTORY_STORAGE_KEY,
+		metricValue,
+		parseHistory,
+		type BenchmarkHistoryEntry,
+		type BenchmarkHistoryMetric,
+	} from "../lib/benchmark-history";
 
 	type MemoryPerformance = Performance & { memory?: { usedJSHeapSize: number } };
 
@@ -69,6 +129,17 @@
 		return samples;
 	}
 
+	function formatMilliseconds(value: number) {
+		return `${value < 100 ? value.toFixed(1) : Math.round(value)} ms`;
+	}
+
+	const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+	const seriesColors = ["#73c7a5", "#fcfffc", "#e7b75f", "#b9a7e8"];
+
+	function svgElement<ElementName extends keyof SVGElementTagNameMap>(name: ElementName) {
+		return document.createElementNS(SVG_NAMESPACE, name);
+	}
+
 	const container = requireElement<HTMLElement>("#benchmark-graph");
 	const sizeSelect = requireElement<HTMLSelectElement>("#benchmark-size");
 	const modeSelect = requireElement<HTMLSelectElement>("#benchmark-mode");
@@ -77,13 +148,139 @@
 	const copyButton = requireElement<HTMLButtonElement>("#benchmark-copy");
 	const output = requireElement<HTMLElement>("#benchmark-output");
 	const status = requireElement<HTMLElement>("#benchmark-status");
+	const stageMode = requireElement<HTMLElement>("#benchmark-stage-mode");
+	const metricFmf = requireElement<HTMLElement>("#metric-fmf");
+	const metricFrame = requireElement<HTMLElement>("#metric-frame");
+	const metricIncremental = requireElement<HTMLElement>("#metric-incremental");
+	const metricSnapshot = requireElement<HTMLElement>("#metric-snapshot");
+	const metricVisible = requireElement<HTMLElement>("#metric-visible");
+	const metricLod = requireElement<HTMLElement>("#metric-lod");
+	const metricDrawCalls = requireElement<HTMLElement>("#metric-draw-calls");
+	const metricPicking = requireElement<HTMLElement>("#metric-picking");
+	const historyMetric = requireElement<HTMLSelectElement>("#benchmark-history-metric");
+	const historyClear = requireElement<HTMLButtonElement>("#benchmark-history-clear");
+	const historyChart = requireElement<SVGSVGElement>("#benchmark-history-chart");
+	const historyEmpty = requireElement<HTMLElement>("#benchmark-history-empty");
+	const historyLegend = requireElement<HTMLElement>("#benchmark-history-legend");
+	const historyCount = requireElement<HTMLElement>("#benchmark-history-count");
 	let graph: Graphraum | null = null;
 	let result = "";
+
+	function loadHistory() {
+		try {
+			return parseHistory(localStorage.getItem(BENCHMARK_HISTORY_STORAGE_KEY));
+		} catch {
+			return [];
+		}
+	}
+
+	function persistHistory(entry: BenchmarkHistoryEntry) {
+		try {
+			localStorage.setItem(BENCHMARK_HISTORY_STORAGE_KEY, JSON.stringify(appendHistory(loadHistory(), entry)));
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	function renderHistory() {
+		const entries = loadHistory().filter(
+			(entry) => entry.nodeCount === Number(sizeSelect.value),
+		);
+		const selectedMetric = historyMetric.value as BenchmarkHistoryMetric;
+		historyChart.replaceChildren();
+		historyLegend.replaceChildren();
+		historyEmpty.hidden = entries.length > 0;
+		historyChart.toggleAttribute("hidden", entries.length === 0);
+		historyCount.textContent = entries.length
+			? `${entries.length} saved ${entries.length === 1 ? "run" : "runs"} for this fixture.`
+			: "Runs are saved in this browser after they complete.";
+		if (entries.length === 0) return;
+
+		const width = 800;
+		const height = 260;
+		const padding = { top: 20, right: 24, bottom: 34, left: 58 };
+		const plotWidth = width - padding.left - padding.right;
+		const plotHeight = height - padding.top - padding.bottom;
+		const maximum = Math.max(...entries.map((entry) => metricValue(entry, selectedMetric)), 1) * 1.1;
+
+		for (let index = 0; index <= 4; index += 1) {
+			const y = padding.top + (plotHeight * index) / 4;
+			const line = svgElement("line");
+			line.setAttribute("x1", String(padding.left));
+			line.setAttribute("x2", String(width - padding.right));
+			line.setAttribute("y1", String(y));
+			line.setAttribute("y2", String(y));
+			line.setAttribute("class", "benchmark-chart-grid");
+			historyChart.append(line);
+			const label = svgElement("text");
+			label.setAttribute("x", String(padding.left - 10));
+			label.setAttribute("y", String(y + 4));
+			label.setAttribute("class", "benchmark-chart-label");
+			label.textContent = formatMilliseconds(maximum * (1 - index / 4));
+			historyChart.append(label);
+		}
+
+		const series = new Map<string, { color: string; points: string[] }>();
+		entries.forEach((entry, index) => {
+			const key = `${entry.approach} · ${entry.mode.toUpperCase()}`;
+			const current = series.get(key) ?? { color: seriesColors[series.size % seriesColors.length], points: [] };
+			const x = entries.length === 1 ? padding.left + plotWidth / 2 : padding.left + (plotWidth * index) / (entries.length - 1);
+			const value = metricValue(entry, selectedMetric);
+			const y = padding.top + plotHeight * (1 - value / maximum);
+			current.points.push(`${x},${y}`);
+			series.set(key, current);
+
+			const dot = svgElement("circle");
+			dot.setAttribute("cx", String(x));
+			dot.setAttribute("cy", String(y));
+			dot.setAttribute("r", "5");
+			dot.setAttribute("fill", current.color);
+			const title = svgElement("title");
+			title.textContent = `${key}: ${formatMilliseconds(value)} · ${new Date(entry.timestamp).toLocaleString()}`;
+			dot.append(title);
+			historyChart.append(dot);
+		});
+
+		for (const [name, seriesValue] of series) {
+			if (seriesValue.points.length > 1) {
+				const line = svgElement("polyline");
+				line.setAttribute("points", seriesValue.points.join(" "));
+				line.setAttribute("fill", "none");
+				line.setAttribute("stroke", seriesValue.color);
+				line.setAttribute("stroke-width", "3");
+				line.setAttribute("stroke-linejoin", "round");
+				historyChart.prepend(line);
+			}
+			const legendItem = document.createElement("span");
+			const swatch = document.createElement("i");
+			swatch.style.background = seriesValue.color;
+			legendItem.append(swatch, name);
+			historyLegend.append(legendItem);
+		}
+	}
 
 	container.addEventListener("click", (event) => {
 		const selected = graph?.pick(event.clientX, event.clientY);
 		graph?.setSelection(selected ? [selected] : []);
 	});
+
+	modeSelect.addEventListener("change", () => {
+		stageMode.textContent = `${modeSelect.value.toUpperCase()} · ready`;
+	});
+	sizeSelect.addEventListener("change", renderHistory);
+	historyMetric.addEventListener("change", renderHistory);
+	historyClear.addEventListener("click", () => {
+		if (!window.confirm("Clear the benchmark history saved in this browser?")) return;
+		try {
+			localStorage.removeItem(BENCHMARK_HISTORY_STORAGE_KEY);
+		} catch {
+			historyCount.textContent = "Browser storage is unavailable, so history could not be cleared.";
+			return;
+		}
+		renderHistory();
+	});
+	renderHistory();
 
 	copyButton.addEventListener("click", async () => {
 		await navigator.clipboard.writeText(result);
@@ -94,6 +291,7 @@
 	runButton.addEventListener("click", async () => {
 		runButton.disabled = true;
 		copyButton.disabled = true;
+		stageMode.textContent = `${modeSelect.value.toUpperCase()} · measuring`;
 		status.textContent = "Running… keep this tab visible for representative frame timing.";
 		output.textContent = "Collecting browser measurements…";
 		graph?.destroy();
@@ -130,7 +328,7 @@
 			const firstMeaningfulFrameMilliseconds = performance.now() - mountedAt;
 			const displayCadence = summarize(await measureFrames(() => {}, 30));
 			status.textContent = `Measuring ${frameSampleCount} rendered frames…`;
-			const frameTimes = await measureFrames(() => graph?.render(), frameSampleCount);
+			const frameTimes = summarize(await measureFrames(() => graph?.render(), frameSampleCount));
 			const selectionFeedback: number[] = [];
 			status.textContent = `Measuring ${selectionSampleCount} selection changes…`;
 			for (let index = 0; index < selectionSampleCount; index += 1) {
@@ -159,47 +357,74 @@
 			const heapAfter = (performance as MemoryPerformance).memory?.usedJSHeapSize;
 			const diagnostics = graph.getDiagnostics();
 
-			result = JSON.stringify(
-				{
-					fixture: { nodeCount, edgeCount },
-					protocol: { frameSampleCount, selectionSampleCount },
-					mode,
-					devicePixelRatio: window.devicePixelRatio,
-					maxPixelRatio,
-					effectivePixelRatio: effectivePixelRatio(window.devicePixelRatio, maxPixelRatio),
-					phases: {
-						fixtureGenerationMilliseconds,
-						rendererConstructionMilliseconds,
-						setDataMilliseconds,
-						firstVisibleFrameMilliseconds,
-					},
-					firstMeaningfulFrameMilliseconds,
-					displayCadence,
-					frameTimes: summarize(frameTimes),
-					longTasks: summarize(longTasks),
-					selectionFeedback: summarize(selectionFeedback),
-					incrementalNodeUpdate: { count: incrementalNodeCount, milliseconds: incrementalNodeUpdateMilliseconds },
-					heapGrowthBytes: heapBefore === undefined || heapAfter === undefined ? null : heapAfter - heapBefore,
-					updateMilliseconds,
-					gpuDrawCalls: diagnostics.gpuDrawCalls,
-					pickingStrategy: diagnostics.pickingStrategy,
-					viewport: {
-						lodLevel: diagnostics.lodLevel,
-						visibleNodes: diagnostics.visibleNodes,
-						visibleEdgeCandidates: diagnostics.visibleEdgeCandidates,
-						visibleEdges: diagnostics.visibleEdges,
-					},
-					userAgent: navigator.userAgent,
-					timestamp: new Date().toISOString(),
+			const selectionSummary = summarize(selectionFeedback);
+			const payload = {
+				approach: "graphraum",
+				fixture: { nodeCount, edgeCount },
+				protocol: { frameSampleCount, selectionSampleCount },
+				mode,
+				devicePixelRatio: window.devicePixelRatio,
+				maxPixelRatio,
+				effectivePixelRatio: effectivePixelRatio(window.devicePixelRatio, maxPixelRatio),
+				phases: {
+					fixtureGenerationMilliseconds,
+					rendererConstructionMilliseconds,
+					setDataMilliseconds,
+					firstVisibleFrameMilliseconds,
 				},
-				null,
-				2,
-			);
+				firstMeaningfulFrameMilliseconds,
+				displayCadence,
+				frameTimes,
+				longTasks: summarize(longTasks),
+				selectionFeedback: selectionSummary,
+				incrementalNodeUpdate: { count: incrementalNodeCount, milliseconds: incrementalNodeUpdateMilliseconds },
+				heapGrowthBytes: heapBefore === undefined || heapAfter === undefined ? null : heapAfter - heapBefore,
+				updateMilliseconds,
+				gpuDrawCalls: diagnostics.gpuDrawCalls,
+				pickingStrategy: diagnostics.pickingStrategy,
+				viewport: {
+					lodLevel: diagnostics.lodLevel,
+					visibleNodes: diagnostics.visibleNodes,
+					visibleEdgeCandidates: diagnostics.visibleEdgeCandidates,
+					visibleEdges: diagnostics.visibleEdges,
+				},
+				userAgent: navigator.userAgent,
+				timestamp: new Date().toISOString(),
+			};
+
+			result = JSON.stringify(payload, null, 2);
 			output.textContent = result;
-			status.textContent = `Complete: ${nodeCount.toLocaleString()} nodes and ${edgeCount.toLocaleString()} edges in ${mode.toUpperCase()}.`;
+			const historyEntry: BenchmarkHistoryEntry = {
+				id: crypto.randomUUID(),
+				timestamp: payload.timestamp,
+				approach: payload.approach,
+				mode,
+				nodeCount,
+				edgeCount,
+				firstMeaningfulFrameMilliseconds,
+				frameP95Milliseconds: frameTimes.p95 ?? 0,
+				selectionP95Milliseconds: selectionSummary.p95 ?? 0,
+				incrementalUpdateMilliseconds: incrementalNodeUpdateMilliseconds,
+				fullSnapshotUpdateMilliseconds: updateMilliseconds,
+			};
+			const historyPersisted = persistHistory(historyEntry);
+			renderHistory();
+			metricFmf.textContent = formatMilliseconds(firstMeaningfulFrameMilliseconds);
+			metricFrame.textContent = formatMilliseconds(frameTimes.p95 ?? 0);
+			metricIncremental.textContent = formatMilliseconds(incrementalNodeUpdateMilliseconds);
+			metricSnapshot.textContent = formatMilliseconds(updateMilliseconds);
+			metricVisible.textContent = diagnostics.visibleNodes.toLocaleString();
+			metricLod.textContent = `${diagnostics.lodLevel} · ${diagnostics.visibleEdges.toLocaleString()} edges`;
+			metricDrawCalls.textContent = String(diagnostics.gpuDrawCalls);
+			metricPicking.textContent = diagnostics.pickingStrategy;
+			stageMode.textContent = `${mode.toUpperCase()} · complete`;
+			status.textContent = historyPersisted
+				? `Complete: ${nodeCount.toLocaleString()} nodes and ${edgeCount.toLocaleString()} edges in ${mode.toUpperCase()}. Saved to local history.`
+				: `Complete: ${nodeCount.toLocaleString()} nodes and ${edgeCount.toLocaleString()} edges in ${mode.toUpperCase()}. Browser storage is unavailable.`;
 			copyButton.disabled = false;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			stageMode.textContent = `${modeSelect.value.toUpperCase()} · failed`;
 			status.textContent = `Benchmark failed: ${message}`;
 			output.textContent = message;
 		} finally {
