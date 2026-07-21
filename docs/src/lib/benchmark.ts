@@ -39,7 +39,7 @@ export function createFixture(nodeCount: number): GraphraumData {
 				y: Math.floor(index / columns) * 12,
 				z: ((index * 17) % 101) - 50,
 			},
-			color: index === 0 ? "#f59e0b" : index % 11 === 0 ? "#38bdf8" : "#a1a1aa",
+			...(index === 0 ? { color: "#fcfffc" } : index % 11 === 0 ? { color: "#73c7a5" } : {}),
 			size: 2.5,
 		})),
 		edges: Array.from({ length: edgeCount }, (_, index) => ({

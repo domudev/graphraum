@@ -10,6 +10,9 @@ describe("live benchmark helpers", () => {
 		expect(first).toEqual(second);
 		expect(first.nodes).toHaveLength(100);
 		expect(first.edges).toHaveLength(300);
+		expect(first.nodes[0]?.color).toBe("#fcfffc");
+		expect(first.nodes[1]?.color).toBeUndefined();
+		expect(first.nodes[11]?.color).toBe("#73c7a5");
 	});
 
 	test("summarizes empty and populated samples honestly", () => {

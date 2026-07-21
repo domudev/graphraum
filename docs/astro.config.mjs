@@ -19,10 +19,25 @@ export default defineConfig({
 			},
 			social: [{ icon: "github", label: "graphraum on GitHub", href: "https://github.com/domudev/graphraum" }],
 			sidebar: [
-				{ label: "Overview", link: "/" },
-				{ label: "Get started", link: "/get-started/" },
-				{ label: "Architecture", link: "/architecture/" },
-				{ label: "Live benchmark", link: "/benchmark/", badge: "Proof" },
+				{
+					label: "Start",
+					items: [
+						{ label: "Overview", link: "/" },
+						{ label: "Get started", link: "/get-started/" },
+					],
+				},
+				{
+					label: "Engine",
+					items: [
+						{ label: "Visual language", link: "/visual-language/" },
+						{ label: "API reference", link: "/api-reference/" },
+						{ label: "Architecture", link: "/architecture/" },
+					],
+				},
+				{
+					label: "Evidence",
+					items: [{ label: "Live benchmark", link: "/benchmark/", badge: "Proof" }],
+				},
 			],
 		}),
 	],

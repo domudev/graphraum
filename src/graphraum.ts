@@ -24,6 +24,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { compileGraph } from "./compile-graph";
 import { prepareNodeUpdates } from "./node-updates";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
+import { graphraumTheme } from "./theme";
 import type {
 	GraphraumData,
 	GraphraumDiagnostics,
@@ -33,13 +34,6 @@ import type {
 	GraphraumTheme,
 } from "./types";
 import { applyEdgeBudget, collectIncidentEdges } from "./viewport-lod";
-
-const defaultTheme: GraphraumTheme = {
-	background: "#09090b",
-	edge: "#3f3f46",
-	node: "#a1a1aa",
-	selectedNode: "#f59e0b",
-};
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
 
@@ -92,7 +86,7 @@ export class Graphraum {
 		if (!Number.isFinite(this.viewportOverscan) || this.viewportOverscan < 0) {
 			throw new Error("Viewport overscan must be a non-negative finite number.");
 		}
-		this.theme = { ...defaultTheme, ...options.theme };
+		this.theme = { ...graphraumTheme, ...options.theme };
 		this.scene.background = new Color(this.theme.background);
 		this.renderer = new WebGLRenderer({ antialias: options.antialias ?? false });
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, options.maxPixelRatio ?? 2));

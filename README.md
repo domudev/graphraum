@@ -10,7 +10,7 @@ An opinionated WebGL engine for interactive node-edge graphs in 2D and 3D.
 
 graphraum is deliberately narrow: it renders graphs, accepts positions from any layout engine, and keeps the hot path outside a component framework. Nodes use one instanced mesh, edges use one batched geometry, and rendering happens on demand.
 
-> Early development. The API will change before the first release.
+> Pre-1.0 development. The API will continue to evolve while the rendering and visual contracts are proven.
 
 ## Principles
 
@@ -57,7 +57,7 @@ Publishing is driven by GitHub Releases. A release tag must exactly match the pa
 
 ## Documentation
 
-The documentation and executable browser benchmark are published at [domudev.github.io/graphraum](https://domudev.github.io/graphraum/). Run them locally with:
+The [documentation](https://domudev.github.io/graphraum/), [API reference](https://domudev.github.io/graphraum/api-reference/), [visual language](https://domudev.github.io/graphraum/visual-language/), and executable [browser benchmark](https://domudev.github.io/graphraum/benchmark/) are published on GitHub Pages. Run them locally with:
 
 ```sh
 bun install --cwd docs

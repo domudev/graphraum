@@ -1,0 +1,80 @@
+---
+title: Visual language
+description: The graphraum palette, node states, theme contract, and rules for extending them.
+---
+
+import BrandGraph from "../../components/BrandGraph.astro";
+
+graphraum ships with an opinionated visual baseline so a first render is legible and recognizably graphraum before an application adds domain semantics.
+
+<BrandGraph />
+
+## Canonical palette
+
+<div class="palette-grid">
+  <div class="palette-swatch palette-ink"><strong>Ink Black</strong><code>#040F0F</code><span>canvas</span></div>
+  <div class="palette-swatch palette-turf"><strong>Turf Green</strong><code>#226F54</code><span>nodes and edges</span></div>
+  <div class="palette-swatch palette-porcelain"><strong>Porcelain</strong><code>#FCFFFC</code><span>selection</span></div>
+</div>
+
+The exported `graphraumTheme` is the source of truth for these defaults:
+
+```ts
+import { graphraumTheme } from "@domudev/graphraum";
+
+console.log(graphraumTheme);
+// {
+//   background: "#040f0f",
+//   edge: "#226f54",
+//   node: "#226f54",
+//   selectedNode: "#fcfffc",
+// }
+```
+
+## Node states
+
+<div class="node-state-grid">
+  <div><strong>Default</strong><span>Turf Green sphere</span><p>Inherits <code>theme.node</code> unless the node supplies <code>color</code>.</p></div>
+  <div><strong>Domain color</strong><span>Application color</span><p><code>node.color</code> carries product meaning and wins over the theme.</p></div>
+  <div><strong>Selected</strong><span>Porcelain sphere</span><p><code>theme.selectedNode</code> temporarily wins without changing graph data.</p></div>
+  <div><strong>Hidden</strong><span>Not materialized</span><p>Viewport culling removes off-screen 2D nodes from the active instance range.</p></div>
+</div>
+
+Selection is a color change inside the existing instanced node mesh. It deliberately does not add a halo mesh or another rendering pass, so the two-draw-call baseline remains true.
+
+## Override without forking
+
+Override only the tokens your product owns. The remaining values continue to follow the canonical theme.
+
+```ts
+const graph = new Graphraum(container, {
+  theme: {
+    node: "#6d5bd0",
+    selectedNode: "#fcfffc",
+  },
+});
+```
+
+Per-node colors remain available for semantic categories:
+
+```ts
+graph.setData({
+  nodes: [
+    { id: "person:ada", position: { x: -20, y: 0 } },
+    { id: "place:london", position: { x: 20, y: 0 }, color: "#73c7a5" },
+  ],
+  edges: [{ id: "born-in", source: "person:ada", target: "place:london" }],
+});
+```
+
+## Keep meaning outside color alone
+
+The WebGL surface is not the accessibility tree. Applications should mirror focus and selection into an accessible node list, expose labels in HTML, and pair semantic colors with text, shape, or filtering controls. graphraum owns the fast visual primitive; the host owns understandable interaction.
+
+## Beyond color and size
+
+Arbitrary HTML per node is not the dense rendering path: it would trade away batching, viewport materialization, and the 100k-node target. The planned translation layer maps domain attributes to typed node and edge visuals at ingestion and update boundaries, then compiles those visuals into GPU buffers.
+
+Built-in shapes should stay in one instanced node draw call through an SDF or atlas shader. Reliable edge width, dashes, and direction markers require GPU edge quads rather than one object per edge. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
+
+Follow the design and benchmark acceptance criteria in [the node and edge visual translation issue](https://github.com/domudev/graphraum/issues/30).

@@ -1,0 +1,135 @@
+<figure class="brand-graph">
+	<svg viewBox="0 0 960 420" role="img" aria-labelledby="brand-graph-title brand-graph-description">
+		<title id="brand-graph-title">graphraum visual language</title>
+		<desc id="brand-graph-description">
+			A network of Turf Green nodes and edges on Ink Black, with one selected Porcelain node.
+		</desc>
+		<g class="edges">
+			<path d="M92 236 220 116 360 180 474 72 602 154 752 86 874 204" />
+			<path d="M92 236 246 306 360 180 508 304 602 154 720 292 874 204" />
+			<path d="M220 116 246 306M474 72 508 304M752 86 720 292" />
+			<path d="M360 180 602 154M246 306 508 304 720 292" />
+		</g>
+		<g class="nodes">
+			<circle cx="92" cy="236" r="16" />
+			<circle cx="220" cy="116" r="22" />
+			<circle cx="246" cy="306" r="13" />
+			<circle cx="360" cy="180" r="28" />
+			<circle cx="474" cy="72" r="13" />
+			<circle cx="508" cy="304" r="19" />
+			<circle cx="602" cy="154" r="24" />
+			<circle cx="720" cy="292" r="15" />
+			<circle cx="752" cy="86" r="18" />
+			<circle cx="874" cy="204" r="23" />
+		</g>
+		<g class="selected-node">
+			<circle cx="602" cy="154" r="33" />
+			<circle cx="602" cy="154" r="20" />
+		</g>
+		<g class="labels" aria-hidden="true">
+			<text x="78" y="276">NODE</text>
+			<text x="570" y="205">SELECTED</text>
+			<text x="814" y="250">EDGE</text>
+		</g>
+	</svg>
+	<figcaption>
+		<span><i class="node-swatch"></i> Turf Green nodes</span>
+		<span><i class="selection-swatch"></i> Porcelain selection</span>
+		<span><i class="edge-swatch"></i> Bounded edges</span>
+	</figcaption>
+</figure>
+
+<style>
+	.brand-graph {
+		background: #040f0f;
+		border: 1px solid #226f54;
+		border-radius: 1rem;
+		box-shadow: 0 2rem 5rem rgb(4 15 15 / 18%);
+		margin: 1rem auto 4rem;
+		max-width: 72rem;
+		overflow: hidden;
+	}
+
+	svg {
+		display: block;
+		width: 100%;
+	}
+
+	.edges {
+		fill: none;
+		opacity: 0.72;
+		stroke: #226f54;
+		stroke-linecap: round;
+		stroke-width: 3;
+	}
+
+	.nodes {
+		fill: #226f54;
+		stroke: #73c7a5;
+		stroke-width: 2;
+	}
+
+	.selected-node circle:first-child {
+		fill: none;
+		opacity: 0.35;
+		stroke: #fcfffc;
+		stroke-width: 2;
+	}
+
+	.selected-node circle:last-child {
+		fill: #fcfffc;
+	}
+
+	.labels {
+		fill: #73c7a5;
+		font-family: ui-monospace, monospace;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+	}
+
+	figcaption {
+		border-top: 1px solid #17372d;
+		color: #b8c9c1;
+		display: flex;
+		flex-wrap: wrap;
+		font-size: 0.72rem;
+		gap: 1.25rem;
+		padding: 0.8rem 1rem;
+	}
+
+	figcaption span {
+		align-items: center;
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	figcaption i {
+		border-radius: 50%;
+		display: inline-block;
+		height: 0.55rem;
+		width: 0.55rem;
+	}
+
+	.node-swatch {
+		background: #226f54;
+	}
+
+	.selection-swatch {
+		background: #fcfffc;
+	}
+
+	.edge-swatch {
+		border: 1px solid #226f54;
+	}
+
+	@media (max-width: 40rem) {
+		.brand-graph {
+			border-radius: 0.7rem;
+		}
+
+		.labels {
+			display: none;
+		}
+	}
+</style>

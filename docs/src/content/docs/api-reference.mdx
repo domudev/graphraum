@@ -1,0 +1,123 @@
+---
+title: API reference
+description: The graphraum constructor, graph contract, update paths, interaction methods, options, and diagnostics.
+---
+
+## Import
+
+```ts
+import {
+  Graphraum,
+  graphraumTheme,
+  type GraphraumData,
+  type GraphraumDiagnostics,
+  type GraphraumNodeUpdate,
+  type GraphraumOptions,
+} from "@domudev/graphraum";
+```
+
+## Constructor
+
+```ts
+new Graphraum(container: HTMLElement, options?: GraphraumOptions)
+```
+
+The container must have a non-zero width and height. graphraum appends one canvas, observes container resizing, creates the selected camera, and renders on demand.
+
+```ts
+interface GraphraumOptions {
+  mode?: "2d" | "3d";             // default: "2d"
+  antialias?: boolean;              // default: false
+  maxPixelRatio?: number;           // default: 2
+  maxVisibleEdges?: number;         // default: 100_000
+  viewportCulling?: boolean;        // default: true
+  viewportOverscan?: number;        // default: 16 world units
+  theme?: Partial<GraphraumTheme>;
+}
+```
+
+Invalid edge budgets, overscan values, positions, and node sizes fail at the boundary with an actionable error.
+
+## Graph data
+
+```ts
+interface GraphraumData {
+  nodes: readonly GraphraumNode[];
+  edges: readonly GraphraumEdge[];
+}
+
+interface GraphraumNode {
+  id: string;
+  position: { x: number; y: number; z?: number };
+  color?: string | number;
+  size?: number;
+}
+
+interface GraphraumEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+```
+
+Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node sizes must be positive. Positions and sizes use world units.
+
+## Data and updates
+
+<div class="api-grid">
+  <div><code>setData(data)</code><p>Validates and replaces the complete topology, rebuilds canonical buffers, fits the camera, materializes the viewport, and schedules a render.</p></div>
+  <div><code>updateNodes(updates)</code><p>Changes position, size, or color for existing nodes and updates only their node matrices and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
+  <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
+  <div><code>render()</code><p>Schedules one render on the next animation frame. Repeated calls in the same frame are coalesced.</p></div>
+</div>
+
+```ts
+const updates: readonly GraphraumNodeUpdate[] = [
+  { id: "person:ada", position: { x: 20, y: 12 } },
+  { id: "place:london", color: "#73c7a5", size: 6 },
+];
+
+graph.updateNodes(updates);
+```
+
+## Camera and interaction
+
+<div class="api-grid">
+  <div><code>pick(clientX, clientY)</code><p>Returns the nearest node ID or <code>null</code>. Uses the spatial grid in 2D and instance raycasting in 3D.</p></div>
+  <div><code>setMode(mode)</code><p>Switches between orthographic 2D and perspective 3D, replaces controls, and fits the current graph.</p></div>
+  <div><code>getMode()</code><p>Returns the active <code>"2d"</code> or <code>"3d"</code> mode.</p></div>
+  <div><code>fitView()</code><p>Fits the active camera to the complete graph bounds and rematerializes the viewport.</p></div>
+  <div><code>resize()</code><p>Synchronizes the renderer and active camera immediately. A <code>ResizeObserver</code> already calls this for normal container changes.</p></div>
+  <div><code>destroy()</code><p>Disconnects observation and controls, cancels pending rendering, disposes GPU resources, and removes the canvas.</p></div>
+</div>
+
+## Theme
+
+`graphraumTheme` is immutable. Constructor overrides are copied per renderer, so one graph cannot change another graph's defaults.
+
+```ts
+const graph = new Graphraum(container, {
+  theme: { ...graphraumTheme, selectedNode: "#73c7a5" },
+});
+```
+
+See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
+
+## Diagnostics
+
+```ts
+const diagnostics: GraphraumDiagnostics = graph.getDiagnostics();
+```
+
+```ts
+interface GraphraumDiagnostics {
+  gpuDrawCalls: number;
+  lodLevel: "detail" | "overview";
+  pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+  visibleEdgeCandidates: number;
+  visibleEdges: number;
+  visibleNodes: number;
+}
+```
+
+Diagnostics describe the final rendered frame. They make viewport materialization and edge-budget decisions observable instead of asking applications to re-derive them.
