@@ -3,6 +3,8 @@ import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import remarkMermaid from "./src/plugins/remark-mermaid.ts";
 
+const docsThreePath = fileURLToPath(new URL("./node_modules/three", import.meta.url));
+
 export default defineConfig({
 	site: "https://domudev.github.io",
 	base: "/graphraum",
@@ -26,6 +28,7 @@ export default defineConfig({
 		resolve: {
 			alias: {
 				"@domudev/graphraum": fileURLToPath(new URL("../src/index.ts", import.meta.url)),
+				three: docsThreePath,
 			},
 		},
 	},
