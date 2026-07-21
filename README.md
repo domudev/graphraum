@@ -53,7 +53,16 @@ Then install it with Bun:
 bun add @domudev/graphraum
 ```
 
-Publishing is driven by GitHub Releases. A release tag must exactly match the package version with a `v` prefix, for example `v0.1.0`. The release workflow validates, tests, builds, and publishes with its repository-scoped `GITHUB_TOKEN`.
+Publishing is driven by GitHub Releases. A release tag must exactly match the package version with a `v` prefix, for example `v0.2.0`. The release workflow validates, tests, builds, and publishes with its repository-scoped `GITHUB_TOKEN`.
+
+## Documentation
+
+The documentation and executable browser benchmark are published at [domudev.github.io/graphraum](https://domudev.github.io/graphraum/). Run them locally with:
+
+```sh
+bun install --cwd docs
+bun run docs:dev
+```
 
 ## Status
 

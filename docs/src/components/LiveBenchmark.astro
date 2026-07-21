@@ -1,0 +1,164 @@
+<section class="benchmark-shell" aria-labelledby="benchmark-title">
+	<div class="benchmark-controls">
+		<div>
+			<p class="benchmark-eyebrow">Runs on this device</p>
+			<h2 id="benchmark-title">Live Graphraum benchmark</h2>
+		</div>
+		<label>
+			Fixture
+			<select id="benchmark-size">
+				<option value="1000">1,000 nodes / 3,000 edges</option>
+				<option value="10000">10,000 nodes / 30,000 edges</option>
+			</select>
+		</label>
+		<label>
+			Mode
+			<select id="benchmark-mode">
+				<option value="2d">2D</option>
+				<option value="3d">3D</option>
+			</select>
+		</label>
+		<label>
+			Pixel ratio
+			<select id="benchmark-pixel-ratio">
+				<option value="1">1× controlled</option>
+				<option value="2">Up to 2× native</option>
+			</select>
+		</label>
+		<button id="benchmark-run" type="button">Run benchmark</button>
+	</div>
+
+	<div id="benchmark-graph" class="benchmark-graph" aria-label="Interactive benchmark graph"></div>
+
+	<div class="benchmark-report">
+		<div>
+			<p id="benchmark-status" class="benchmark-status" aria-live="polite">Ready. Nothing has been measured yet.</p>
+			<p class="benchmark-note">Drag to pan, scroll to zoom, and click a node to select it after the run.</p>
+		</div>
+		<button id="benchmark-copy" class="benchmark-secondary" type="button" disabled>Copy JSON</button>
+	</div>
+	<pre id="benchmark-output" class="benchmark-output" tabindex="0">Run the benchmark to produce a result.</pre>
+</section>
+
+<script>
+	import { Graphraum, type GraphraumMode } from "@domudev/graphraum";
+	import { createFixture, summarize } from "../lib/benchmark";
+
+	type MemoryPerformance = Performance & { memory?: { usedJSHeapSize: number } };
+
+	function requireElement<ElementType extends Element>(selector: string) {
+		const element = document.querySelector<ElementType>(selector);
+		if (!element) throw new Error(`Benchmark element not found: ${selector}`);
+		return element;
+	}
+
+	function nextFrame() {
+		return new Promise<number>((resolve) => requestAnimationFrame(resolve));
+	}
+
+	async function measureFrames(trigger: () => void, count: number) {
+		const samples: number[] = [];
+		let previous = await nextFrame();
+		for (let index = 0; index < count; index += 1) {
+			trigger();
+			const current = await nextFrame();
+			samples.push(current - previous);
+			previous = current;
+		}
+		return samples;
+	}
+
+	const container = requireElement<HTMLElement>("#benchmark-graph");
+	const sizeSelect = requireElement<HTMLSelectElement>("#benchmark-size");
+	const modeSelect = requireElement<HTMLSelectElement>("#benchmark-mode");
+	const pixelRatioSelect = requireElement<HTMLSelectElement>("#benchmark-pixel-ratio");
+	const runButton = requireElement<HTMLButtonElement>("#benchmark-run");
+	const copyButton = requireElement<HTMLButtonElement>("#benchmark-copy");
+	const output = requireElement<HTMLElement>("#benchmark-output");
+	const status = requireElement<HTMLElement>("#benchmark-status");
+	let graph: Graphraum | null = null;
+	let result = "";
+
+	container.addEventListener("click", (event) => {
+		const selected = graph?.pick(event.clientX, event.clientY);
+		graph?.setSelection(selected ? [selected] : []);
+	});
+
+	copyButton.addEventListener("click", async () => {
+		await navigator.clipboard.writeText(result);
+		copyButton.textContent = "Copied";
+		setTimeout(() => (copyButton.textContent = "Copy JSON"), 1200);
+	});
+
+	runButton.addEventListener("click", async () => {
+		runButton.disabled = true;
+		copyButton.disabled = true;
+		status.textContent = "Running… keep this tab visible for representative frame timing.";
+		output.textContent = "Collecting browser measurements…";
+		graph?.destroy();
+
+		try {
+			const nodeCount = Number(sizeSelect.value);
+			const edgeCount = nodeCount * 3;
+			const mode = modeSelect.value as GraphraumMode;
+			const maxPixelRatio = Number(pixelRatioSelect.value);
+			const data = createFixture(nodeCount);
+			const longTasks: number[] = [];
+			const observer =
+				"PerformanceObserver" in window && PerformanceObserver.supportedEntryTypes.includes("longtask")
+					? new PerformanceObserver((list) => longTasks.push(...list.getEntries().map((entry) => entry.duration)))
+					: null;
+			observer?.observe({ type: "longtask" });
+			const heapBefore = (performance as MemoryPerformance).memory?.usedJSHeapSize;
+			const mountedAt = performance.now();
+			graph = new Graphraum(container, { mode, maxPixelRatio });
+			graph.setData(data);
+			await nextFrame();
+			const firstMeaningfulFrameMilliseconds = performance.now() - mountedAt;
+			const frameTimes = await measureFrames(() => graph?.fitView(), 120);
+			const selectionFeedback: number[] = [];
+			for (let index = 0; index < 20; index += 1) {
+				const startedAt = performance.now();
+				graph.setSelection([`node-${index % 2}`]);
+				await nextFrame();
+				selectionFeedback.push(performance.now() - startedAt);
+			}
+			const updateStartedAt = performance.now();
+			graph.setData(createFixture(nodeCount + Math.max(10, Math.floor(nodeCount * 0.01))));
+			await nextFrame();
+			const updateMilliseconds = performance.now() - updateStartedAt;
+			await nextFrame();
+			observer?.disconnect();
+			const heapAfter = (performance as MemoryPerformance).memory?.usedJSHeapSize;
+
+			result = JSON.stringify(
+				{
+					fixture: { nodeCount, edgeCount },
+					mode,
+					devicePixelRatio: window.devicePixelRatio,
+					maxPixelRatio,
+					firstMeaningfulFrameMilliseconds,
+					frameTimes: summarize(frameTimes),
+					longTasks: summarize(longTasks),
+					selectionFeedback: summarize(selectionFeedback),
+					heapGrowthBytes: heapBefore === undefined || heapAfter === undefined ? null : heapAfter - heapBefore,
+					updateMilliseconds,
+					gpuDrawCalls: graph.getDiagnostics().gpuDrawCalls,
+					userAgent: navigator.userAgent,
+					timestamp: new Date().toISOString(),
+				},
+				null,
+				2,
+			);
+			output.textContent = result;
+			status.textContent = `Complete: ${nodeCount.toLocaleString()} nodes and ${edgeCount.toLocaleString()} edges in ${mode.toUpperCase()}.`;
+			copyButton.disabled = false;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			status.textContent = `Benchmark failed: ${message}`;
+			output.textContent = message;
+		} finally {
+			runButton.disabled = false;
+		}
+	});
+</script>

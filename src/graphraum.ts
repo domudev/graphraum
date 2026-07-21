@@ -22,7 +22,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
-import type { GraphraumData, GraphraumMode, GraphraumOptions, GraphraumTheme } from "./types";
+import type { GraphraumData, GraphraumDiagnostics, GraphraumMode, GraphraumOptions, GraphraumTheme } from "./types";
 
 const defaultTheme: GraphraumTheme = {
 	background: "#09090b",
@@ -128,6 +128,10 @@ export class Graphraum {
 
 	getMode() {
 		return this.mode;
+	}
+
+	getDiagnostics(): GraphraumDiagnostics {
+		return { gpuDrawCalls: this.renderer.info.render.calls };
 	}
 
 	pick(clientX: number, clientY: number): string | null {

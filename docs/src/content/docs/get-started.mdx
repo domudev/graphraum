@@ -1,0 +1,59 @@
+---
+title: Get started
+description: Install Graphraum from GitHub Packages and render your first graph.
+---
+
+## Install
+
+Graphraum is currently published through the GitHub Packages npm registry. Configure the `@domudev` scope with a classic GitHub token that has `read:packages` permission:
+
+```ini title=".npmrc"
+@domudev:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+```
+
+Install with Bun:
+
+```sh
+bun add @domudev/graphraum
+```
+
+## Render a graph
+
+The container must have a real width and height before Graphraum is constructed.
+
+```ts
+import { Graphraum } from "@domudev/graphraum";
+
+const container = document.querySelector<HTMLElement>("#graph");
+if (!container) throw new Error("Missing graph container");
+
+const graph = new Graphraum(container, { mode: "2d" });
+
+graph.setData({
+  nodes: [
+    { id: "berlin", position: { x: -40, y: 0 }, color: "#38bdf8" },
+    { id: "hamburg", position: { x: 40, y: 0 }, color: "#f59e0b" },
+  ],
+  edges: [{ id: "rail", source: "berlin", target: "hamburg" }],
+});
+```
+
+## Interact and clean up
+
+Picking accepts viewport coordinates. Selection remains explicit application state.
+
+```ts
+container.addEventListener("click", (event) => {
+  const nodeId = graph.pick(event.clientX, event.clientY);
+  graph.setSelection(nodeId ? [nodeId] : []);
+});
+
+graph.setMode("3d");
+graph.fitView();
+
+// When the surface unmounts:
+graph.destroy();
+```
+
+`destroy()` disconnects resize observation, disposes controls and GPU resources, cancels pending rendering, and removes the canvas.

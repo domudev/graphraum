@@ -1,6 +1,6 @@
 {
 	"name": "@domudev/graphraum",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "An opinionated WebGL engine for interactive graphs in 2D and 3D",
 	"type": "module",
 	"license": "Apache-2.0",
@@ -27,6 +27,9 @@
 		"build": "tsdown",
 		"check": "biome check . && tsc --noEmit",
 		"dev": "vite examples/benchmark",
+		"docs:build": "bun run --cwd docs build",
+		"docs:check": "bun run --cwd docs check",
+		"docs:dev": "bun run --cwd docs dev",
 		"prepack": "bun run build",
 		"test": "vitest run"
 	},

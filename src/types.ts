@@ -39,3 +39,7 @@ export interface GraphraumOptions {
 	mode?: GraphraumMode;
 	theme?: Partial<GraphraumTheme>;
 }
+
+export interface GraphraumDiagnostics {
+	gpuDrawCalls: number;
+}
