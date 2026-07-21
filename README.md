@@ -37,6 +37,24 @@ bun run check
 bun run build
 ```
 
+## Install
+
+Graphraum is currently published to the GitHub Packages npm registry. Configure the `@domudev` scope and authenticate with a classic GitHub token that has `read:packages` permission:
+
+```ini
+# .npmrc
+@domudev:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+```
+
+Then install it with Bun:
+
+```sh
+bun add @domudev/graphraum
+```
+
+Publishing is driven by GitHub Releases. A release tag must exactly match the package version with a `v` prefix, for example `v0.1.0`. The release workflow validates, tests, builds, and publishes with its repository-scoped `GITHUB_TOKEN`.
+
 ## Status
 
 The initial engine includes batched edges, instanced nodes, explicit render scheduling, 2D and 3D cameras, selection colors, picking, fitting, resize handling, and resource disposal. Smooth 2D–3D camera transitions, semantic label LOD, incremental buffer updates, and accessibility adapters remain ahead.
