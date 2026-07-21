@@ -183,6 +183,12 @@
 					updateMilliseconds,
 					gpuDrawCalls: diagnostics.gpuDrawCalls,
 					pickingStrategy: diagnostics.pickingStrategy,
+					viewport: {
+						lodLevel: diagnostics.lodLevel,
+						visibleNodes: diagnostics.visibleNodes,
+						visibleEdgeCandidates: diagnostics.visibleEdgeCandidates,
+						visibleEdges: diagnostics.visibleEdges,
+					},
 					userAgent: navigator.userAgent,
 					timestamp: new Date().toISOString(),
 				},

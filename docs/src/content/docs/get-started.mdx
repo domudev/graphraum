@@ -28,7 +28,12 @@ import { Graphraum } from "@domudev/graphraum";
 const container = document.querySelector<HTMLElement>("#graph");
 if (!container) throw new Error("Missing graph container");
 
-const graph = new Graphraum(container, { mode: "2d" });
+const graph = new Graphraum(container, {
+  mode: "2d",
+  viewportCulling: true,
+  viewportOverscan: 16,
+  maxVisibleEdges: 100_000,
+});
 
 graph.setData({
   nodes: [
