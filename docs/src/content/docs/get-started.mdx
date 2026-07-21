@@ -52,6 +52,12 @@ container.addEventListener("click", (event) => {
 graph.setMode("3d");
 graph.fitView();
 
+// Update existing node buffers and incident edge endpoints without rebuilding the graph:
+graph.updateNodes([
+  { id: "berlin", position: { x: -20, y: 10 } },
+  { id: "hamburg", color: "#22c55e" },
+]);
+
 // When the surface unmounts:
 graph.destroy();
 ```

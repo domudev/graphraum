@@ -18,7 +18,8 @@ The benchmark below is executable evidence, not a screenshot of one favorable ma
 - **Frame times:** 120 explicitly scheduled renders at 1k/10k and 30 at 100k, reported as p50, p95, and max.
 - **Long tasks:** browser Performance Observer entries over 50ms during the run.
 - **Selection feedback:** 20 selection changes at 1k/10k and 5 at 100k, measured through the following animation frame.
-- **Update:** replacement with a graph containing 1% more nodes and three edges per node.
+- **Incremental update:** position changes for 1% of existing nodes, including only their node matrices and incident edge endpoints.
+- **Full update:** replacement with a graph containing 1% more nodes and three edges per node.
 - **GPU draw calls:** Three.js renderer calls from the final frame.
 - **Heap growth:** Chrome's non-standard precise heap counter when available; `null` elsewhere.
 
