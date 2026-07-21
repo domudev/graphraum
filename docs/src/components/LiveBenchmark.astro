@@ -9,6 +9,7 @@
 			<select id="benchmark-size">
 				<option value="1000">1,000 nodes / 3,000 edges</option>
 				<option value="10000">10,000 nodes / 30,000 edges</option>
+				<option value="100000">100,000 nodes / 300,000 edges</option>
 			</select>
 		</label>
 		<label>
@@ -42,7 +43,7 @@
 
 <script>
 	import { Graphraum, type GraphraumMode } from "@domudev/graphraum";
-	import { createFixture, summarize } from "../lib/benchmark";
+	import { createFixture, effectivePixelRatio, summarize } from "../lib/benchmark";
 
 	type MemoryPerformance = Performance & { memory?: { usedJSHeapSize: number } };
 
@@ -100,9 +101,10 @@
 		try {
 			const nodeCount = Number(sizeSelect.value);
 			const edgeCount = nodeCount * 3;
+			const frameSampleCount = nodeCount >= 100_000 ? 30 : 120;
+			const selectionSampleCount = nodeCount >= 100_000 ? 5 : 20;
 			const mode = modeSelect.value as GraphraumMode;
 			const maxPixelRatio = Number(pixelRatioSelect.value);
-			const data = createFixture(nodeCount);
 			const longTasks: number[] = [];
 			const observer =
 				"PerformanceObserver" in window && PerformanceObserver.supportedEntryTypes.includes("longtask")
@@ -111,19 +113,34 @@
 			observer?.observe({ type: "longtask" });
 			const heapBefore = (performance as MemoryPerformance).memory?.usedJSHeapSize;
 			const mountedAt = performance.now();
-			graph = new Graphraum(container, { mode, maxPixelRatio });
-			graph.setData(data);
+			const fixtureStartedAt = performance.now();
+			const data = createFixture(nodeCount);
+			const fixtureGenerationMilliseconds = performance.now() - fixtureStartedAt;
 			await nextFrame();
+			const constructionStartedAt = performance.now();
+			graph = new Graphraum(container, { mode, maxPixelRatio });
+			const rendererConstructionMilliseconds = performance.now() - constructionStartedAt;
+			const setDataStartedAt = performance.now();
+			graph.setData(data);
+			const setDataMilliseconds = performance.now() - setDataStartedAt;
+			status.textContent = "Measuring first frame…";
+			const firstFrameStartedAt = performance.now();
+			await nextFrame();
+			const firstVisibleFrameMilliseconds = performance.now() - firstFrameStartedAt;
 			const firstMeaningfulFrameMilliseconds = performance.now() - mountedAt;
-			const frameTimes = await measureFrames(() => graph?.fitView(), 120);
+			const displayCadence = summarize(await measureFrames(() => {}, 30));
+			status.textContent = `Measuring ${frameSampleCount} rendered frames…`;
+			const frameTimes = await measureFrames(() => graph?.render(), frameSampleCount);
 			const selectionFeedback: number[] = [];
-			for (let index = 0; index < 20; index += 1) {
+			status.textContent = `Measuring ${selectionSampleCount} selection changes…`;
+			for (let index = 0; index < selectionSampleCount; index += 1) {
 				const startedAt = performance.now();
 				graph.setSelection([`node-${index % 2}`]);
 				await nextFrame();
 				selectionFeedback.push(performance.now() - startedAt);
 			}
 			const updateStartedAt = performance.now();
+			status.textContent = "Measuring a 1% full-snapshot update…";
 			graph.setData(createFixture(nodeCount + Math.max(10, Math.floor(nodeCount * 0.01))));
 			await nextFrame();
 			const updateMilliseconds = performance.now() - updateStartedAt;
@@ -134,10 +151,19 @@
 			result = JSON.stringify(
 				{
 					fixture: { nodeCount, edgeCount },
+					protocol: { frameSampleCount, selectionSampleCount },
 					mode,
 					devicePixelRatio: window.devicePixelRatio,
 					maxPixelRatio,
+					effectivePixelRatio: effectivePixelRatio(window.devicePixelRatio, maxPixelRatio),
+					phases: {
+						fixtureGenerationMilliseconds,
+						rendererConstructionMilliseconds,
+						setDataMilliseconds,
+						firstVisibleFrameMilliseconds,
+					},
 					firstMeaningfulFrameMilliseconds,
+					displayCadence,
 					frameTimes: summarize(frameTimes),
 					longTasks: summarize(longTasks),
 					selectionFeedback: summarize(selectionFeedback),

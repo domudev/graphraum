@@ -1,6 +1,6 @@
 ---
 title: Live benchmark
-description: Run Graphraum against deterministic 1k and 10k fixtures in this browser.
+description: Run Graphraum against deterministic 1k, 10k, and 100k fixtures in this browser.
 tableOfContents: false
 ---
 
@@ -12,14 +12,16 @@ The benchmark below is executable evidence, not a screenshot of one favorable ma
 
 ## What it measures
 
-- **First meaningful frame:** construction, data upload, camera fitting, and the first scheduled WebGL render.
-- **Frame times:** 120 consecutive fit-and-render frames, reported as p50, p95, and max.
+- **Phases:** fixture generation, renderer construction, synchronous `setData`, and the first visible frame are reported separately.
+- **First meaningful frame:** the complete fixture-through-first-frame path for compatibility with earlier results.
+- **Display cadence:** 30 idle animation frames establish the device and display baseline.
+- **Frame times:** 120 explicitly scheduled renders at 1k/10k and 30 at 100k, reported as p50, p95, and max.
 - **Long tasks:** browser Performance Observer entries over 50ms during the run.
-- **Selection feedback:** 20 selection changes measured through the following animation frame.
+- **Selection feedback:** 20 selection changes at 1k/10k and 5 at 100k, measured through the following animation frame.
 - **Update:** replacement with a graph containing 1% more nodes and three edges per node.
 - **GPU draw calls:** Three.js renderer calls from the final frame.
 - **Heap growth:** Chrome's non-standard precise heap counter when available; `null` elsewhere.
 
 ## Interpret honestly
 
-This is a rendering microbenchmark. It does not measure network loading, force-layout convergence, label rendering, application state, accessibility overlays, or a production Graph Explorer. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated runs on the same browser and pixel ratio.
+This is a rendering microbenchmark. It does not measure network loading, force-layout convergence, label rendering, application state, accessibility overlays, or a production Graph Explorer. The 100k fixture intentionally allocates a large in-memory graph and may expose long tasks while full-snapshot updates remain synchronous. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated fresh-page runs on the same browser and effective pixel ratio.
