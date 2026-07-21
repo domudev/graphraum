@@ -3,7 +3,7 @@ title: graphraum
 description: An opinionated WebGL engine for interactive graphs in 2D and 3D.
 template: splash
 hero:
-  tagline: A graph-native WebGL engine for dense, interactive networks in 2D and 3D.
+  tagline: Explore 100,000 nodes and 300,000 edges in two GPU draw calls—then verify it on your own machine.
   actions:
     - text: Get started
       link: ./get-started/
@@ -15,36 +15,40 @@ hero:
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
-import BrandGraph from "../../components/BrandGraph.astro";
-
-<BrandGraph />
+import HomeGraph from "../../components/HomeGraph.astro";
 
 <div class="home-proof" aria-label="graphraum performance summary">
-  <div><strong>100k</strong><span>nodes</span></div>
-  <div><strong>300k</strong><span>edges</span></div>
-  <div><strong>2</strong><span>draw calls</span></div>
-  <div><strong>8.3 ms</strong><span>reference p50</span></div>
+  <div><strong>100k</strong><span>interactive nodes</span></div>
+  <div><strong>300k</strong><span>connected edges</span></div>
+  <div><strong>2</strong><span>GPU draw calls</span></div>
+  <div><strong>8.3 ms</strong><span>reference frame p50</span></div>
 </div>
 
-<p class="home-intro">graphraum is deliberately graph-shaped. Give it nodes, edges, and positions; it handles the WebGL scene while your application keeps ownership of meaning, layout, labels, and interaction policy.</p>
+<HomeGraph />
+
+<div class="home-outcome">
+  <p class="proof-kicker">From overview to detail</p>
+  <h2>Keep the graph moving while your users think.</h2>
+  <p>Pan, zoom, select, and transition between 2D and 3D without turning every node into a component or every interaction into a re-render.</p>
+</div>
 
 <CardGrid>
-  <Card title="2D first. 3D when it earns its place." icon="seti:3d">
-    Start with an orthographic 2D camera. Switch to perspective 3D without changing the graph contract.
+  <Card title="Put dense graphs on screen" icon="seti:3d">
+    Batched nodes and edges avoid a component per entity, so the first useful view arrives without constructing a second UI tree.
   </Card>
-  <Card title="Dense by construction" icon="performance">
-    Instanced nodes, batched edges, viewport materialization, and a bounded overview tier keep the rendering cost explicit.
+  <Card title="Stay responsive at overview scale" icon="performance">
+    Viewport materialization and a bounded edge tier keep interaction work controlled as users pan, zoom, and explore.
   </Card>
-  <Card title="Proof over claims" icon="chart">
-    The benchmark runs on your browser and GPU, breaks the work into phases, and gives you the complete JSON.
+  <Card title="Measure the machine that matters" icon="chart">
+    The live proof lab records startup, frames, selection, updates, memory, and GPU calls on the device running your product.
   </Card>
 </CardGrid>
 
-## A narrow engine boundary
+## Own the experience above the canvas
 
-graphraum owns the WebGL scene, camera, controls, picking, selection colors, resizing, and resource disposal. Your application owns graph meaning, layout policy, labels, accessibility, and product interactions.
+Keep your domain state, layout strategy, labels, accessibility, and product interactions. graphraum takes care of the rendering hot path, camera, picking, selection feedback, resizing, and GPU resources.
 
-That boundary keeps the engine small enough to reason about and makes performance regressions visible instead of hiding them behind a broad framework API.
+You get a fast visual primitive without adopting a second application framework or surrendering control of what the graph means.
 
 <div class="home-cta">
   <div>
