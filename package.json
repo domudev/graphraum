@@ -30,8 +30,9 @@
 		"docs:build": "bun run --cwd docs build",
 		"docs:check": "bun run --cwd docs check",
 		"docs:dev": "bun run --cwd docs dev",
+		"docs:test": "bun run --cwd docs test",
 		"prepack": "bun run build",
-		"test": "vitest run"
+		"test": "vitest run src"
 	},
 	"engines": {
 		"bun": ">=1.2.0"
