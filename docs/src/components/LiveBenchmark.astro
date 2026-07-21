@@ -139,6 +139,16 @@
 				await nextFrame();
 				selectionFeedback.push(performance.now() - startedAt);
 			}
+			const incrementalUpdateStartedAt = performance.now();
+			const incrementalNodeCount = Math.max(10, Math.floor(nodeCount * 0.01));
+			graph.updateNodes(
+				data.nodes.slice(0, incrementalNodeCount).map((node) => ({
+					id: node.id,
+					position: { ...node.position, x: node.position.x + 0.5 },
+				})),
+			);
+			await nextFrame();
+			const incrementalNodeUpdateMilliseconds = performance.now() - incrementalUpdateStartedAt;
 			const updateStartedAt = performance.now();
 			status.textContent = "Measuring a 1% full-snapshot update…";
 			graph.setData(createFixture(nodeCount + Math.max(10, Math.floor(nodeCount * 0.01))));
@@ -167,6 +177,7 @@
 					frameTimes: summarize(frameTimes),
 					longTasks: summarize(longTasks),
 					selectionFeedback: summarize(selectionFeedback),
+					incrementalNodeUpdate: { count: incrementalNodeCount, milliseconds: incrementalNodeUpdateMilliseconds },
 					heapGrowthBytes: heapBefore === undefined || heapAfter === undefined ? null : heapAfter - heapBefore,
 					updateMilliseconds,
 					gpuDrawCalls: graph.getDiagnostics().gpuDrawCalls,

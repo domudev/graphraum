@@ -15,6 +15,13 @@ export interface GraphraumNode {
 	size?: number;
 }
 
+export interface GraphraumNodeUpdate {
+	color?: GraphraumColor | undefined;
+	id: string;
+	position?: GraphraumPosition;
+	size?: number | undefined;
+}
+
 export interface GraphraumEdge {
 	id: string;
 	source: string;

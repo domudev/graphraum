@@ -22,7 +22,15 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
-import type { GraphraumData, GraphraumDiagnostics, GraphraumMode, GraphraumOptions, GraphraumTheme } from "./types";
+import { prepareNodeUpdates } from "./node-updates";
+import type {
+	GraphraumData,
+	GraphraumDiagnostics,
+	GraphraumMode,
+	GraphraumNodeUpdate,
+	GraphraumOptions,
+	GraphraumTheme,
+} from "./types";
 
 const defaultTheme: GraphraumTheme = {
 	background: "#09090b",
@@ -51,6 +59,8 @@ export class Graphraum {
 	private data: GraphraumData = { nodes: [], edges: [] };
 	private nodeIds: readonly string[] = [];
 	private nodeIndices = new Map<string, number>();
+	private edgeNodeIndices: Uint32Array = new Uint32Array();
+	private incidentEdgeIndices: readonly (readonly number[])[] = [];
 	private nodeMesh: InstancedMesh | null = null;
 	private edgeLines: LineSegments | null = null;
 	private selectedNodeIds = new Set<string>();
@@ -79,9 +89,14 @@ export class Graphraum {
 	setData(data: GraphraumData) {
 		const compiled = compileGraph(data);
 		this.disposeGraphObjects();
-		this.data = data;
+		this.data = {
+			edges: data.edges.map((edge) => ({ ...edge })),
+			nodes: data.nodes.map((node) => ({ ...node, position: { ...node.position } })),
+		};
 		this.nodeIds = compiled.nodeIds;
-		this.nodeIndices = new Map(compiled.nodeIds.map((id, index) => [id, index]));
+		this.nodeIndices = new Map(compiled.nodeIndices);
+		this.edgeNodeIndices = compiled.edgeNodeIndices;
+		this.incidentEdgeIndices = compiled.incidentEdgeIndices;
 
 		const nodeGeometry = new SphereGeometry(1, 8, 6);
 		const nodeMaterial = new MeshBasicMaterial({ color: "#ffffff" });
@@ -112,6 +127,49 @@ export class Graphraum {
 		this.scene.add(edgeLines);
 
 		this.fitView();
+	}
+
+	updateNodes(updates: readonly GraphraumNodeUpdate[]) {
+		if (updates.length === 0) return;
+		if (!this.nodeMesh || !this.edgeLines) throw new Error("Cannot update nodes before graph data is set");
+		const prepared = prepareNodeUpdates(this.data.nodes, this.nodeIndices, updates);
+		const nodes = [...this.data.nodes];
+		const matrix = new Matrix4();
+		const edgePosition = this.edgeLines.geometry.getAttribute("position") as BufferAttribute;
+		const edgePositions = edgePosition.array as Float32Array;
+
+		for (const update of prepared) {
+			nodes[update.index] = update.next;
+			if (update.positionChanged || update.sizeChanged) {
+				const size = update.next.size ?? 4;
+				matrix.makeScale(size, size, size);
+				matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
+				this.nodeMesh.setMatrixAt(update.index, matrix);
+				this.nodeMesh.instanceMatrix.addUpdateRange(update.index * 16, 16);
+			}
+			if (update.colorChanged && !this.selectedNodeIds.has(update.next.id)) {
+				this.nodeMesh.setColorAt(update.index, new Color(update.next.color ?? this.theme.node));
+				this.nodeMesh.instanceColor?.addUpdateRange(update.index * 3, 3);
+			}
+			if (update.positionChanged) {
+				for (const edgeIndex of this.incidentEdgeIndices[update.index] ?? []) {
+					const sourceIndex = this.edgeNodeIndices[edgeIndex * 2];
+					const offset = edgeIndex * 6 + (sourceIndex === update.index ? 0 : 3);
+					edgePositions.set([update.next.position.x, update.next.position.y, update.next.position.z ?? 0], offset);
+					edgePosition.addUpdateRange(offset, 3);
+				}
+			}
+		}
+
+		this.data = { ...this.data, nodes };
+		if (prepared.some((update) => update.positionChanged || update.sizeChanged)) {
+			this.nodeMesh.instanceMatrix.needsUpdate = true;
+		}
+		if (prepared.some((update) => update.colorChanged) && this.nodeMesh.instanceColor) {
+			this.nodeMesh.instanceColor.needsUpdate = true;
+		}
+		if (prepared.some((update) => update.positionChanged)) edgePosition.needsUpdate = true;
+		this.requestRender();
 	}
 
 	setSelection(nodeIds: Iterable<string>) {

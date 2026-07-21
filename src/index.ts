@@ -5,6 +5,7 @@ export type {
 	GraphraumEdge,
 	GraphraumMode,
 	GraphraumNode,
+	GraphraumNodeUpdate,
 	GraphraumOptions,
 	GraphraumPosition,
 	GraphraumTheme,

@@ -14,6 +14,9 @@ describe("compileGraph", () => {
 
 		expect([...graph.nodePositions]).toEqual([1, 2, 0, 3, 4, 5]);
 		expect([...graph.edgePositions]).toEqual([1, 2, 0, 3, 4, 5]);
+		expect([...graph.edgeNodeIndices]).toEqual([0, 1]);
+		expect(graph.incidentEdgeIndices).toEqual([[0], [0]]);
+		expect(graph.nodeIndices.get("b")).toBe(1);
 	});
 
 	test("rejects duplicate node identities before rendering", () => {
