@@ -49,4 +49,5 @@ export interface GraphraumOptions {
 
 export interface GraphraumDiagnostics {
 	gpuDrawCalls: number;
+	pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
 }
