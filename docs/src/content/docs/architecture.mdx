@@ -11,7 +11,8 @@ Graphraum consumes positioned nodes and edges. It does not run a force layout, f
 flowchart LR
   App[Application graph state] -->|nodes, edges, positions| Graphraum
   Layout[Layout worker or server] -->|positions| App
-  Graphraum --> Scene[Three.js scene]
+  Graphraum --> Viewport[Spatial viewport query]
+  Viewport --> Scene[Three.js scene]
   Scene --> Nodes[One InstancedMesh]
   Scene --> Edges[One LineSegments geometry]
   Graphraum -->|picked node ID| App
@@ -23,6 +24,12 @@ This keeps layout work independently replaceable and prevents a complete force s
 
 Graphraum renders when data, selection, camera controls, mode, or container size changes. It does not keep an idle animation loop alive. Calls within one browser frame are coalesced through `requestAnimationFrame`.
 
+## Viewport materialization
+
+In 2D, Graphraum queries visible nodes from its spatial grid with an overscan margin, derives unique incident edges without scanning the full edge list, and compacts that subset into the existing node and edge GPU buffers. The renderer remains at two draw calls.
+
+When incident edges exceed `maxVisibleEdges`, Graphraum applies a deterministic overview budget and reports that decision through diagnostics. Application-specific clustering and semantic aggregation remain host concerns.
+
 ## 2D first
 
 The default orthographic camera makes the graph behave as a native 2D surface. The perspective camera is available on demand for structures where depth carries meaning. Both modes use the same node and edge contract.
@@ -32,7 +39,7 @@ The default orthographic camera makes the graph behave as a native 2D surface. T
 The host remains responsible for:
 
 - layout and progressive position updates;
-- labels and semantic level of detail;
+- labels, clustering, and domain-specific semantic level of detail;
 - keyboard navigation and an accessible node list;
 - domain actions such as expand, focus, archive, or inspect;
 - persistence and synchronization.

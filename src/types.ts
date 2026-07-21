@@ -42,12 +42,19 @@ export interface GraphraumTheme {
 
 export interface GraphraumOptions {
 	antialias?: boolean;
+	maxVisibleEdges?: number;
 	maxPixelRatio?: number;
 	mode?: GraphraumMode;
 	theme?: Partial<GraphraumTheme>;
+	viewportCulling?: boolean;
+	viewportOverscan?: number;
 }
 
 export interface GraphraumDiagnostics {
 	gpuDrawCalls: number;
+	lodLevel: "detail" | "overview";
 	pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+	visibleEdgeCandidates: number;
+	visibleEdges: number;
+	visibleNodes: number;
 }
