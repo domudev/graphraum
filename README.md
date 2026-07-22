@@ -37,6 +37,8 @@ bun run check
 bun run build
 ```
 
+Repository decisions and agent instructions live in [`AGENTS.md`](./AGENTS.md). Changes use [Conventional Commits](https://www.conventionalcommits.org/) and require a matching PR title because squash merges become release commits.
+
 ## Install
 
 graphraum is currently published to the GitHub Packages npm registry. Configure the `@domudev` scope and authenticate with a classic GitHub token that has `read:packages` permission:
@@ -53,7 +55,7 @@ Then install it with Bun:
 bun add @domudev/graphraum
 ```
 
-Publishing is driven by GitHub Releases. A release tag must exactly match the package version with a `v` prefix, for example `v0.2.0`. The release workflow validates, tests, builds, and publishes with its repository-scoped `GITHUB_TOKEN`.
+Publishing is automated with semantic-release after CI succeeds on `main`. Commit types determine the next version, semantic-release creates the `v<version>` tag and GitHub Release, and the package is published to GitHub Packages. Do not manually edit the package version or create routine release tags.
 
 ## Documentation
 

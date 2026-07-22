@@ -1,0 +1,6 @@
+---
+description: Canonical graphraum repository instructions
+alwaysApply: true
+---
+
+Read and follow [AGENTS.md](../../AGENTS.md) before changing this repository. `AGENTS.md` is the single source of truth for architecture, engineering principles, testing, commits, releases, and pull requests.
