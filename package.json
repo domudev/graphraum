@@ -32,6 +32,7 @@
 		"docs:dev": "bun run --cwd docs dev",
 		"docs:test": "bun run --cwd docs test",
 		"prepack": "bun run build",
+		"release": "semantic-release",
 		"test": "vitest run --dir src"
 	},
 	"engines": {
@@ -42,7 +43,10 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.5",
+		"@commitlint/cli": "^21.2.1",
+		"@commitlint/config-conventional": "^21.2.0",
 		"@types/three": "^0.185.1",
+		"semantic-release": "^25.0.8",
 		"tsdown": "^0.22.13",
 		"typescript": "^6.0.3",
 		"vite": "^8.1.5",
