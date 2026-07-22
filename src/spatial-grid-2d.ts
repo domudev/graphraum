@@ -1,4 +1,4 @@
-import type { GraphraumNode } from "./types";
+import type { GraphraumNodeGeometry } from "./types";
 
 export interface Bounds2D {
 	bottom: number;
@@ -11,14 +11,14 @@ export interface Bounds2D {
 export class SpatialGrid2D {
 	private readonly cells = new Map<string, number[]>();
 	private readonly cellKeys: (string | undefined)[] = [];
-	private readonly nodes: (GraphraumNode | undefined)[] = [];
+	private readonly nodes: (GraphraumNodeGeometry | undefined)[] = [];
 	private maxRadius = 0;
 
 	constructor(private readonly cellSize = 32) {
 		if (!Number.isFinite(cellSize) || cellSize <= 0) throw new Error("Spatial grid cell size must be positive.");
 	}
 
-	set(index: number, node: GraphraumNode) {
+	set(index: number, node: GraphraumNodeGeometry) {
 		const previousKey = this.cellKeys[index];
 		if (previousKey) {
 			const previousCell = this.cells.get(previousKey);

@@ -73,7 +73,7 @@ The WebGL surface is not the accessibility tree. Applications should mirror focu
 
 ## Beyond color and size
 
-Arbitrary HTML per node is not the dense rendering path: it would trade away batching, viewport materialization, and the 100k-node target. The planned translation layer maps domain attributes to typed node and edge visuals at ingestion and update boundaries, then compiles those visuals into GPU buffers.
+Arbitrary HTML per node is not the dense rendering path: it would trade away batching, viewport materialization, and the 100k-node target. The [`defineVisuals()` translation layer](../node-edge-presentation/) maps typed domain attributes to node and edge visuals once at ingestion, then compiles them into GPU buffers. Titles, properties, and host-owned action descriptors remain available by entity ID.
 
 Built-in shapes should stay in one instanced node draw call through an SDF or atlas shader. Reliable edge width, dashes, and direction markers require GPU edge quads rather than one object per edge. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
 

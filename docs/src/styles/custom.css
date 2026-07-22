@@ -359,6 +359,40 @@
 	margin: 0;
 }
 
+.presentation-contract {
+	border: 1px solid var(--graphraum-border);
+	border-radius: var(--graphraum-radius);
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	margin-block: 1.5rem 2.5rem;
+	overflow: hidden;
+}
+
+.presentation-contract > div {
+	display: grid;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 1rem;
+}
+
+.presentation-contract > div + div {
+	border-left: 1px solid var(--graphraum-border);
+}
+
+.presentation-contract span {
+	color: var(--graphraum-primary);
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.presentation-contract p {
+	color: var(--graphraum-muted-foreground);
+	font-size: 0.85rem;
+	margin: 0;
+}
+
 .api-grid {
 	border: 1px solid var(--graphraum-border);
 	border-radius: var(--graphraum-radius);
@@ -779,6 +813,15 @@
 }
 
 @media (max-width: 50rem) {
+	.presentation-contract {
+		grid-template-columns: 1fr;
+	}
+
+	.presentation-contract > div + div {
+		border-left: 0;
+		border-top: 1px solid var(--graphraum-border);
+	}
+
 	.home-proof,
 	.reference-run {
 		grid-template-columns: repeat(2, 1fr);

@@ -1,14 +1,14 @@
-import type { GraphraumNode, GraphraumNodeUpdate } from "./types";
+import type { GraphraumNode, GraphraumNodeGeometry, GraphraumNodeUpdate } from "./types";
 
-export interface PreparedNodeUpdate {
+export interface PreparedNodeUpdate<NodeAttributes = undefined> {
 	colorChanged: boolean;
 	index: number;
-	next: GraphraumNode;
+	next: GraphraumNode<NodeAttributes>;
 	positionChanged: boolean;
 	sizeChanged: boolean;
 }
 
-function assertFinitePosition(node: GraphraumNode) {
+function assertFinitePosition(node: GraphraumNodeGeometry) {
 	for (const [axis, value] of [
 		["x", node.position.x],
 		["y", node.position.y],
@@ -22,11 +22,11 @@ function assertFinitePosition(node: GraphraumNode) {
 }
 
 /** Validates a complete update batch before the renderer mutates CPU or GPU state. */
-export function prepareNodeUpdates(
-	nodes: readonly GraphraumNode[],
+export function prepareNodeUpdates<NodeAttributes = undefined>(
+	nodes: readonly GraphraumNode<NodeAttributes>[],
 	nodeIndices: ReadonlyMap<string, number>,
 	updates: readonly GraphraumNodeUpdate[],
-): readonly PreparedNodeUpdate[] {
+): readonly PreparedNodeUpdate<NodeAttributes>[] {
 	const seen = new Set<string>();
 	return updates.map((update) => {
 		if (seen.has(update.id)) throw new Error(`Duplicate node update: "${update.id}"`);
@@ -35,7 +35,7 @@ export function prepareNodeUpdates(
 		if (index === undefined) throw new Error(`Cannot update missing node: "${update.id}"`);
 		const current = nodes[index];
 		if (!current) throw new Error(`Cannot update missing node: "${update.id}"`);
-		const next: GraphraumNode = {
+		const next: GraphraumNode<NodeAttributes> = {
 			...current,
 			...(Object.hasOwn(update, "color") ? { color: update.color } : {}),
 			...(update.position ? { position: { ...update.position } } : {}),
