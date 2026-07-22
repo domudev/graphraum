@@ -22,26 +22,19 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - name: Resolve documented release
-        id: version
-        shell: bash
-        run: |
-          tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
-          if [[ -z "$tag" ]]; then
-            tag="development"
-          fi
-          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
-      - uses: withastro/action@v6
-        env:
-          GRAPHRAUM_DOCS_VERSION: ${{ steps.version.outputs.tag }}
+      - uses: oven-sh/setup-bun@v2
         with:
-          path: docs
-          package-manager: bun@1.3.1
+          bun-version: 1.3.1
+      - run: bun run docs:archive
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: .pages
 
   deploy:
     needs: build

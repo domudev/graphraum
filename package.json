@@ -28,6 +28,7 @@
 		"check": "biome check . && tsc --noEmit",
 		"dev": "vite examples/benchmark",
 		"docs:build": "bun run --cwd docs build",
+		"docs:archive": "bun run docs/scripts/build-release-archives.ts",
 		"docs:check": "bun run --cwd docs check",
 		"docs:dev": "bun run --cwd docs dev",
 		"docs:test": "bun run --cwd docs test",
