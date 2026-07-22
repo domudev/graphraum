@@ -1,4 +1,5 @@
 dist/
+.pages/
 .astro/
 node_modules/
 playwright-report/
