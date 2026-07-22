@@ -64,7 +64,7 @@ Node and edge IDs must be unique, every edge endpoint must exist, coordinates mu
 
 ## Data and updates
 
-<div class="api-grid">
+<div class="api-grid not-content">
   <div><code>setData(data)</code><p>Validates and replaces the complete topology, rebuilds canonical buffers, fits the camera, materializes the viewport, and schedules a render.</p></div>
   <div><code>updateNodes(updates)</code><p>Changes position, size, or color for existing nodes and updates only their node matrices and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
   <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
@@ -82,7 +82,7 @@ graph.updateNodes(updates);
 
 ## Camera and interaction
 
-<div class="api-grid">
+<div class="api-grid not-content">
   <div><code>pick(clientX, clientY)</code><p>Returns the nearest node ID or <code>null</code>. Uses the spatial grid in 2D and instance raycasting in 3D.</p></div>
   <div><code>setMode(mode)</code><p>Switches between orthographic 2D and perspective 3D, replaces controls, and fits the current graph.</p></div>
   <div><code>getMode()</code><p>Returns the active <code>"2d"</code> or <code>"3d"</code> mode.</p></div>
