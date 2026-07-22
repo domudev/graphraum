@@ -1,0 +1,22 @@
+---
+import { graphraumDocsVersion as version } from "../lib/docs-version";
+---
+
+<div class="version-reference not-content" aria-label="Documentation version">
+  <div>
+    <span>Documented API</span>
+    <strong>{version.display}</strong>
+  </div>
+  <div>
+    <span>Exact package</span>
+    {version.installCommand ? <code>{version.installCommand}</code> : <strong>Not published</strong>}
+  </div>
+  <a href={version.referenceUrl}>
+    <span>{version.isRelease ? "Release notes" : "Development source"}</span>
+    <strong>Open reference <span aria-hidden="true">→</span></strong>
+  </a>
+  <a href={version.sourceUrl}>
+    <span>Immutable contract</span>
+    <strong>Browse source <span aria-hidden="true">→</span></strong>
+  </a>
+</div>

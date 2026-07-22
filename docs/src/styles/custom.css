@@ -55,6 +55,75 @@
 	letter-spacing: -0.035em;
 }
 
+.versioned-site-title {
+	align-items: center;
+	display: flex;
+	gap: 0.5rem;
+}
+
+.versioned-site-title > a:last-child {
+	background: var(--graphraum-muted);
+	border: 1px solid var(--graphraum-border);
+	border-radius: 999px;
+	color: var(--graphraum-muted-foreground);
+	font-size: 0.65rem;
+	font-weight: 700;
+	line-height: 1;
+	padding: 0.3rem 0.45rem;
+	text-decoration: none;
+}
+
+.version-reference {
+	border: 1px solid var(--graphraum-border);
+	border-radius: var(--graphraum-radius);
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin-block: 1rem 2rem;
+	overflow: hidden;
+}
+
+.version-reference > * {
+	align-content: center;
+	display: grid;
+	gap: 0.35rem;
+	margin: 0;
+	min-width: 0;
+	padding: 1rem;
+}
+
+.version-reference > * + * {
+	border-left: 1px solid var(--graphraum-border);
+}
+
+.version-reference span {
+	color: var(--graphraum-primary);
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.version-reference strong,
+.version-reference code {
+	font-size: 0.78rem;
+	overflow-wrap: anywhere;
+}
+
+.version-reference code {
+	background: transparent;
+	padding: 0;
+}
+
+.version-reference a {
+	color: var(--graphraum-foreground);
+	text-decoration: none;
+}
+
+.version-reference a:hover,
+.version-reference a:focus-visible {
+	background: var(--graphraum-muted);
+}
+
 .hero {
 	padding-block: clamp(3rem, 7vw, 6rem);
 }
@@ -813,6 +882,18 @@
 }
 
 @media (max-width: 50rem) {
+	.version-reference {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.version-reference > :nth-child(3) {
+		border-left: 0;
+	}
+
+	.version-reference > :nth-child(n + 3) {
+		border-top: 1px solid var(--graphraum-border);
+	}
+
 	.presentation-contract {
 		grid-template-columns: 1fr;
 	}
@@ -913,6 +994,15 @@
 }
 
 @media (max-width: 36rem) {
+	.version-reference {
+		grid-template-columns: 1fr;
+	}
+
+	.version-reference > * + * {
+		border-left: 0;
+		border-top: 1px solid var(--graphraum-border);
+	}
+
 	.palette-grid,
 	.node-state-grid,
 	.api-grid {

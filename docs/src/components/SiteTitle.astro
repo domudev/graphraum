@@ -1,0 +1,9 @@
+---
+import Default from "@astrojs/starlight/components/SiteTitle.astro";
+import { graphraumDocsVersion as version } from "../lib/docs-version";
+---
+
+<div class="versioned-site-title">
+  <Default />
+  <a href={version.referenceUrl} aria-label={`Documentation for ${version.display}`}>{version.display}</a>
+</div>

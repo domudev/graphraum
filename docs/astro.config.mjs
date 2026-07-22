@@ -16,6 +16,7 @@ export default defineConfig({
 			components: {
 				Head: "./src/components/Head.astro",
 				PageTitle: "./src/components/PageTitle.astro",
+				SiteTitle: "./src/components/SiteTitle.astro",
 			},
 			social: [{ icon: "github", label: "graphraum on GitHub", href: "https://github.com/domudev/graphraum" }],
 			sidebar: [
