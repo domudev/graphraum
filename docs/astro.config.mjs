@@ -27,10 +27,16 @@ export default defineConfig({
 					],
 				},
 				{
+					label: "SDK",
+					items: [
+						{ label: "Node & edge presentation", link: "/node-edge-presentation/" },
+						{ label: "API reference", link: "/api-reference/" },
+					],
+				},
+				{
 					label: "Engine",
 					items: [
 						{ label: "Visual language", link: "/visual-language/" },
-						{ label: "API reference", link: "/api-reference/" },
 						{ label: "Architecture", link: "/architecture/" },
 					],
 				},

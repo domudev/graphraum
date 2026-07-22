@@ -1,0 +1,117 @@
+---
+title: Node & edge presentation
+description: Compile typed domain attributes into fast GPU visuals and host-owned titles, properties, and actions.
+---
+
+`defineVisuals()` is the boundary between your domain graph and graphraum's render buffers. It maps each node and edge once when `setData()` runs—never inside a frame.
+
+<div class="presentation-contract not-content">
+  <div><strong>GPU visual</strong><span>Always cheap</span><p>Node color and size plus edge color are compiled into the existing two batched draw calls.</p></div>
+  <div><strong>Presentation</strong><span>On demand</span><p>Titles, subtitles, properties, and action descriptors stay available by ID for your focused or selected UI.</p></div>
+  <div><strong>Application</strong><span>Owns behavior</span><p>Your framework renders accessible HTML and decides what an action ID does. The engine never stores callbacks.</p></div>
+</div>
+
+## Define the domain boundary
+
+```ts
+import { Graphraum, defineVisuals } from "@domudev/graphraum";
+
+type NodeAttributes = {
+  kind: "person" | "place";
+  displayName: string;
+  description?: string;
+};
+
+type EdgeAttributes = {
+  relationship: string;
+};
+
+const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
+  node: (node) => ({
+    visual: {
+      color: node.attributes.kind === "person" ? "#73c7a5" : "#469878",
+      size: node.attributes.kind === "person" ? 8 : 6,
+    },
+    presentation: {
+      title: node.attributes.displayName,
+      subtitle: node.attributes.description,
+      properties: [
+        { id: "kind", label: "Kind", value: node.attributes.kind },
+      ],
+      actions: [
+        { id: "inspect", label: "Inspect" },
+        { id: "remove", label: "Remove", disabled: false },
+      ],
+    },
+  }),
+  edge: (edge) => ({
+    visual: { color: "#226f54" },
+    presentation: { title: edge.attributes.relationship },
+  }),
+});
+
+const graph = new Graphraum<NodeAttributes, EdgeAttributes>(container, { visuals });
+```
+
+When attribute generics are supplied, `attributes` is required on every matching node and edge. This makes missing product data a compile-time error instead of an ambiguous rendering fallback.
+
+## Set typed data
+
+```ts
+graph.setData({
+  nodes: [
+    {
+      id: "person:ada",
+      position: { x: -20, y: 0 },
+      attributes: { kind: "person", displayName: "Ada Lovelace" },
+    },
+    {
+      id: "place:london",
+      position: { x: 20, y: 0 },
+      attributes: { kind: "place", displayName: "London" },
+    },
+  ],
+  edges: [
+    {
+      id: "born-in",
+      source: "person:ada",
+      target: "place:london",
+      attributes: { relationship: "Born in" },
+    },
+  ],
+});
+```
+
+The mapper result overrides direct `color` and `size` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API.
+
+## Render detail only when needed
+
+Use graphraum's picking result to fetch immutable, serializable presentation data. Render it in your own React, Vue, Svelte, or plain HTML surface.
+
+```ts
+container.addEventListener("click", (event) => {
+  const nodeId = graph.pick(event.clientX, event.clientY);
+  const presentation = nodeId ? graph.getNodePresentation(nodeId) : null;
+
+  detailsPanel.render(presentation);
+});
+```
+
+`getNodePresentation(id)` and `getEdgePresentation(id)` return `null` when no presentation was compiled. Returned properties and actions are detached from the mapper input and frozen.
+
+## Dispatch actions in the host
+
+Actions are descriptors, not functions. Stable IDs keep serialization, worker compilation, framework adapters, and testing possible.
+
+```ts
+function runNodeAction(nodeId: string, actionId: string) {
+  if (actionId === "inspect") openInspector(nodeId);
+  if (actionId === "remove") requestRemoval(nodeId);
+}
+```
+
+Do not put arbitrary HTML, component instances, closures, or mutable domain objects into presentation metadata. Properties accept only `string`, `number`, `boolean`, or `null`; numeric values must be finite. Empty labels and duplicate property or action IDs fail during `setData()` with the entity ID in the error.
+
+## Density policy
+
+Color and size can remain visible across the graph. Titles should be budgeted by zoom and importance in a future label layer. Full properties and actions belong to a bounded focused or selected subset in host HTML. This preserves both accessibility and the dense rendering path.

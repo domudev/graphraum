@@ -1,30 +1,111 @@
-import type { GraphraumData } from "./types";
+import type {
+	CompiledGraphraumPresentation,
+	GraphraumData,
+	GraphraumEdgeVisual,
+	GraphraumNodeVisual,
+	GraphraumPresentation,
+	GraphraumVisualMapper,
+} from "./types";
 
 export interface CompiledGraph {
 	edgeNodeIndices: Uint32Array;
 	edgePositions: Float32Array;
+	edgePresentations: ReadonlyMap<string, CompiledGraphraumPresentation>;
+	edgeVisuals: readonly Readonly<GraphraumEdgeVisual>[];
 	incidentEdgeIndices: readonly (readonly number[])[];
 	nodeIds: readonly string[];
 	nodeIndices: ReadonlyMap<string, number>;
 	nodePositions: Float32Array;
+	nodePresentations: ReadonlyMap<string, CompiledGraphraumPresentation>;
+	nodeVisuals: readonly Readonly<GraphraumNodeVisual>[];
 }
 
 function assertFinitePosition(nodeId: string, axis: string, value: number) {
 	if (!Number.isFinite(value)) throw new Error(`Node "${nodeId}" has a non-finite ${axis} position`);
 }
 
+function assertNotEmpty(value: string, message: string) {
+	if (value.trim().length === 0) throw new Error(message);
+}
+
+function compilePresentation(
+	kind: "Edge" | "Node",
+	id: string,
+	presentation: GraphraumPresentation,
+): CompiledGraphraumPresentation {
+	const prefix = `${kind} "${id}" presentation`;
+	assertNotEmpty(presentation.title, `${prefix} title must not be empty`);
+	if (presentation.subtitle !== undefined) {
+		assertNotEmpty(presentation.subtitle, `${prefix} subtitle must not be empty`);
+	}
+
+	const propertyIds = new Set<string>();
+	const properties = (presentation.properties ?? []).map((property) => {
+		assertNotEmpty(property.id, `${prefix} property id must not be empty`);
+		assertNotEmpty(property.label, `${prefix} property "${property.id}" label must not be empty`);
+		if (propertyIds.has(property.id)) throw new Error(`${prefix} has duplicate property id "${property.id}"`);
+		propertyIds.add(property.id);
+		if (typeof property.value === "number" && !Number.isFinite(property.value)) {
+			throw new Error(`${prefix} property "${property.id}" must have a finite numeric value`);
+		}
+		if (
+			property.value !== null &&
+			!(["boolean", "number", "string"] as const).includes(typeof property.value as "boolean" | "number" | "string")
+		) {
+			throw new Error(`${prefix} property "${property.id}" must have a serializable scalar value`);
+		}
+		return Object.freeze({ ...property });
+	});
+
+	const actionIds = new Set<string>();
+	const actions = (presentation.actions ?? []).map((action) => {
+		assertNotEmpty(action.id, `${prefix} action id must not be empty`);
+		assertNotEmpty(action.label, `${prefix} action "${action.id}" label must not be empty`);
+		if (action.disabled !== undefined && typeof action.disabled !== "boolean") {
+			throw new Error(`${prefix} action "${action.id}" disabled must be a boolean`);
+		}
+		if (actionIds.has(action.id)) throw new Error(`${prefix} has duplicate action id "${action.id}"`);
+		actionIds.add(action.id);
+		return Object.freeze({ ...action });
+	});
+
+	return Object.freeze({
+		...presentation,
+		actions: Object.freeze(actions),
+		properties: Object.freeze(properties),
+	});
+}
+
+function compileNodeVisual(id: string, visual: GraphraumNodeVisual): Readonly<GraphraumNodeVisual> {
+	if (visual.size !== undefined && (!Number.isFinite(visual.size) || visual.size <= 0)) {
+		throw new Error(`Node "${id}" visual must have a positive finite size`);
+	}
+	return Object.freeze({ ...visual });
+}
+
 /** Validates graph identity and compiles lookup-heavy objects into GPU-oriented position buffers. */
-export function compileGraph(data: GraphraumData): CompiledGraph {
+export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefined>(
+	data: GraphraumData<NodeAttributes, EdgeAttributes>,
+	visuals?: GraphraumVisualMapper<NodeAttributes, EdgeAttributes>,
+): CompiledGraph {
 	const nodeIndices = new Map<string, number>();
 	const nodePositions = new Float32Array(data.nodes.length * 3);
+	const nodePresentations = new Map<string, CompiledGraphraumPresentation>();
+	const nodeVisuals: Readonly<GraphraumNodeVisual>[] = [];
 
 	for (const [index, node] of data.nodes.entries()) {
 		if (nodeIndices.has(node.id)) throw new Error(`Duplicate node id: "${node.id}"`);
 		assertFinitePosition(node.id, "x", node.position.x);
 		assertFinitePosition(node.id, "y", node.position.y);
 		assertFinitePosition(node.id, "z", node.position.z ?? 0);
-		if (node.size !== undefined && (!Number.isFinite(node.size) || node.size <= 0)) {
+		const encoding = visuals?.node?.(node);
+		const visual = compileNodeVisual(node.id, encoding?.visual ?? { color: node.color, size: node.size });
+		if (visual.size !== undefined && (!Number.isFinite(visual.size) || visual.size <= 0)) {
 			throw new Error(`Node "${node.id}" must have a positive finite size`);
+		}
+		nodeVisuals.push(visual);
+		if (encoding?.presentation) {
+			nodePresentations.set(node.id, compilePresentation("Node", node.id, encoding.presentation));
 		}
 
 		nodeIndices.set(node.id, index);
@@ -34,10 +115,17 @@ export function compileGraph(data: GraphraumData): CompiledGraph {
 	const edgeIds = new Set<string>();
 	const edgeNodeIndices = new Uint32Array(data.edges.length * 2);
 	const edgePositions = new Float32Array(data.edges.length * 6);
+	const edgePresentations = new Map<string, CompiledGraphraumPresentation>();
+	const edgeVisuals: Readonly<GraphraumEdgeVisual>[] = [];
 	const incidentEdgeIndices = Array.from({ length: data.nodes.length }, () => [] as number[]);
 	for (const [index, edge] of data.edges.entries()) {
 		if (edgeIds.has(edge.id)) throw new Error(`Duplicate edge id: "${edge.id}"`);
 		edgeIds.add(edge.id);
+		const encoding = visuals?.edge?.(edge);
+		edgeVisuals.push(Object.freeze({ ...(encoding?.visual ?? { color: edge.color }) }));
+		if (encoding?.presentation) {
+			edgePresentations.set(edge.id, compilePresentation("Edge", edge.id, encoding.presentation));
+		}
 
 		const sourceIndex = nodeIndices.get(edge.source);
 		const targetIndex = nodeIndices.get(edge.target);
@@ -54,9 +142,13 @@ export function compileGraph(data: GraphraumData): CompiledGraph {
 	return {
 		edgeNodeIndices,
 		edgePositions,
+		edgePresentations,
+		edgeVisuals,
 		incidentEdgeIndices,
 		nodeIds: data.nodes.map((node) => node.id),
 		nodeIndices,
 		nodePositions,
+		nodePresentations,
+		nodeVisuals,
 	};
 }

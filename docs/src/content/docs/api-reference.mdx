@@ -8,6 +8,7 @@ description: The graphraum constructor, graph contract, update paths, interactio
 ```ts
 import {
   Graphraum,
+  defineVisuals,
   graphraumTheme,
   type GraphraumData,
   type GraphraumDiagnostics,
@@ -33,6 +34,7 @@ interface GraphraumOptions {
   viewportCulling?: boolean;        // default: true
   viewportOverscan?: number;        // default: 16 world units
   theme?: Partial<GraphraumTheme>;
+  visuals?: GraphraumVisualMapper<NodeAttributes, EdgeAttributes>;
 }
 ```
 
@@ -41,9 +43,9 @@ Invalid edge budgets, overscan values, positions, and node sizes fail at the bou
 ## Graph data
 
 ```ts
-interface GraphraumData {
-  nodes: readonly GraphraumNode[];
-  edges: readonly GraphraumEdge[];
+interface GraphraumData<NodeAttributes = undefined, EdgeAttributes = undefined> {
+  nodes: readonly GraphraumNode<NodeAttributes>[];
+  edges: readonly GraphraumEdge<EdgeAttributes>[];
 }
 
 interface GraphraumNode {
@@ -57,10 +59,13 @@ interface GraphraumEdge {
   id: string;
   source: string;
   target: string;
+  color?: string | number;
 }
 ```
 
 Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node sizes must be positive. Positions and sizes use world units.
+
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color and size, edge color, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
 
 ## Data and updates
 
@@ -68,6 +73,8 @@ Node and edge IDs must be unique, every edge endpoint must exist, coordinates mu
   <div><code>setData(data)</code><p>Validates and replaces the complete topology, rebuilds canonical buffers, fits the camera, materializes the viewport, and schedules a render.</p></div>
   <div><code>updateNodes(updates)</code><p>Changes position, size, or color for existing nodes and updates only their node matrices and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
   <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
+  <div><code>getNodePresentation(id)</code><p>Returns the compiled title, subtitle, properties, and action descriptors for a node, or <code>null</code>.</p></div>
+  <div><code>getEdgePresentation(id)</code><p>Returns the compiled presentation for an edge, or <code>null</code>.</p></div>
   <div><code>render()</code><p>Schedules one render on the next animation frame. Repeated calls in the same frame are coalesced.</p></div>
 </div>
 
