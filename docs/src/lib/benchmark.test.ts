@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { createFixture, effectivePixelRatio, summarize } from "./benchmark";
+import { BENCHMARK_NODE_COLORS, createFixture, effectivePixelRatio, summarize } from "./benchmark";
 
 describe("live benchmark helpers", () => {
 	test("builds a deterministic three-edges-per-node fixture", () => {
@@ -10,9 +10,8 @@ describe("live benchmark helpers", () => {
 		expect(first).toEqual(second);
 		expect(first.nodes).toHaveLength(100);
 		expect(first.edges).toHaveLength(300);
-		expect(first.nodes[0]?.color).toBe("#fcfffc");
-		expect(first.nodes[1]?.color).toBeUndefined();
-		expect(first.nodes[11]?.color).toBe("#73c7a5");
+		expect(new Set(first.nodes.map((node) => node.color))).toEqual(new Set(BENCHMARK_NODE_COLORS));
+		expect(BENCHMARK_NODE_COLORS).not.toContain("#fcfffc");
 	});
 
 	test("summarizes empty and populated samples honestly", () => {
