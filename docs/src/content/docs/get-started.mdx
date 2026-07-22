@@ -3,6 +3,10 @@ title: Get started
 description: Install graphraum from GitHub Packages and render your first graph.
 ---
 
+import VersionReference from "../../components/VersionReference.astro";
+
+<VersionReference />
+
 ## Install
 
 graphraum is currently published through the GitHub Packages npm registry. Configure the `@domudev` scope with a classic GitHub token that has `read:packages` permission:
@@ -12,11 +16,7 @@ graphraum is currently published through the GitHub Packages npm registry. Confi
 //npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
 ```
 
-Install with Bun:
-
-```sh
-bun add @domudev/graphraum
-```
+The exact Bun command in the version card pins the package documented by this site. Remove the version suffix only when you intentionally want the newest published release.
 
 ## Render a graph
 
