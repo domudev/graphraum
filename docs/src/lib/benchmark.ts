@@ -7,6 +7,8 @@ export interface BenchmarkStatistics {
 	max: number | null;
 }
 
+export const BENCHMARK_NODE_COLORS = ["#226f54", "#347f63", "#469878", "#5caf8d", "#73c7a5"] as const;
+
 export function summarize(samples: readonly number[]): BenchmarkStatistics {
 	if (samples.length === 0) return { count: 0, p50: null, p95: null, max: null };
 	const sorted = samples.toSorted((left, right) => left - right);
@@ -32,16 +34,19 @@ export function createFixture(nodeCount: number): GraphraumData {
 	const edgeCount = nodeCount * 3;
 	const columns = Math.ceil(Math.sqrt(nodeCount));
 	return {
-		nodes: Array.from({ length: nodeCount }, (_, index) => ({
-			id: `node-${index}`,
-			position: {
-				x: (index % columns) * 12,
-				y: Math.floor(index / columns) * 12,
-				z: ((index * 17) % 101) - 50,
-			},
-			...(index === 0 ? { color: "#fcfffc" } : index % 11 === 0 ? { color: "#73c7a5" } : {}),
-			size: 2.5,
-		})),
+		nodes: Array.from({ length: nodeCount }, (_, index) => {
+			const row = Math.floor(index / columns);
+			return {
+				id: `node-${index}`,
+				position: {
+					x: (index % columns) * 12,
+					y: row * 12,
+					z: ((index * 17) % 101) - 50,
+				},
+				color: BENCHMARK_NODE_COLORS[(index * 7 + row * 3) % BENCHMARK_NODE_COLORS.length] ?? "#226f54",
+				size: 2.5,
+			};
+		}),
 		edges: Array.from({ length: edgeCount }, (_, index) => ({
 			id: `edge-${index}`,
 			source: `node-${index % nodeCount}`,
