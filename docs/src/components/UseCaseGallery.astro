@@ -1,0 +1,605 @@
+---
+import { demoUseCases } from "../lib/use-case-demos";
+---
+
+<section class="use-case-gallery not-content" data-use-case-gallery>
+	<header class="gallery-intro">
+		<div>
+			<span>Executable SDK examples</span>
+			<h2>One renderer. Different graph products.</h2>
+		</div>
+		<p>Choose a domain, select a node, inspect its relationships, and dispatch application-owned actions.</p>
+	</header>
+
+	<nav class="use-case-tabs" aria-label="Graph use case">
+		{demoUseCases.map((useCase, index) => (
+			<button
+				type="button"
+				class="use-case-tab"
+				data-use-case-id={useCase.id}
+				aria-pressed={index === 0 ? "true" : "false"}
+			>
+				<span>{useCase.kicker}</span>
+				<strong>{useCase.title}</strong>
+			</button>
+		))}
+	</nav>
+
+	<div class="gallery-summary">
+		<div>
+			<span data-demo-kicker></span>
+			<h3 data-demo-title></h3>
+		</div>
+		<p data-demo-description></p>
+	</div>
+
+	<div class="gallery-workspace">
+		<section class="graph-stage" aria-label="Interactive graph">
+			<header>
+				<span data-demo-counts></span>
+				<div class="graph-controls" aria-label="Graph view controls">
+					<button type="button" data-mode="2d" aria-pressed="true">2D</button>
+					<button type="button" data-mode="3d" aria-pressed="false">3D</button>
+					<button type="button" data-fit-view>Fit view</button>
+				</div>
+			</header>
+			<div
+				class="use-case-canvas"
+				data-demo-canvas
+				role="img"
+				aria-label="Interactive graph. Select an entity from the accessible list below or click a node."
+			></div>
+		</section>
+
+		<aside class="presentation-panel" aria-live="polite">
+			<header>
+				<span data-presentation-kind>Selected node</span>
+				<h3 data-presentation-title>Select an entity</h3>
+				<p data-presentation-subtitle>Its compiled presentation will appear here.</p>
+			</header>
+			<dl data-presentation-properties></dl>
+			<section class="relationship-section">
+				<span>Relationships</span>
+				<div data-presentation-relationships></div>
+			</section>
+			<footer data-presentation-actions></footer>
+		</aside>
+	</div>
+
+	<section class="entity-navigation">
+		<header>
+			<span>Accessible entity navigation</span>
+			<p>Selecting here and selecting on the canvas use the same SDK presentation path.</p>
+		</header>
+		<div data-entity-navigation></div>
+	</section>
+
+	<footer class="gallery-status" role="status" data-demo-status>
+		Ready. The graph is dense GPU content; this bounded HTML surface carries accessible detail and actions.
+	</footer>
+</section>
+
+<script>
+	import { Graphraum } from "@domudev/graphraum";
+	import {
+		demoUseCases,
+		demoVisuals,
+		resolveDemoAction,
+		type DemoUseCase,
+	} from "../lib/use-case-demos";
+
+	function requiredElement<ElementType extends Element>(parent: ParentNode, selector: string): ElementType {
+		const element = parent.querySelector<ElementType>(selector);
+		if (!element) throw new Error(`Interactive use-case gallery is missing "${selector}".`);
+		return element;
+	}
+
+	const root = requiredElement<HTMLElement>(document, "[data-use-case-gallery]");
+	const canvas = requiredElement<HTMLElement>(root, "[data-demo-canvas]");
+	const kicker = requiredElement<HTMLElement>(root, "[data-demo-kicker]");
+	const title = requiredElement<HTMLElement>(root, "[data-demo-title]");
+	const description = requiredElement<HTMLElement>(root, "[data-demo-description]");
+	const counts = requiredElement<HTMLElement>(root, "[data-demo-counts]");
+	const presentationKind = requiredElement<HTMLElement>(root, "[data-presentation-kind]");
+	const presentationTitle = requiredElement<HTMLElement>(root, "[data-presentation-title]");
+	const presentationSubtitle = requiredElement<HTMLElement>(root, "[data-presentation-subtitle]");
+	const properties = requiredElement<HTMLElement>(root, "[data-presentation-properties]");
+	const relationships = requiredElement<HTMLElement>(root, "[data-presentation-relationships]");
+	const actions = requiredElement<HTMLElement>(root, "[data-presentation-actions]");
+	const entityNavigation = requiredElement<HTMLElement>(root, "[data-entity-navigation]");
+	const status = requiredElement<HTMLElement>(root, "[data-demo-status]");
+
+	const graph = new Graphraum(canvas, {
+		maxPixelRatio: 1,
+		theme: { background: "#040f0f", edge: "#356b5a", node: "#3f7b65", selectedNode: "#fcfffc" },
+		visuals: demoVisuals,
+	});
+	let activeUseCase: DemoUseCase = demoUseCases[0];
+	let focusedNodeId: string | null = null;
+
+	function renderProperties(items: readonly { label: string; value: boolean | null | number | string }[]) {
+		properties.replaceChildren(
+			...items.flatMap((item) => {
+				const term = document.createElement("dt");
+				term.textContent = item.label;
+				const detail = document.createElement("dd");
+				detail.textContent = item.value === null ? "—" : String(item.value);
+				return [term, detail];
+			}),
+		);
+	}
+
+	function renderEdge(edgeId: string) {
+		const presentation = graph.getEdgePresentation(edgeId);
+		if (!presentation) return;
+		presentationKind.textContent = "Selected edge";
+		presentationTitle.textContent = presentation.title;
+		presentationSubtitle.textContent = "Compiled edge presentation";
+		renderProperties(presentation.properties);
+		relationships.replaceChildren();
+		actions.replaceChildren();
+		if (focusedNodeId) {
+			const back = document.createElement("button");
+			back.type = "button";
+			back.textContent = "Back to node";
+			back.addEventListener("click", () => selectNode(focusedNodeId));
+			actions.append(back);
+		}
+		status.textContent = `Edge “${presentation.title}” resolved through getEdgePresentation().`;
+	}
+
+	function renderRelationships(nodeId: string) {
+		const incident = activeUseCase.data.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+		if (incident.length === 0) {
+			const empty = document.createElement("span");
+			empty.textContent = "No direct relationships";
+			relationships.replaceChildren(empty);
+			return;
+		}
+		relationships.replaceChildren(
+			...incident.map((edge) => {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.textContent = graph.getEdgePresentation(edge.id)?.title ?? edge.id;
+				button.addEventListener("click", () => renderEdge(edge.id));
+				return button;
+			}),
+		);
+	}
+
+	function selectNode(nodeId: string | null) {
+		focusedNodeId = nodeId;
+		graph.setSelection(nodeId ? [nodeId] : []);
+		for (const button of entityNavigation.querySelectorAll<HTMLButtonElement>("button")) {
+			button.setAttribute("aria-pressed", String(button.dataset.nodeId === nodeId));
+		}
+		if (!nodeId) return;
+		const presentation = graph.getNodePresentation(nodeId);
+		if (!presentation) return;
+		presentationKind.textContent = "Selected node";
+		presentationTitle.textContent = presentation.title;
+		presentationSubtitle.textContent = presentation.subtitle ?? "";
+		renderProperties(presentation.properties);
+		renderRelationships(nodeId);
+		actions.replaceChildren(
+			...presentation.actions.map((action) => {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.disabled = action.disabled ?? false;
+				button.textContent = action.label;
+				button.addEventListener("click", () => {
+					const result = resolveDemoAction(activeUseCase, nodeId, action.id);
+					graph.setSelection(result.selectedNodeIds);
+					status.textContent = result.message;
+				});
+				return button;
+			}),
+		);
+		status.textContent = `${presentation.title} resolved through getNodePresentation().`;
+	}
+
+	function renderEntityNavigation() {
+		entityNavigation.replaceChildren(
+			...activeUseCase.data.nodes.map((node) => {
+				const presentation = graph.getNodePresentation(node.id);
+				const button = document.createElement("button");
+				button.type = "button";
+				button.dataset.nodeId = node.id;
+				button.setAttribute("aria-pressed", "false");
+				const category = document.createElement("span");
+				category.textContent = node.attributes.category;
+				const label = document.createElement("strong");
+				label.textContent = presentation?.title ?? node.id;
+				button.append(category, label);
+				button.addEventListener("click", () => selectNode(node.id));
+				return button;
+			}),
+		);
+	}
+
+	function activateUseCase(useCase: DemoUseCase) {
+		activeUseCase = useCase;
+		focusedNodeId = null;
+		graph.setData(useCase.data);
+		kicker.textContent = useCase.kicker;
+		title.textContent = useCase.title;
+		description.textContent = useCase.description;
+		counts.textContent = `${useCase.data.nodes.length} nodes · ${useCase.data.edges.length} edges · 2 draw calls`;
+		for (const tab of root.querySelectorAll<HTMLButtonElement>("[data-use-case-id]")) {
+			tab.setAttribute("aria-pressed", String(tab.dataset.useCaseId === useCase.id));
+		}
+		renderEntityNavigation();
+		selectNode(useCase.data.nodes[0]?.id ?? null);
+	}
+
+	for (const tab of root.querySelectorAll<HTMLButtonElement>("[data-use-case-id]")) {
+		tab.addEventListener("click", () => {
+			const useCase = demoUseCases.find(({ id }) => id === tab.dataset.useCaseId);
+			if (useCase) activateUseCase(useCase);
+		});
+	}
+	for (const modeButton of root.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
+		modeButton.addEventListener("click", () => {
+			const mode = modeButton.dataset.mode;
+			if (mode !== "2d" && mode !== "3d") return;
+			graph.setMode(mode);
+			for (const button of root.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
+				button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+			}
+			status.textContent = `${mode.toUpperCase()} camera active without changing the graph contract.`;
+		});
+	}
+	root.querySelector<HTMLButtonElement>("[data-fit-view]")?.addEventListener("click", () => graph.fitView());
+	canvas.addEventListener("click", (event) => selectNode(graph.pick(event.clientX, event.clientY)));
+	activateUseCase(activeUseCase);
+	window.addEventListener("pagehide", () => graph.destroy(), { once: true });
+</script>
+
+<style is:global>
+	.use-case-gallery {
+		background: var(--graphraum-card);
+		border: 1px solid var(--graphraum-border);
+		border-radius: var(--graphraum-radius);
+		display: grid;
+		margin-block: 1.5rem 3rem;
+		min-width: 0;
+		overflow: hidden;
+		width: 100%;
+	}
+
+	.use-case-gallery > * + * {
+		border-top: 1px solid var(--graphraum-border);
+	}
+
+	.use-case-gallery > *,
+	.gallery-workspace > *,
+	.entity-navigation {
+		min-width: 0;
+	}
+
+	.gallery-intro,
+	.gallery-summary,
+	.entity-navigation > header {
+		display: grid;
+		gap: 1rem;
+		grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.75fr);
+		padding: 1.25rem;
+	}
+
+	.gallery-intro span,
+	.gallery-summary span,
+	.presentation-panel span,
+	.entity-navigation span {
+		color: var(--graphraum-primary);
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.gallery-intro h2,
+	.gallery-summary h3,
+	.gallery-intro p,
+	.gallery-summary p,
+	.entity-navigation p {
+		margin: 0;
+	}
+
+	.gallery-intro h2 {
+		font-size: clamp(1.6rem, 3vw, 2.35rem);
+		letter-spacing: -0.04em;
+		line-height: 1.05;
+		margin-top: 0.3rem;
+	}
+
+	.use-case-tabs {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	.use-case-tab,
+	.graph-controls button,
+	.presentation-panel button,
+	.entity-navigation button {
+		appearance: none;
+		background: transparent;
+		border: 0;
+		border-radius: 0;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		margin: 0;
+		text-align: left;
+	}
+
+	.use-case-tab {
+		display: grid;
+		gap: 0.25rem;
+		min-width: 0;
+		overflow-wrap: anywhere;
+		padding: 1rem;
+	}
+
+	.use-case-tab + .use-case-tab,
+	.graph-controls button + button,
+	.presentation-panel footer button + button,
+	.entity-navigation button + button {
+		border-left: 1px solid var(--graphraum-border);
+	}
+
+	.use-case-tab span,
+	.entity-navigation button span {
+		color: var(--graphraum-muted-foreground);
+		font-size: 0.64rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.use-case-tab[aria-pressed="true"],
+	.graph-controls button[aria-pressed="true"],
+	.entity-navigation button[aria-pressed="true"] {
+		background: var(--graphraum-muted);
+	}
+
+	.gallery-summary {
+		align-items: end;
+	}
+
+	.gallery-summary h3 {
+		font-size: clamp(1.25rem, 2vw, 1.65rem);
+		margin-top: 0.25rem;
+	}
+
+	.gallery-summary p,
+	.gallery-intro p,
+	.entity-navigation p,
+	.presentation-panel p {
+		color: var(--graphraum-muted-foreground);
+		line-height: 1.55;
+	}
+
+	.gallery-workspace {
+		display: grid;
+		grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 0.85fr);
+	}
+
+	.graph-stage {
+		background: #040f0f;
+		color: #fcfffc;
+		min-width: 0;
+	}
+
+	.graph-stage > header {
+		align-items: stretch;
+		border-bottom: 1px solid #17372d;
+		display: flex;
+		justify-content: space-between;
+		min-height: 2.8rem;
+	}
+
+	.graph-stage > header > span {
+		align-items: center;
+		color: #b8c9c1;
+		display: flex;
+		font-size: 0.68rem;
+		padding-inline: 1rem;
+	}
+
+	.graph-controls {
+		display: flex;
+	}
+
+	.graph-controls button {
+		border-left: 1px solid #17372d;
+		color: #fcfffc;
+		font-size: 0.7rem;
+		font-weight: 700;
+		padding: 0.65rem 0.8rem;
+	}
+
+	.graph-controls button[aria-pressed="true"] {
+		background: #17372d;
+	}
+
+	.use-case-canvas {
+		height: 29rem;
+		touch-action: none;
+		width: 100%;
+	}
+
+	.presentation-panel {
+		border-left: 1px solid var(--graphraum-border);
+		display: grid;
+		grid-template-rows: auto auto 1fr auto;
+		min-width: 0;
+	}
+
+	.presentation-panel > * {
+		padding: 1rem;
+	}
+
+	.presentation-panel > * + * {
+		border-top: 1px solid var(--graphraum-border);
+	}
+
+	.presentation-panel h3 {
+		font-size: 1.35rem;
+		letter-spacing: -0.03em;
+		margin: 0.35rem 0 0;
+	}
+
+	.presentation-panel p {
+		font-size: 0.8rem;
+		margin: 0.3rem 0 0;
+	}
+
+	.presentation-panel dl {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		margin: 0;
+	}
+
+	.presentation-panel dt,
+	.presentation-panel dd {
+		font-size: 0.75rem;
+		margin: 0;
+		padding-block: 0.35rem;
+	}
+
+	.presentation-panel dt {
+		color: var(--graphraum-muted-foreground);
+	}
+
+	.presentation-panel dd {
+		font-weight: 700;
+		text-align: right;
+	}
+
+	.relationship-section > div {
+		display: grid;
+		margin: 0.55rem -1rem -1rem;
+	}
+
+	.relationship-section button {
+		border-top: 1px solid var(--graphraum-border);
+		font-size: 0.72rem;
+		padding: 0.7rem 1rem;
+	}
+
+	.presentation-panel footer {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		padding: 0;
+	}
+
+	.presentation-panel footer button {
+		font-size: 0.72rem;
+		font-weight: 750;
+		padding: 0.85rem 1rem;
+		text-align: center;
+	}
+
+	.presentation-panel button:hover,
+	.presentation-panel button:focus-visible,
+	.entity-navigation button:hover,
+	.entity-navigation button:focus-visible,
+	.use-case-tab:hover,
+	.use-case-tab:focus-visible {
+		background: var(--graphraum-muted);
+	}
+
+	.entity-navigation > header {
+		align-items: center;
+		padding-block: 0.8rem;
+	}
+
+	.entity-navigation {
+		overflow: hidden;
+	}
+
+	.entity-navigation > header p {
+		font-size: 0.72rem;
+	}
+
+	.entity-navigation > div {
+		border-top: 1px solid var(--graphraum-border);
+		display: flex;
+		max-width: 100%;
+		overflow-x: auto;
+		width: 100%;
+	}
+
+	.entity-navigation button {
+		display: grid;
+		flex: 1 0 8.5rem;
+		gap: 0.2rem;
+		padding: 0.8rem;
+	}
+
+	.entity-navigation button strong {
+		font-size: 0.72rem;
+	}
+
+	.gallery-status {
+		color: var(--graphraum-muted-foreground);
+		font-size: 0.72rem;
+		padding: 0.8rem 1rem;
+	}
+
+	@media (max-width: 52rem) {
+		.gallery-intro,
+		.gallery-summary,
+		.entity-navigation > header,
+		.gallery-workspace {
+			grid-template-columns: 1fr;
+		}
+
+		.gallery-workspace {
+			display: block;
+		}
+
+		.presentation-panel {
+			border-left: 0;
+			border-top: 1px solid var(--graphraum-border);
+		}
+
+		.use-case-canvas {
+			height: 23rem;
+		}
+	}
+
+	@media (max-width: 38rem) {
+		.use-case-tabs {
+			grid-template-columns: 1fr;
+		}
+
+		.use-case-tab + .use-case-tab {
+			border-left: 0;
+			border-top: 1px solid var(--graphraum-border);
+		}
+
+		.graph-stage > header {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		.graph-stage > header > span {
+			min-height: 2.5rem;
+		}
+
+		.graph-controls {
+			border-top: 1px solid #17372d;
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+		}
+
+		.graph-controls button:first-child {
+			border-left: 0;
+		}
+
+		.use-case-canvas {
+			height: 20rem;
+		}
+	}
+</style>

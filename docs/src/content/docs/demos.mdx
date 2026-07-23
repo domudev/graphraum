@@ -1,0 +1,57 @@
+---
+title: Interactive demos
+description: Run graphraum against knowledge, dependency, and investigation graphs using one typed SDK contract.
+---
+
+import UseCaseGallery from "../../components/UseCaseGallery.astro";
+import VersionReference from "../../components/VersionReference.astro";
+
+<VersionReference />
+
+These are executable examples, not captured videos. Every graph below is rendered by the SDK version shown above and every detail panel is resolved from compiled presentation data.
+
+<UseCaseGallery />
+
+## The reusable boundary
+
+The three domains share the same engine contract. Product attributes are translated once when data enters graphraum; render frames only consume the compiled buffers.
+
+```ts
+const visuals = defineVisuals<DomainNode, DomainEdge>({
+  node: (node) => ({
+    visual: {
+      color: palette[node.attributes.category],
+      size: node.attributes.importance,
+    },
+    presentation: {
+      title: node.attributes.label,
+      properties: node.attributes.properties,
+      actions: [
+        { id: "trace-connections", label: "Trace connections" },
+        { id: "primary", label: node.attributes.primaryActionLabel },
+      ],
+    },
+  }),
+  edge: (edge) => ({
+    visual: { color: edge.attributes.color },
+    presentation: {
+      title: edge.attributes.relationship,
+      properties: edge.attributes.properties,
+    },
+  }),
+});
+```
+
+The canvas owns dense rendering and picking. The bounded HTML panel owns accessibility, properties, and action dispatch:
+
+```ts
+const nodeId = graph.pick(event.clientX, event.clientY);
+const presentation = nodeId ? graph.getNodePresentation(nodeId) : null;
+
+graph.setSelection(nodeId ? [nodeId] : []);
+details.render(presentation);
+```
+
+Actions remain serializable descriptors. The demos interpret their IDs in the host and visibly update selection or application status; graphraum never accepts callbacks or framework components in graph data.
+
+Continue with [Node & edge presentation](/graphraum/node-edge-presentation/) for the full contract or [API reference](/graphraum/api-reference/) for exact signatures.

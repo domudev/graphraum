@@ -30,6 +30,7 @@ export default defineConfig({
 				{
 					label: "SDK",
 					items: [
+						{ label: "Interactive demos", link: "/demos/", badge: "Live" },
 						{ label: "Node & edge presentation", link: "/node-edge-presentation/" },
 						{ label: "API reference", link: "/api-reference/" },
 					],
