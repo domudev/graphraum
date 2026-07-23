@@ -2,6 +2,8 @@ export type GraphraumColor = number | string;
 
 export type GraphraumMode = "2d" | "3d";
 
+export type GraphraumNodeShape = "circle" | "diamond" | "square";
+
 export interface GraphraumPosition {
 	x: number;
 	y: number;
@@ -16,6 +18,7 @@ export interface GraphraumNodeGeometry {
 	id: string;
 	position: GraphraumPosition;
 	color?: GraphraumColor;
+	shape?: GraphraumNodeShape;
 	size?: number;
 }
 
@@ -25,6 +28,7 @@ export interface GraphraumNodeUpdate {
 	color?: GraphraumColor | undefined;
 	id: string;
 	position?: GraphraumPosition;
+	shape?: GraphraumNodeShape | undefined;
 	size?: number | undefined;
 }
 
@@ -42,6 +46,7 @@ export interface GraphraumData<NodeAttributes = undefined, EdgeAttributes = unde
 
 export interface GraphraumNodeVisual {
 	color?: GraphraumColor;
+	shape?: GraphraumNodeShape;
 	size?: number;
 }
 

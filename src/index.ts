@@ -1,4 +1,5 @@
 export { Graphraum } from "./graphraum";
+export { graphraumNodeShapes } from "./node-shapes";
 export { graphraumTheme } from "./theme";
 export type {
 	CompiledGraphraumPresentation,
@@ -11,6 +12,7 @@ export type {
 	GraphraumNode,
 	GraphraumNodeEncoding,
 	GraphraumNodeGeometry,
+	GraphraumNodeShape,
 	GraphraumNodeUpdate,
 	GraphraumNodeVisual,
 	GraphraumOptions,

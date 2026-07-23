@@ -3,14 +3,29 @@ title: Interactive demos
 description: Run graphraum against knowledge, dependency, and investigation graphs using one typed SDK contract.
 ---
 
-import UseCaseGallery from "../../components/UseCaseGallery.astro";
 import VersionReference from "../../components/VersionReference.astro";
 
 <VersionReference />
 
-These are executable examples, not captured videos. Every graph below is rendered by the SDK version shown above and every detail panel is resolved from compiled presentation data.
+These are executable examples, not captured videos. Each use case has its own focused page, stable URL, live graph, accessible entity navigation, and compiled detail panel.
 
-<UseCaseGallery />
+<nav class="demo-route-grid not-content" aria-label="Interactive graph use cases">
+  <a href="./knowledge/">
+    <span>Knowledge graph</span>
+    <strong>Connect people, ideas, and evidence</strong>
+    <p>Model people, places, concepts, provenance, and the relationships between them.</p>
+  </a>
+  <a href="./dependencies/">
+    <span>Software topology</span>
+    <strong>Follow dependencies before incidents</strong>
+    <p>Explore services, gateways, data stores, ownership, and blast radius.</p>
+  </a>
+  <a href="./investigation/">
+    <span>Fraud investigation</span>
+    <strong>Surface suspicious connections</strong>
+    <p>Trace accounts, devices, payment methods, and merchants without losing context.</p>
+  </a>
+</nav>
 
 ## The reusable boundary
 
@@ -21,6 +36,7 @@ const visuals = defineVisuals<DomainNode, DomainEdge>({
   node: (node) => ({
     visual: {
       color: palette[node.attributes.category],
+      shape: shapeByCategory[node.attributes.category],
       size: node.attributes.importance,
     },
     presentation: {

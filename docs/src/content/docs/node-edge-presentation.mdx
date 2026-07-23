@@ -12,7 +12,7 @@ import VersionReference from "../../components/VersionReference.astro";
 Prefer proof over snippets? Run the same contract across three domains in the [interactive demos](../demos/).
 
 <div class="presentation-contract not-content">
-  <div><strong>GPU visual</strong><span>Always cheap</span><p>Node color and size plus edge color are compiled into the existing two batched draw calls.</p></div>
+  <div><strong>GPU visual</strong><span>Always cheap</span><p>Node color, shape, and size plus edge color are compiled into the existing two batched draw calls.</p></div>
   <div><strong>Presentation</strong><span>On demand</span><p>Titles, subtitles, properties, and action descriptors stay available by ID for your focused or selected UI.</p></div>
   <div><strong>Application</strong><span>Owns behavior</span><p>Your framework renders accessible HTML and decides what an action ID does. The engine never stores callbacks.</p></div>
 </div>
@@ -36,6 +36,7 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
   node: (node) => ({
     visual: {
       color: node.attributes.kind === "person" ? "#73c7a5" : "#469878",
+      shape: node.attributes.kind === "person" ? "circle" : "square",
       size: node.attributes.kind === "person" ? 8 : 6,
     },
     presentation: {
@@ -88,7 +89,7 @@ graph.setData({
 });
 ```
 
-The mapper result overrides direct `color` and `size` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API.
+The mapper result overrides direct `color`, `shape`, and `size` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API. Built-in `circle`, `square`, and `diamond` shapes share one instanced billboard geometry and one node draw call in both 2D and 3D.
 
 ## Render detail only when needed
 
@@ -120,4 +121,4 @@ Do not put arbitrary HTML, component instances, closures, or mutable domain obje
 
 ## Density policy
 
-Color and size can remain visible across the graph. Titles should be budgeted by zoom and importance in a future label layer. Full properties and actions belong to a bounded focused or selected subset in host HTML. This preserves both accessibility and the dense rendering path.
+Color, shape, and size can remain visible across the graph. Titles should be budgeted by zoom and importance in a future label layer. Full properties and actions belong to a bounded focused or selected subset in host HTML. This preserves both accessibility and the dense rendering path.

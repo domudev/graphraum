@@ -1,4 +1,4 @@
-import type { GraphraumData, GraphraumPresentationProperty } from "../../../src/types";
+import type { GraphraumData, GraphraumNodeShape, GraphraumPresentationProperty } from "../../../src/types";
 import { defineVisuals } from "../../../src/visuals";
 
 export type DemoUseCaseId = "dependencies" | "investigation" | "knowledge";
@@ -42,6 +42,15 @@ const palette = {
 	purple: "#b875d5",
 } as const;
 
+const squareCategories = new Set(["Database", "Payment method", "Place", "Service"]);
+const diamondCategories = new Set(["Concept", "Device", "Field", "Gateway"]);
+
+function shapeForCategory(category: string): GraphraumNodeShape {
+	if (squareCategories.has(category)) return "square";
+	if (diamondCategories.has(category)) return "diamond";
+	return "circle";
+}
+
 function property(id: string, label: string, value: boolean | null | number | string): GraphraumPresentationProperty {
 	return { id, label, value };
 }
@@ -64,7 +73,11 @@ export const demoVisuals = defineVisuals<DemoNodeAttributes, DemoEdgeAttributes>
 			subtitle: node.attributes.subtitle,
 			title: node.attributes.label,
 		},
-		visual: { color: node.attributes.color, size: node.attributes.size },
+		visual: {
+			color: node.attributes.color,
+			shape: shapeForCategory(node.attributes.category),
+			size: node.attributes.size,
+		},
 	}),
 });
 

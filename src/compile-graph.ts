@@ -1,3 +1,4 @@
+import { assertNodeShape } from "./node-shapes";
 import type {
 	CompiledGraphraumPresentation,
 	GraphraumData,
@@ -80,6 +81,7 @@ function compileNodeVisual(id: string, visual: GraphraumNodeVisual): Readonly<Gr
 	if (visual.size !== undefined && (!Number.isFinite(visual.size) || visual.size <= 0)) {
 		throw new Error(`Node "${id}" visual must have a positive finite size`);
 	}
+	if (visual.shape !== undefined) assertNodeShape(id, visual.shape);
 	return Object.freeze({ ...visual });
 }
 
@@ -99,7 +101,10 @@ export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefi
 		assertFinitePosition(node.id, "y", node.position.y);
 		assertFinitePosition(node.id, "z", node.position.z ?? 0);
 		const encoding = visuals?.node?.(node);
-		const visual = compileNodeVisual(node.id, encoding?.visual ?? { color: node.color, size: node.size });
+		const visual = compileNodeVisual(
+			node.id,
+			encoding?.visual ?? { color: node.color, shape: node.shape, size: node.size },
+		);
 		if (visual.size !== undefined && (!Number.isFinite(visual.size) || visual.size <= 0)) {
 			throw new Error(`Node "${node.id}" must have a positive finite size`);
 		}
