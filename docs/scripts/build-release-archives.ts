@@ -7,10 +7,13 @@ import { fileURLToPath } from "node:url";
 import {
 	createReleaseFallback,
 	createRootRedirect,
+	createVersionArchive,
 	createVersionManifest,
 	docsBasePath,
 	injectVersionNavigation,
 	parseReleaseTags,
+	type ReleaseMetadata,
+	type RevisionMetadata,
 } from "../src/lib/release-archive";
 
 const docsRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -61,6 +64,17 @@ async function commandExit(
 
 async function releaseHasDocs(version: string): Promise<boolean> {
 	return (await commandExit(["git", "cat-file", "-e", `${version}:docs/package.json`], repositoryRoot)) === 0;
+}
+
+async function readRevisionMetadata(reference: string): Promise<RevisionMetadata> {
+	const fields = (await output(["git", "log", "-1", "--format=%cI%x00%H%x00%s", reference], repositoryRoot))
+		.trimEnd()
+		.split("\0");
+	const [publishedAt, revision, summary] = fields;
+	if (!publishedAt || !revision || !summary) {
+		throw new Error(`Could not read documentation metadata for ${reference}`);
+	}
+	return { publishedAt, revision, summary };
 }
 
 async function findHtmlFiles(directory: string): Promise<readonly string[]> {
@@ -137,7 +151,10 @@ async function main() {
 	const versions = parseReleaseTags(await output(["git", "tag", "--list", "v*"], repositoryRoot));
 	const latest = versions[0];
 	if (!latest) throw new Error("No stable Graphraum release tags were found");
-	const nextRevision = (await output(["git", "rev-parse", "HEAD"], repositoryRoot)).trim();
+	const releases: readonly ReleaseMetadata[] = await Promise.all(
+		versions.map(async (version) => ({ version, ...(await readRevisionMetadata(version)) })),
+	);
+	const next = await readRevisionMetadata("HEAD");
 
 	await rm(outputRoot, { force: true, recursive: true });
 	await mkdir(outputRoot, { recursive: true });
@@ -148,13 +165,16 @@ async function main() {
 		await rm(temporaryRoot, { force: true, recursive: true });
 		await run(["git", "worktree", "prune"], repositoryRoot);
 	}
-	await buildNext(nextRevision);
+	await buildNext(next.revision);
 
 	await copyFile(join(selectorRoot, "version-selector.js"), join(outputRoot, "version-selector.js"));
 	await copyFile(join(selectorRoot, "version-selector.css"), join(outputRoot, "version-selector.css"));
-	await writeFile(join(outputRoot, "versions.json"), createVersionManifest(versions, nextRevision));
+	await writeFile(join(outputRoot, "versions.json"), createVersionManifest(releases, next));
 	await writeFile(join(outputRoot, ".nojekyll"), "");
 	await createLatestAliases(latest);
+	const archiveRoot = join(outputRoot, "versions");
+	await mkdir(archiveRoot, { recursive: true });
+	await writeFile(join(archiveRoot, "index.html"), createVersionArchive(releases));
 }
 
 await main();
