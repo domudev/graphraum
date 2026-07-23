@@ -38,10 +38,16 @@ describe("release archive", () => {
 		expect(createRootRedirect("v0.4.0", "api-reference/")).toContain("/graphraum/v0.4.0/api-reference/");
 	});
 
-	test("generates selector metadata from the release tags", () => {
-		expect(JSON.parse(createVersionManifest(["v0.4.0", "v0.3.0"]))).toEqual({
+	test("adds next to selector metadata while keeping the latest stable tag", () => {
+		const revision = "0123456789abcdef0123456789abcdef01234567";
+		expect(JSON.parse(createVersionManifest(["v0.4.0", "v0.3.0"], revision))).toEqual({
 			latest: "v0.4.0",
 			versions: [
+				{
+					href: "/graphraum/next/",
+					releaseNotes: `https://github.com/domudev/graphraum/compare/v0.4.0...${revision}`,
+					version: "next",
+				},
 				{
 					href: "/graphraum/v0.4.0/",
 					releaseNotes: "https://github.com/domudev/graphraum/releases/tag/v0.4.0",
@@ -54,5 +60,9 @@ describe("release archive", () => {
 				},
 			],
 		});
+	});
+
+	test("rejects a mutable or malformed next revision", () => {
+		expect(() => createVersionManifest(["v0.4.0"], "main")).toThrow("full Git revision");
 	});
 });
