@@ -1,16 +1,24 @@
 .graphraum-version-nav {
 	align-items: stretch;
 	border: 1px solid var(--graphraum-border, var(--sl-color-gray-5));
-	border-radius: 0.5rem;
+	border-radius: 0.65rem;
 	display: flex;
 	margin-left: 0.5rem;
 	overflow: hidden;
 }
 
 .graphraum-version-label {
+	align-items: center;
 	display: flex;
-	font-size: 0;
 	margin: 0;
+}
+
+.graphraum-version-label > span {
+	color: var(--graphraum-muted-foreground, var(--sl-color-gray-2));
+	font: 800 0.6rem / 1 var(--sl-font, system-ui, sans-serif);
+	letter-spacing: 0.08em;
+	padding-left: 0.65rem;
+	text-transform: uppercase;
 }
 
 .graphraum-version-nav select,
@@ -22,10 +30,14 @@
 	font: 700 0.68rem / 1 var(--sl-font, system-ui, sans-serif);
 	margin: 0;
 	padding: 0.45rem 0.55rem;
+	white-space: nowrap;
 }
 
 .graphraum-version-nav select {
+	appearance: auto;
 	cursor: pointer;
+	max-width: 10.5rem;
+	padding-left: 0.4rem;
 }
 
 .graphraum-version-nav a {
@@ -48,5 +60,10 @@
 	.graphraum-version-nav select,
 	.graphraum-version-nav a {
 		padding-inline: 0.45rem;
+	}
+
+	.graphraum-version-label > span,
+	.graphraum-version-nav .graphraum-version-changes {
+		display: none;
 	}
 }

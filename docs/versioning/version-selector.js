@@ -30,23 +30,39 @@ function createVersionNavigation(manifest) {
 	navigation.className = "graphraum-version-nav";
 	const label = document.createElement("label");
 	label.className = "graphraum-version-label";
-	label.textContent = "Documentation version";
+	const labelText = document.createElement("span");
+	labelText.textContent = "Docs";
 	const select = document.createElement("select");
 	select.setAttribute("aria-label", "Documentation version");
-	for (const version of manifest.versions) {
+	const visibleVersions = new Set(["next", ...manifest.selectorVersions, current.version]);
+	for (const version of manifest.versions.filter(({ version }) => visibleVersions.has(version))) {
 		const option = document.createElement("option");
 		option.selected = version.version === current.version;
-		option.textContent = version.version;
+		option.textContent =
+			version.version === manifest.latest
+				? `${version.version} · latest`
+				: version.version === "next"
+					? "next · development"
+					: version.version;
 		option.value = version.version;
 		select.append(option);
 	}
+	const archiveOption = document.createElement("option");
+	archiveOption.textContent = "Show more…";
+	archiveOption.value = "__archive";
+	select.append(archiveOption);
 	select.addEventListener("change", () => {
+		if (select.value === archiveOption.value) {
+			window.location.assign(manifest.archiveHref);
+			return;
+		}
 		const selected = manifest.versions.find(({ version }) => version === select.value);
 		if (selected) void navigateToVersion(selected, current);
 	});
-	label.append(select);
+	label.append(labelText, select);
 
 	const changes = document.createElement("a");
+	changes.className = "graphraum-version-changes";
 	changes.href = current.releaseNotes;
 	changes.textContent = "What changed";
 	navigation.append(label, changes);
@@ -54,7 +70,7 @@ function createVersionNavigation(manifest) {
 }
 
 async function initializeVersionNavigation() {
-	const response = await fetch(`${docsBasePath}versions.json`);
+	const response = await fetch(`${docsBasePath}versions.json`, { cache: "no-store" });
 	if (!response.ok) return;
 	createVersionNavigation(await response.json());
 }
