@@ -23,6 +23,21 @@ describe("docs version", () => {
 		});
 	});
 
+	test("labels the automated main build as next without claiming a package release", () => {
+		const revision = "0123456789abcdef0123456789abcdef01234567";
+		expect(resolveDocsVersion("next", revision)).toEqual({
+			display: "next",
+			installCommand: null,
+			isRelease: false,
+			referenceUrl: `https://github.com/domudev/graphraum/commit/${revision}`,
+			sourceUrl: `https://github.com/domudev/graphraum/tree/${revision}`,
+		});
+	});
+
+	test("requires an immutable revision for next", () => {
+		expect(() => resolveDocsVersion("next")).toThrow("Next documentation requires a full Git revision");
+	});
+
 	test("rejects a malformed supplied release tag", () => {
 		expect(() => resolveDocsVersion("0.4")).toThrow('Invalid graphraum docs version: "0.4"');
 	});

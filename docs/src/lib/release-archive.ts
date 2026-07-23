@@ -1,6 +1,7 @@
 export const docsBasePath = "/graphraum/";
 
 const releaseTagPattern = /^v(\d+)\.(\d+)\.(\d+)$/;
+const fullGitRevisionPattern = /^[0-9a-f]{40,64}$/;
 const navigationMarker = "graphraum-version-navigation";
 
 export function parseReleaseTags(output: string): readonly string[] {
@@ -50,17 +51,27 @@ export function createRootRedirect(version: string, relativePath = ""): string {
 </html>`;
 }
 
-export function createVersionManifest(versions: readonly string[]): string {
+export function createVersionManifest(versions: readonly string[], nextRevision: string): string {
 	const latest = versions[0];
 	if (!latest) throw new Error("Cannot create a documentation manifest without releases");
+	if (!fullGitRevisionPattern.test(nextRevision)) {
+		throw new Error("Next documentation requires a full Git revision");
+	}
 	return JSON.stringify(
 		{
 			latest,
-			versions: versions.map((version) => ({
-				href: `${docsBasePath}${version}/`,
-				releaseNotes: `https://github.com/domudev/graphraum/releases/tag/${version}`,
-				version,
-			})),
+			versions: [
+				{
+					href: `${docsBasePath}next/`,
+					releaseNotes: `https://github.com/domudev/graphraum/compare/${latest}...${nextRevision}`,
+					version: "next",
+				},
+				...versions.map((version) => ({
+					href: `${docsBasePath}${version}/`,
+					releaseNotes: `https://github.com/domudev/graphraum/releases/tag/${version}`,
+					version,
+				})),
+			],
 		},
 		null,
 		2,

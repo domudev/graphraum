@@ -105,6 +105,17 @@ async function buildRelease(version: string, temporaryRoot: string) {
 	}
 }
 
+async function buildNext(revision: string) {
+	const nextOutput = join(outputRoot, "next");
+	await run(["bun", "install", "--cwd", "docs", "--frozen-lockfile"], repositoryRoot);
+	await run(
+		["bun", "run", "--cwd", "docs", "build", "--", "--outDir", nextOutput, "--base", `${docsBasePath}next`],
+		repositoryRoot,
+		{ GRAPHRAUM_DOCS_REVISION: revision, GRAPHRAUM_DOCS_VERSION: "next" },
+	);
+	await injectNavigation(nextOutput);
+}
+
 function redirectPath(htmlPath: string): string {
 	if (htmlPath === "index.html") return "";
 	if (htmlPath.endsWith("/index.html")) return htmlPath.slice(0, -"index.html".length);
@@ -126,6 +137,7 @@ async function main() {
 	const versions = parseReleaseTags(await output(["git", "tag", "--list", "v*"], repositoryRoot));
 	const latest = versions[0];
 	if (!latest) throw new Error("No stable Graphraum release tags were found");
+	const nextRevision = (await output(["git", "rev-parse", "HEAD"], repositoryRoot)).trim();
 
 	await rm(outputRoot, { force: true, recursive: true });
 	await mkdir(outputRoot, { recursive: true });
@@ -136,10 +148,11 @@ async function main() {
 		await rm(temporaryRoot, { force: true, recursive: true });
 		await run(["git", "worktree", "prune"], repositoryRoot);
 	}
+	await buildNext(nextRevision);
 
 	await copyFile(join(selectorRoot, "version-selector.js"), join(outputRoot, "version-selector.js"));
 	await copyFile(join(selectorRoot, "version-selector.css"), join(outputRoot, "version-selector.css"));
-	await writeFile(join(outputRoot, "versions.json"), createVersionManifest(versions));
+	await writeFile(join(outputRoot, "versions.json"), createVersionManifest(versions, nextRevision));
 	await writeFile(join(outputRoot, ".nojekyll"), "");
 	await createLatestAliases(latest);
 }
