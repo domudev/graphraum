@@ -3,6 +3,7 @@ import {
 	BufferAttribute,
 	BufferGeometry,
 	Color,
+	type InstancedBufferAttribute,
 	InstancedMesh,
 	LineBasicMaterial,
 	LineSegments,
@@ -22,6 +23,8 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
+import { createNodeGeometry, createNodeMaterial, setNodeShapeAt } from "./node-rendering";
+import { containsNodePoint } from "./node-shapes";
 import { prepareNodeUpdates } from "./node-updates";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
 import { graphraumTheme } from "./theme";
@@ -50,6 +53,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private readonly scene = new Scene();
 	private readonly raycaster = new Raycaster();
 	private readonly pointer = new Vector2();
+	private readonly pickCenter = new Vector3();
+	private readonly pickRight = new Vector3();
 	private readonly theme: GraphraumTheme;
 	private readonly resizeObserver: ResizeObserver;
 	private readonly maxVisibleEdges: number;
@@ -69,6 +74,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private edgePresentations = new Map<string, CompiledGraphraumPresentation>();
 	private spatialGrid2d = new SpatialGrid2D();
 	private nodeMesh: InstancedMesh | null = null;
+	private nodePickMesh: InstancedMesh | null = null;
 	private edgeLines: LineSegments | null = null;
 	private selectedNodeIds = new Set<string>();
 	private visibleNodeSlots = new Map<number, number>();
@@ -136,8 +142,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.spatialGrid2d = new SpatialGrid2D();
 		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
 
-		const nodeGeometry = new SphereGeometry(1, 8, 6);
-		const nodeMaterial = new MeshBasicMaterial({ color: "#ffffff" });
+		const nodeGeometry = createNodeGeometry(data.nodes.length);
+		const nodeMaterial = createNodeMaterial();
 		const nodeMesh = new InstancedMesh(nodeGeometry, nodeMaterial, data.nodes.length);
 		const matrix = new Matrix4();
 		for (const [index, node] of this.data.nodes.entries()) {
@@ -149,11 +155,23 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				index,
 				new Color(this.selectedNodeIds.has(node.id) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
 			);
+			setNodeShapeAt(nodeGeometry.getAttribute("instanceShape") as InstancedBufferAttribute, index, node.shape);
 		}
 		nodeMesh.instanceMatrix.needsUpdate = true;
 		if (nodeMesh.instanceColor) nodeMesh.instanceColor.needsUpdate = true;
+		nodeGeometry.getAttribute("instanceShape").needsUpdate = true;
 		this.nodeMesh = nodeMesh;
 		this.scene.add(nodeMesh);
+
+		const nodePickMesh = new InstancedMesh(new SphereGeometry(1, 8, 6), new MeshBasicMaterial(), data.nodes.length);
+		for (const [index, node] of this.data.nodes.entries()) {
+			const size = (node.size ?? 4) * Math.SQRT2;
+			matrix.makeScale(size, size, size);
+			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
+			nodePickMesh.setMatrixAt(index, matrix);
+		}
+		nodePickMesh.instanceMatrix.needsUpdate = true;
+		this.nodePickMesh = nodePickMesh;
 
 		const edgeGeometry = new BufferGeometry();
 		edgeGeometry.setAttribute("position", new BufferAttribute(compiled.edgePositions.slice(), 3));
@@ -170,11 +188,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	updateNodes(updates: readonly GraphraumNodeUpdate[]) {
 		if (updates.length === 0) return;
-		if (!this.nodeMesh || !this.edgeLines) throw new Error("Cannot update nodes before graph data is set");
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) {
+			throw new Error("Cannot update nodes before graph data is set");
+		}
 		const prepared = prepareNodeUpdates(this.data.nodes, this.nodeIndices, updates);
 		const nodes = [...this.data.nodes];
 		const matrix = new Matrix4();
 		const edgePosition = this.edgeLines.geometry.getAttribute("position") as BufferAttribute;
+		const nodeShape = this.nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
 		const renderedEdgePositions = edgePosition.array as Float32Array;
 		const viewportBounds = this.getViewportBounds2d();
 		let visibilityChanged = false;
@@ -194,11 +215,20 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 					matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
 					this.nodeMesh.setMatrixAt(nodeSlot, matrix);
 					this.nodeMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
+					const pickSize = size * Math.SQRT2;
+					matrix.makeScale(pickSize, pickSize, pickSize);
+					matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
+					this.nodePickMesh.setMatrixAt(nodeSlot, matrix);
+					this.nodePickMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
 				}
 			}
 			if (update.colorChanged && !this.selectedNodeIds.has(update.next.id) && nodeSlot !== undefined) {
 				this.nodeMesh.setColorAt(nodeSlot, new Color(update.next.color ?? this.theme.node));
 				this.nodeMesh.instanceColor?.addUpdateRange(nodeSlot * 3, 3);
+			}
+			if (update.shapeChanged && nodeSlot !== undefined) {
+				setNodeShapeAt(nodeShape, nodeSlot, update.next.shape);
+				nodeShape.addUpdateRange(nodeSlot, 1);
 			}
 			if (update.positionChanged) {
 				for (const edgeIndex of this.incidentEdgeIndices[update.index] ?? []) {
@@ -224,10 +254,12 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 		if (prepared.some((update) => update.positionChanged || update.sizeChanged)) {
 			this.nodeMesh.instanceMatrix.needsUpdate = true;
+			this.nodePickMesh.instanceMatrix.needsUpdate = true;
 		}
 		if (prepared.some((update) => update.colorChanged) && this.nodeMesh.instanceColor) {
 			this.nodeMesh.instanceColor.needsUpdate = true;
 		}
+		if (prepared.some((update) => update.shapeChanged)) nodeShape.needsUpdate = true;
 		if (prepared.some((update) => update.positionChanged)) edgePosition.needsUpdate = true;
 		this.requestRender();
 	}
@@ -283,7 +315,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	pick(clientX: number, clientY: number): string | null {
-		if (!this.nodeMesh) return null;
+		if (!this.nodeMesh || !this.nodePickMesh) return null;
 		const bounds = this.renderer.domElement.getBoundingClientRect();
 		this.pointer.set(
 			((clientX - bounds.left) / bounds.width) * 2 - 1,
@@ -295,9 +327,30 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			return index === null ? null : (this.nodeIds[index] ?? null);
 		}
 		this.raycaster.setFromCamera(this.pointer, this.camera);
-		const hit = this.raycaster.intersectObject(this.nodeMesh, false)[0];
-		const nodeIndex = hit?.instanceId === undefined ? undefined : this.visibleNodeIndices[hit.instanceId];
-		return nodeIndex === undefined ? null : (this.nodeIds[nodeIndex] ?? null);
+		const checkedInstances = new Set<number>();
+		for (const hit of this.raycaster.intersectObject(this.nodePickMesh, false)) {
+			if (hit.instanceId === undefined || checkedInstances.has(hit.instanceId)) continue;
+			checkedInstances.add(hit.instanceId);
+			const nodeIndex = this.visibleNodeIndices[hit.instanceId];
+			if (nodeIndex === undefined) continue;
+			const node = this.data.nodes[nodeIndex];
+			if (!node) continue;
+			const radius = node.size ?? 4;
+			this.pickCenter.set(node.position.x, node.position.y, node.position.z ?? 0).project(this.camera);
+			this.pickRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(radius);
+			this.pickRight.set(
+				this.pickRight.x + node.position.x,
+				this.pickRight.y + node.position.y,
+				this.pickRight.z + (node.position.z ?? 0),
+			);
+			this.pickRight.project(this.camera);
+			const radiusNdc = Math.abs(this.pickRight.x - this.pickCenter.x);
+			if (radiusNdc === 0) continue;
+			const offsetX = (this.pointer.x - this.pickCenter.x) / radiusNdc;
+			const offsetY = (this.pointer.y - this.pickCenter.y) / (radiusNdc * (bounds.width / bounds.height));
+			if (containsNodePoint(node.shape, offsetX, offsetY)) return this.nodeIds[nodeIndex] ?? null;
+		}
+		return null;
 	}
 
 	fitView() {
@@ -434,7 +487,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private materializeViewport() {
-		if (!this.nodeMesh || !this.edgeLines) return;
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) return;
 		const bounds = this.getViewportBounds2d();
 		const visibleNodeIndices = bounds
 			? this.spatialGrid2d.queryBounds(bounds, this.viewportOverscan)
@@ -447,7 +500,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.visibleNodeSlots = new Map();
 		this.visibleNodeIndices = visibleNodeIndices;
 		this.nodeMesh.instanceMatrix.clearUpdateRanges();
+		this.nodePickMesh.instanceMatrix.clearUpdateRanges();
 		this.nodeMesh.instanceColor?.clearUpdateRanges();
+		const nodeShape = this.nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
+		nodeShape.clearUpdateRanges();
 		for (const [slot, nodeIndex] of visibleNodeIndices.entries()) {
 			const node = this.data.nodes[nodeIndex];
 			if (!node) continue;
@@ -456,18 +512,28 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			matrix.makeScale(size, size, size);
 			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
 			this.nodeMesh.setMatrixAt(slot, matrix);
+			const pickSize = size * Math.SQRT2;
+			matrix.makeScale(pickSize, pickSize, pickSize);
+			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
+			this.nodePickMesh.setMatrixAt(slot, matrix);
 			this.nodeMesh.setColorAt(
 				slot,
 				new Color(this.selectedNodeIds.has(node.id) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
 			);
+			setNodeShapeAt(nodeShape, slot, node.shape);
 		}
 		this.nodeMesh.count = visibleNodeIndices.length;
+		this.nodePickMesh.count = visibleNodeIndices.length;
 		this.nodeMesh.instanceMatrix.addUpdateRange(0, visibleNodeIndices.length * 16);
 		this.nodeMesh.instanceMatrix.needsUpdate = true;
+		this.nodePickMesh.instanceMatrix.addUpdateRange(0, visibleNodeIndices.length * 16);
+		this.nodePickMesh.instanceMatrix.needsUpdate = true;
 		if (this.nodeMesh.instanceColor) {
 			this.nodeMesh.instanceColor.addUpdateRange(0, visibleNodeIndices.length * 3);
 			this.nodeMesh.instanceColor.needsUpdate = true;
 		}
+		nodeShape.addUpdateRange(0, visibleNodeIndices.length);
+		nodeShape.needsUpdate = true;
 
 		const edgePosition = this.edgeLines.geometry.getAttribute("position") as BufferAttribute;
 		const renderedEdgePositions = edgePosition.array as Float32Array;
@@ -498,6 +564,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.nodeMesh.geometry.dispose();
 			disposeMaterial(this.nodeMesh.material);
 			this.nodeMesh = null;
+		}
+		if (this.nodePickMesh) {
+			this.nodePickMesh.geometry.dispose();
+			disposeMaterial(this.nodePickMesh.material);
+			this.nodePickMesh = null;
 		}
 		if (this.edgeLines) {
 			this.scene.remove(this.edgeLines);

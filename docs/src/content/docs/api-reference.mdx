@@ -56,6 +56,7 @@ interface GraphraumNode {
   id: string;
   position: { x: number; y: number; z?: number };
   color?: string | number;
+  shape?: "circle" | "square" | "diamond";
   size?: number;
 }
 
@@ -69,13 +70,13 @@ interface GraphraumEdge {
 
 Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node sizes must be positive. Positions and sizes use world units.
 
-Supply generic attribute types and `defineVisuals()` to compile domain data into node color and size, edge color, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, and size, edge color, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
 
 ## Data and updates
 
 <div class="api-grid not-content">
   <div><code>setData(data)</code><p>Validates and replaces the complete topology, rebuilds canonical buffers, fits the camera, materializes the viewport, and schedules a render.</p></div>
-  <div><code>updateNodes(updates)</code><p>Changes position, size, or color for existing nodes and updates only their node matrices and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
+  <div><code>updateNodes(updates)</code><p>Changes position, size, shape, or color for existing nodes and updates only the affected instance data and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
   <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
   <div><code>getNodePresentation(id)</code><p>Returns the compiled title, subtitle, properties, and action descriptors for a node, or <code>null</code>.</p></div>
   <div><code>getEdgePresentation(id)</code><p>Returns the compiled presentation for an edge, or <code>null</code>.</p></div>
@@ -85,7 +86,7 @@ Supply generic attribute types and `defineVisuals()` to compile domain data into
 ```ts
 const updates: readonly GraphraumNodeUpdate[] = [
   { id: "person:ada", position: { x: 20, y: 12 } },
-  { id: "place:london", color: "#73c7a5", size: 6 },
+  { id: "place:london", color: "#73c7a5", shape: "square", size: 6 },
 ];
 
 graph.updateNodes(updates);

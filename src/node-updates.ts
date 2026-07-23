@@ -1,3 +1,4 @@
+import { assertNodeShape } from "./node-shapes";
 import type { GraphraumNode, GraphraumNodeGeometry, GraphraumNodeUpdate } from "./types";
 
 export interface PreparedNodeUpdate<NodeAttributes = undefined> {
@@ -5,6 +6,7 @@ export interface PreparedNodeUpdate<NodeAttributes = undefined> {
 	index: number;
 	next: GraphraumNode<NodeAttributes>;
 	positionChanged: boolean;
+	shapeChanged: boolean;
 	sizeChanged: boolean;
 }
 
@@ -19,6 +21,7 @@ function assertFinitePosition(node: GraphraumNodeGeometry) {
 	if (node.size !== undefined && (!Number.isFinite(node.size) || node.size <= 0)) {
 		throw new Error(`Node "${node.id}" must have a positive finite size`);
 	}
+	if (node.shape !== undefined) assertNodeShape(node.id, node.shape);
 }
 
 /** Validates a complete update batch before the renderer mutates CPU or GPU state. */
@@ -39,6 +42,7 @@ export function prepareNodeUpdates<NodeAttributes = undefined>(
 			...current,
 			...(Object.hasOwn(update, "color") ? { color: update.color } : {}),
 			...(update.position ? { position: { ...update.position } } : {}),
+			...(Object.hasOwn(update, "shape") ? { shape: update.shape } : {}),
 			...(Object.hasOwn(update, "size") ? { size: update.size } : {}),
 		};
 		assertFinitePosition(next);
@@ -47,6 +51,7 @@ export function prepareNodeUpdates<NodeAttributes = undefined>(
 			index,
 			next,
 			positionChanged: update.position !== undefined,
+			shapeChanged: Object.hasOwn(update, "shape"),
 			sizeChanged: Object.hasOwn(update, "size"),
 		};
 	});

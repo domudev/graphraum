@@ -1,29 +1,21 @@
 ---
-import { demoUseCases } from "../lib/use-case-demos";
+import type { DemoUseCaseId } from "../lib/use-case-demos";
+
+interface Props {
+	useCaseId: DemoUseCaseId;
+}
+
+const { useCaseId } = Astro.props;
 ---
 
-<section class="use-case-gallery not-content" data-use-case-gallery>
+<section class="use-case-gallery not-content" data-use-case-gallery data-use-case-id={useCaseId}>
 	<header class="gallery-intro">
 		<div>
-			<span>Executable SDK examples</span>
-			<h2>One renderer. Different graph products.</h2>
+			<span>Executable SDK example</span>
+			<h2>Rendered by graphraum. Owned by your product.</h2>
 		</div>
-		<p>Choose a domain, select a node, inspect its relationships, and dispatch application-owned actions.</p>
+		<p>Select a node, inspect its relationships, switch between 2D and 3D, and dispatch application-owned actions.</p>
 	</header>
-
-	<nav class="use-case-tabs" aria-label="Graph use case">
-		{demoUseCases.map((useCase, index) => (
-			<button
-				type="button"
-				class="use-case-tab"
-				data-use-case-id={useCase.id}
-				aria-pressed={index === 0 ? "true" : "false"}
-			>
-				<span>{useCase.kicker}</span>
-				<strong>{useCase.title}</strong>
-			</button>
-		))}
-	</nav>
 
 	<div class="gallery-summary">
 		<div>
@@ -88,11 +80,17 @@ import { demoUseCases } from "../lib/use-case-demos";
 		type DemoUseCase,
 	} from "../lib/use-case-demos";
 
-	function requiredElement<ElementType extends Element>(parent: ParentNode, selector: string): ElementType {
-		const element = parent.querySelector<ElementType>(selector);
-		if (!element) throw new Error(`Interactive use-case gallery is missing "${selector}".`);
-		return element;
-	}
+		function requiredElement<ElementType extends Element>(parent: ParentNode, selector: string): ElementType {
+			const element = parent.querySelector<ElementType>(selector);
+			if (!element) throw new Error(`Interactive use-case gallery is missing "${selector}".`);
+			return element;
+		}
+
+		function requiredUseCase(id: string | undefined): DemoUseCase {
+			const useCase = demoUseCases.find((candidate) => candidate.id === id);
+			if (!useCase) throw new Error(`Unknown interactive use case "${id ?? ""}".`);
+			return useCase;
+		}
 
 	const root = requiredElement<HTMLElement>(document, "[data-use-case-gallery]");
 	const canvas = requiredElement<HTMLElement>(root, "[data-demo-canvas]");
@@ -106,16 +104,16 @@ import { demoUseCases } from "../lib/use-case-demos";
 	const properties = requiredElement<HTMLElement>(root, "[data-presentation-properties]");
 	const relationships = requiredElement<HTMLElement>(root, "[data-presentation-relationships]");
 	const actions = requiredElement<HTMLElement>(root, "[data-presentation-actions]");
-	const entityNavigation = requiredElement<HTMLElement>(root, "[data-entity-navigation]");
-	const status = requiredElement<HTMLElement>(root, "[data-demo-status]");
+		const entityNavigation = requiredElement<HTMLElement>(root, "[data-entity-navigation]");
+		const status = requiredElement<HTMLElement>(root, "[data-demo-status]");
+		const activeUseCase = requiredUseCase(root.dataset.useCaseId);
 
 	const graph = new Graphraum(canvas, {
 		maxPixelRatio: 1,
 		theme: { background: "#040f0f", edge: "#356b5a", node: "#3f7b65", selectedNode: "#fcfffc" },
 		visuals: demoVisuals,
 	});
-	let activeUseCase: DemoUseCase = demoUseCases[0];
-	let focusedNodeId: string | null = null;
+		let focusedNodeId: string | null = null;
 
 	function renderProperties(items: readonly { label: string; value: boolean | null | number | string }[]) {
 		properties.replaceChildren(
@@ -217,27 +215,16 @@ import { demoUseCases } from "../lib/use-case-demos";
 		);
 	}
 
-	function activateUseCase(useCase: DemoUseCase) {
-		activeUseCase = useCase;
-		focusedNodeId = null;
+		function activateUseCase(useCase: DemoUseCase) {
+			focusedNodeId = null;
 		graph.setData(useCase.data);
 		kicker.textContent = useCase.kicker;
 		title.textContent = useCase.title;
 		description.textContent = useCase.description;
 		counts.textContent = `${useCase.data.nodes.length} nodes · ${useCase.data.edges.length} edges · 2 draw calls`;
-		for (const tab of root.querySelectorAll<HTMLButtonElement>("[data-use-case-id]")) {
-			tab.setAttribute("aria-pressed", String(tab.dataset.useCaseId === useCase.id));
+			renderEntityNavigation();
+			selectNode(useCase.data.nodes[0]?.id ?? null);
 		}
-		renderEntityNavigation();
-		selectNode(useCase.data.nodes[0]?.id ?? null);
-	}
-
-	for (const tab of root.querySelectorAll<HTMLButtonElement>("[data-use-case-id]")) {
-		tab.addEventListener("click", () => {
-			const useCase = demoUseCases.find(({ id }) => id === tab.dataset.useCaseId);
-			if (useCase) activateUseCase(useCase);
-		});
-	}
 	for (const modeButton of root.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
 		modeButton.addEventListener("click", () => {
 			const mode = modeButton.dataset.mode;
@@ -312,12 +299,6 @@ import { demoUseCases } from "../lib/use-case-demos";
 		margin-top: 0.3rem;
 	}
 
-	.use-case-tabs {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-	}
-
-	.use-case-tab,
 	.graph-controls button,
 	.presentation-panel button,
 	.entity-navigation button {
@@ -332,22 +313,12 @@ import { demoUseCases } from "../lib/use-case-demos";
 		text-align: left;
 	}
 
-	.use-case-tab {
-		display: grid;
-		gap: 0.25rem;
-		min-width: 0;
-		overflow-wrap: anywhere;
-		padding: 1rem;
-	}
-
-	.use-case-tab + .use-case-tab,
 	.graph-controls button + button,
 	.presentation-panel footer button + button,
 	.entity-navigation button + button {
 		border-left: 1px solid var(--graphraum-border);
 	}
 
-	.use-case-tab span,
 	.entity-navigation button span {
 		color: var(--graphraum-muted-foreground);
 		font-size: 0.64rem;
@@ -356,7 +327,6 @@ import { demoUseCases } from "../lib/use-case-demos";
 		text-transform: uppercase;
 	}
 
-	.use-case-tab[aria-pressed="true"],
 	.graph-controls button[aria-pressed="true"],
 	.entity-navigation button[aria-pressed="true"] {
 		background: var(--graphraum-muted);
@@ -503,9 +473,7 @@ import { demoUseCases } from "../lib/use-case-demos";
 	.presentation-panel button:hover,
 	.presentation-panel button:focus-visible,
 	.entity-navigation button:hover,
-	.entity-navigation button:focus-visible,
-	.use-case-tab:hover,
-	.use-case-tab:focus-visible {
+	.entity-navigation button:focus-visible {
 		background: var(--graphraum-muted);
 	}
 
@@ -570,15 +538,6 @@ import { demoUseCases } from "../lib/use-case-demos";
 	}
 
 	@media (max-width: 38rem) {
-		.use-case-tabs {
-			grid-template-columns: 1fr;
-		}
-
-		.use-case-tab + .use-case-tab {
-			border-left: 0;
-			border-top: 1px solid var(--graphraum-border);
-		}
-
 		.graph-stage > header {
 			align-items: stretch;
 			flex-direction: column;

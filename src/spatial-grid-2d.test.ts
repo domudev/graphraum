@@ -11,6 +11,18 @@ describe("SpatialGrid2D", () => {
 		expect(grid.pick(30, 30)).toBeNull();
 	});
 
+	test("respects the visible boundary of each built-in shape", () => {
+		const grid = new SpatialGrid2D(10);
+		grid.set(0, { id: "circle", position: { x: 0, y: 0 }, shape: "circle", size: 5 });
+		grid.set(1, { id: "square", position: { x: 20, y: 0 }, shape: "square", size: 5 });
+		grid.set(2, { id: "diamond", position: { x: 40, y: 0 }, shape: "diamond", size: 5 });
+
+		expect(grid.pick(4, 4)).toBeNull();
+		expect(grid.pick(24, 4)).toBe(1);
+		expect(grid.pick(44, 4)).toBeNull();
+		expect(grid.pick(42, 2)).toBe(2);
+	});
+
 	test("moves nodes without leaving stale memberships", () => {
 		const grid = new SpatialGrid2D(10);
 		grid.set(4, { id: "moving", position: { x: 1, y: 1 }, size: 2 });

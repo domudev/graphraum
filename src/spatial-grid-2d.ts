@@ -1,3 +1,4 @@
+import { containsNodePoint } from "./node-shapes";
 import type { GraphraumNodeGeometry } from "./types";
 
 export interface Bounds2D {
@@ -50,8 +51,11 @@ export class SpatialGrid2D {
 				for (const index of this.cells.get(this.key(cellX, cellY)) ?? []) {
 					const node = this.nodes[index];
 					if (!node) continue;
-					const distance = (node.position.x - x) ** 2 + (node.position.y - y) ** 2;
-					if (distance <= (node.size ?? 4) ** 2 && distance < nearestDistance) {
+					const radius = node.size ?? 4;
+					const offsetX = node.position.x - x;
+					const offsetY = node.position.y - y;
+					const distance = offsetX ** 2 + offsetY ** 2;
+					if (containsNodePoint(node.shape, offsetX / radius, offsetY / radius) && distance < nearestDistance) {
 						nearestDistance = distance;
 						nearestIndex = index;
 					}

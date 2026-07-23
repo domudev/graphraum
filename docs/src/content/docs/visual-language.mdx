@@ -71,10 +71,12 @@ graph.setData({
 
 The WebGL surface is not the accessibility tree. Applications should mirror focus and selection into an accessible node list, expose labels in HTML, and pair semantic colors with text, shape, or filtering controls. graphraum owns the fast visual primitive; the host owns understandable interaction.
 
-## Beyond color and size
+## Built-in node shapes
 
 Arbitrary HTML per node is not the dense rendering path: it would trade away batching, viewport materialization, and the 100k-node target. The [`defineVisuals()` translation layer](../node-edge-presentation/) maps typed domain attributes to node and edge visuals once at ingestion, then compiles them into GPU buffers. Titles, properties, and host-owned action descriptors remain available by entity ID.
 
-Built-in shapes should stay in one instanced node draw call through an SDF or atlas shader. Reliable edge width, dashes, and direction markers require GPU edge quads rather than one object per edge. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
+`circle`, `square`, and `diamond` are rendered as signed-distance fields on one instanced billboard geometry. Mixing them does not add meshes, materials, or draw calls, and the same shapes face the camera in 2D and 3D. Picking applies the same shape boundary in world space for 2D and projected screen space for 3D.
+
+Reliable edge width, dashes, and direction markers require GPU edge quads rather than one object per edge. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
 
 Follow the design and benchmark acceptance criteria in [the node and edge visual translation issue](https://github.com/domudev/graphraum/issues/30).

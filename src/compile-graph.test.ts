@@ -39,6 +39,7 @@ describe("compileGraph", () => {
 					},
 					visual: {
 						color: node.attributes.kind === "person" ? "#73c7a5" : "#226f54",
+						shape: node.attributes.kind === "person" ? "circle" : "diamond",
 						size: node.attributes.kind === "person" ? 8 : 6,
 					},
 				};
@@ -73,8 +74,8 @@ describe("compileGraph", () => {
 		expect(nodeCalls).toBe(2);
 		expect(edgeCalls).toBe(1);
 		expect(graph.nodeVisuals).toEqual([
-			{ color: "#73c7a5", size: 8 },
-			{ color: "#226f54", size: 6 },
+			{ color: "#73c7a5", shape: "circle", size: 8 },
+			{ color: "#226f54", shape: "diamond", size: 6 },
 		]);
 		expect(graph.edgeVisuals).toEqual([{ color: "#469878" }]);
 		expect(graph.nodePresentations.get("ada")).toEqual({
@@ -90,6 +91,17 @@ describe("compileGraph", () => {
 		});
 		expect(Object.isFrozen(graph.nodePresentations.get("ada"))).toBe(true);
 		expect(Object.isFrozen(graph.nodePresentations.get("ada")?.properties)).toBe(true);
+	});
+
+	test("rejects unsupported mapper shapes at the ingestion boundary", () => {
+		expect(() =>
+			compileGraph(
+				{ edges: [], nodes: [{ id: "customer-42", position: { x: 0, y: 0 } }] },
+				defineVisuals({
+					node: () => ({ visual: { shape: "hexagon" as "circle" } }),
+				}),
+			),
+		).toThrow('Node "customer-42" shape must be one of: "circle", "square", "diamond"');
 	});
 
 	test.each([

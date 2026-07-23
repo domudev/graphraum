@@ -26,7 +26,12 @@ describe("interactive SDK use-case demos", () => {
 
 			expect(compiled.nodePresentations.size).toBe(useCase.data.nodes.length);
 			expect(compiled.edgePresentations.size).toBe(useCase.data.edges.length);
-			expect(compiled.nodeVisuals.every(({ color, size }) => color !== undefined && size !== undefined)).toBe(true);
+			expect(
+				compiled.nodeVisuals.every(
+					({ color, shape, size }) => color !== undefined && shape !== undefined && size !== undefined,
+				),
+			).toBe(true);
+			expect(new Set(compiled.nodeVisuals.map(({ shape }) => shape)).size).toBeGreaterThan(1);
 			expect(compiled.edgeVisuals.every(({ color }) => color !== undefined)).toBe(true);
 		}
 	});
