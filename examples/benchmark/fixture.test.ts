@@ -4,6 +4,7 @@ import { createFixture, type Encoding, type FixtureOptions } from "./fixture";
 
 function options(encoding: Encoding): FixtureOptions {
 	return {
+		edgeDistribution: "linear",
 		edgeColors: { mentions: "#111111", related: "#222222" },
 		edgeMultiplier: 2,
 		encoding,
@@ -33,5 +34,50 @@ describe("createFixture", () => {
 		expect(snapshot.edges[1]).toHaveProperty("color", "#222222");
 		expect(snapshot.nodes[0]).not.toHaveProperty("color");
 		expect(snapshot.edges[0]).not.toHaveProperty("color");
+	});
+
+	test("generates random edges without self loops", () => {
+		const random = createFixture({
+			...options("mapper"),
+			edgeDistribution: "random",
+			edgeMultiplier: 4,
+			nodeCount: 11,
+		});
+		const linear = createFixture({
+			...options("mapper"),
+			edgeDistribution: "linear",
+			edgeMultiplier: 4,
+			nodeCount: 11,
+		});
+
+		expect(random.edges.length).toBe(linear.edges.length);
+		expect(random.edges.every(({ source, target }) => source !== target)).toBe(true);
+	});
+
+	test("uses deterministic random edges", () => {
+		const first = createFixture({
+			...options("snapshot"),
+			edgeDistribution: "random",
+			nodeCount: 13,
+			edgeMultiplier: 3,
+			edgeColors: { mentions: "#111111", related: "#222222" },
+			nodeColors: { concept: "#333333", document: "#444444", person: "#555555" },
+			nodeShapes: { concept: "diamond", document: "square", person: "circle" },
+			nodeSize: 3,
+			scoreSize: 4,
+		});
+		const second = createFixture({
+			...options("snapshot"),
+			edgeDistribution: "random",
+			nodeCount: 13,
+			edgeMultiplier: 3,
+			edgeColors: { mentions: "#111111", related: "#222222" },
+			nodeColors: { concept: "#333333", document: "#444444", person: "#555555" },
+			nodeShapes: { concept: "diamond", document: "square", person: "circle" },
+			nodeSize: 3,
+			scoreSize: 4,
+		});
+
+		expect(first).toEqual(second);
 	});
 });

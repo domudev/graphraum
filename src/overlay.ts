@@ -30,7 +30,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		if (!Number.isSafeInteger(maxLabels) || maxLabels < 0) {
 			throw new Error("Overlay maxLabels must be a non-negative integer.");
 		}
-		this.root.className = "graphraum-overlay";
+		this.root.className = `graphraum-overlay ${options.overlayClassName ?? ""}`.trim();
 		this.root.style.cssText = "inset:0;pointer-events:none;position:absolute;";
 		this.previousContainerPosition =
 			getComputedStyle(this.container).position === "static" ? this.container.style.position : null;
@@ -80,6 +80,14 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		const element = render({ id: nodeId, presentation });
 		assertElement(element, kind);
 		if (!element) return null;
+		const className = `graphraum-overlay-${kind.toLowerCase()}`;
+		element.classList.add("graphraum-overlay-entry", className);
+		if (kind === "Label" && this.options.labelClassName) {
+			this.applyClassName(element, this.options.labelClassName);
+		}
+		if (kind === "Toolbar" && this.options.toolbarClassName) {
+			this.applyClassName(element, this.options.toolbarClassName);
+		}
 		element.dataset.graphraumNodeId = nodeId;
 		element.style.position = "absolute";
 		element.style.pointerEvents = pointerEvents;
@@ -115,10 +123,24 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 			else this.labels.delete(nodeId);
 			return;
 		}
+		const className = `graphraum-overlay-${kind}`;
+		replacement.classList.add("graphraum-overlay-entry", className);
+		if (kind === "label" && this.options.labelClassName) {
+			this.applyClassName(replacement, this.options.labelClassName);
+		}
+		if (kind === "toolbar" && this.options.toolbarClassName) {
+			this.applyClassName(replacement, this.options.toolbarClassName);
+		}
 		replacement.dataset.graphraumNodeId = nodeId;
 		replacement.style.cssText = `${entry.element.style.cssText};position:absolute;pointer-events:${pointerEvents};`;
 		entry.element.replaceWith(replacement);
 		entry.element = replacement;
 		entry.presentation = presentation;
+	}
+
+	private applyClassName(element: HTMLElement, className: string) {
+		for (const token of className.split(/\s+/g)) {
+			if (token) element.classList.add(token);
+		}
 	}
 }

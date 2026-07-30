@@ -13,6 +13,7 @@ import {
 	MOUSE,
 	OrthographicCamera,
 	PerspectiveCamera,
+	Plane,
 	Raycaster,
 	Scene,
 	SphereGeometry,
@@ -356,6 +357,24 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			x: ((projected.x + 1) * width) / 2,
 			y: ((1 - projected.y) * height) / 2,
 		};
+	}
+
+	/** Converts client coordinates to graph world coordinates on the z=0 plane. */
+	screenToWorld(clientX: number, clientY: number): { x: number; y: number; z: number } | null {
+		const bounds = this.renderer.domElement.getBoundingClientRect();
+		if (bounds.width === 0 || bounds.height === 0) return null;
+		const worldX = ((clientX - bounds.left) / bounds.width) * 2 - 1;
+		const worldY = -((clientY - bounds.top) / bounds.height) * 2 + 1;
+		this.pointer.set(worldX, worldY);
+		if (this.camera instanceof OrthographicCamera) {
+			const world = new Vector3(this.pointer.x, this.pointer.y, 0).unproject(this.camera);
+			return { x: world.x, y: world.y, z: world.z };
+		}
+		this.raycaster.setFromCamera(this.pointer, this.camera);
+		const plane = new Plane(new Vector3(0, 0, 1), 0);
+		const world = this.raycaster.ray.intersectPlane(plane, new Vector3());
+		if (!world) return null;
+		return { x: world.x, y: world.y, z: world.z };
 	}
 
 	/** Creates a bounded DOM layer for styled labels and a focused-node toolbar. */
