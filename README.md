@@ -29,7 +29,8 @@ bun install
 bun run dev
 ```
 
-The benchmark example can switch between 1,000 nodes / 3,000 edges and 10,000 nodes / 30,000 edges, as well as between 2D and 3D.
+The local graph laboratory exposes every renderer option, theme and visual mapping control, presentation
+metadata, diagnostics, and fixture tiers from 100 to 100,000 nodes.
 
 ```sh
 bun run test

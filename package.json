@@ -34,7 +34,7 @@
 		"docs:test": "bun run --cwd docs test",
 		"prepack": "bun run build",
 		"release": "semantic-release",
-		"test": "vitest run --dir src"
+		"test": "vitest run src examples --exclude 'docs/**'"
 	},
 	"engines": {
 		"bun": ">=1.2.0"
