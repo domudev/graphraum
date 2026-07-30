@@ -36,6 +36,7 @@ import type {
 	GraphraumDiagnostics,
 	GraphraumLayoutPositions,
 	GraphraumMode,
+	GraphraumNodeState,
 	GraphraumNodeUpdate,
 	GraphraumOptions,
 	GraphraumOverlayOptions,
@@ -87,6 +88,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private nodePickMesh: InstancedMesh | null = null;
 	private edgeLines: LineSegments | null = null;
 	private selectedNodeIds = new Set<string>();
+	private hoveredNodeIds = new Set<string>();
+	private focusedNodeIds = new Set<string>();
+	private dimmedNodeIds = new Set<string>();
 	private visibleNodeSlots = new Map<number, number>();
 	private visibleEdgeSlots = new Map<number, number>();
 	private visibleNodeIndices: readonly number[] = [];
@@ -162,10 +166,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			matrix.makeScale(size, size, size);
 			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
 			nodeMesh.setMatrixAt(index, matrix);
-			nodeMesh.setColorAt(
-				index,
-				new Color(this.selectedNodeIds.has(node.id) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
-			);
+			nodeMesh.setColorAt(index, this.getNodeColor(node));
 			setNodeShapeAt(nodeGeometry.getAttribute("instanceShape") as InstancedBufferAttribute, index, node.shape);
 		}
 		nodeMesh.instanceMatrix.needsUpdate = true;
@@ -253,8 +254,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 					nodePickMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
 				}
 			}
-			if (update.colorChanged && !this.selectedNodeIds.has(update.next.id) && nodeSlot !== undefined) {
-				nodeMesh.setColorAt(nodeSlot, new Color(update.next.color ?? this.theme.node));
+			if (update.colorChanged && nodeSlot !== undefined) {
+				nodeMesh.setColorAt(nodeSlot, this.getNodeColor(update.next));
 				nodeMesh.instanceColor?.addUpdateRange(nodeSlot * 3, 3);
 			}
 			if (update.shapeChanged && nodeSlot !== undefined) {
@@ -296,13 +297,19 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	setSelection(nodeIds: Iterable<string>) {
+		this.setNodeState("selected", nodeIds);
+	}
+
+	/** Applies an application-owned visual state without changing source graph data. */
+	setNodeState(state: GraphraumNodeState, nodeIds: Iterable<string>) {
 		const nextSelection = new Set(nodeIds);
+		const currentSelection = this.getNodeStateIds(state);
 		const changedNodeIds = new Set(
-			[...this.selectedNodeIds, ...nextSelection].filter(
-				(nodeId) => this.selectedNodeIds.has(nodeId) !== nextSelection.has(nodeId),
+			[...currentSelection, ...nextSelection].filter(
+				(nodeId) => currentSelection.has(nodeId) !== nextSelection.has(nodeId),
 			),
 		);
-		this.selectedNodeIds = nextSelection;
+		this.setNodeStateIds(state, nextSelection);
 		this.applySelectionColors(changedNodeIds);
 		this.requestRender();
 	}
@@ -522,12 +529,46 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			if (slot === undefined) continue;
 			const node = this.data.nodes[index];
 			if (!node) continue;
-			this.nodeMesh.setColorAt(
-				slot,
-				new Color(this.selectedNodeIds.has(nodeId) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
-			);
+			this.nodeMesh.setColorAt(slot, this.getNodeColor(node));
 		}
 		if (this.nodeMesh.instanceColor) this.nodeMesh.instanceColor.needsUpdate = true;
+	}
+
+	private getNodeStateIds(state: GraphraumNodeState) {
+		switch (state) {
+			case "dimmed":
+				return this.dimmedNodeIds;
+			case "focused":
+				return this.focusedNodeIds;
+			case "hovered":
+				return this.hoveredNodeIds;
+			case "selected":
+				return this.selectedNodeIds;
+		}
+	}
+
+	private setNodeStateIds(state: GraphraumNodeState, nodeIds: Set<string>) {
+		switch (state) {
+			case "dimmed":
+				this.dimmedNodeIds = nodeIds;
+				return;
+			case "focused":
+				this.focusedNodeIds = nodeIds;
+				return;
+			case "hovered":
+				this.hoveredNodeIds = nodeIds;
+				return;
+			case "selected":
+				this.selectedNodeIds = nodeIds;
+		}
+	}
+
+	private getNodeColor(node: GraphraumData<NodeAttributes, EdgeAttributes>["nodes"][number]) {
+		if (this.focusedNodeIds.has(node.id)) return new Color(this.theme.focusedNode);
+		if (this.selectedNodeIds.has(node.id)) return new Color(this.theme.selectedNode);
+		if (this.hoveredNodeIds.has(node.id)) return new Color(this.theme.hoveredNode);
+		if (this.dimmedNodeIds.has(node.id)) return new Color(this.theme.dimmedNode);
+		return new Color(node.color ?? this.theme.node);
 	}
 
 	private getViewportBounds2d(): Bounds2D | null {
@@ -581,10 +622,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			matrix.makeScale(pickSize, pickSize, pickSize);
 			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
 			this.nodePickMesh.setMatrixAt(slot, matrix);
-			this.nodeMesh.setColorAt(
-				slot,
-				new Color(this.selectedNodeIds.has(node.id) ? this.theme.selectedNode : (node.color ?? this.theme.node)),
-			);
+			this.nodeMesh.setColorAt(slot, this.getNodeColor(node));
 			setNodeShapeAt(nodeShape, slot, node.shape);
 		}
 		this.nodeMesh.count = visibleNodeIndices.length;

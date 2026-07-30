@@ -2,6 +2,8 @@ export type GraphraumColor = number | string;
 
 export type GraphraumMode = "2d" | "3d";
 
+export type GraphraumNodeState = "dimmed" | "focused" | "hovered" | "selected";
+
 export type GraphraumNodeShape = "circle" | "diamond" | "square";
 
 export interface GraphraumPosition {
@@ -120,7 +122,10 @@ export interface GraphraumVisualMapper<NodeAttributes = undefined, EdgeAttribute
 
 export interface GraphraumTheme {
 	background: GraphraumColor;
+	dimmedNode: GraphraumColor;
 	edge: GraphraumColor;
+	focusedNode: GraphraumColor;
+	hoveredNode: GraphraumColor;
 	node: GraphraumColor;
 	selectedNode: GraphraumColor;
 }

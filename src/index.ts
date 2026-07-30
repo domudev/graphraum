@@ -16,6 +16,7 @@ export type {
 	GraphraumNodeEncoding,
 	GraphraumNodeGeometry,
 	GraphraumNodeShape,
+	GraphraumNodeState,
 	GraphraumNodeUpdate,
 	GraphraumNodeVisual,
 	GraphraumOptions,

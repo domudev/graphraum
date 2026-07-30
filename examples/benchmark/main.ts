@@ -3,6 +3,7 @@ import {
 	Graphraum,
 	type GraphraumMode,
 	type GraphraumNodeShape,
+	type GraphraumNodeState,
 	type GraphraumOptions,
 	type GraphraumOverlay,
 } from "../../src";
@@ -20,9 +21,13 @@ interface LabState extends FixtureOptions {
 	maxPixelRatio: number;
 	maxVisibleEdges: number;
 	mode: GraphraumMode;
+	nodeStates: Record<GraphraumNodeState, number>;
 	theme: {
 		background: string;
+		dimmedNode: string;
 		edge: string;
+		focusedNode: string;
+		hoveredNode: string;
 		node: string;
 		selectedNode: string;
 	};
@@ -69,6 +74,12 @@ function readState(): LabState {
 		maxPixelRatio: formNumber(values, "maxPixelRatio"),
 		maxVisibleEdges: formNumber(values, "maxVisibleEdges"),
 		mode: formValue(values, "mode") as GraphraumMode,
+		nodeStates: {
+			dimmed: formNumber(values, "dimmedNodeIndex"),
+			focused: formNumber(values, "focusedNodeIndex"),
+			hovered: formNumber(values, "hoveredNodeIndex"),
+			selected: formNumber(values, "selectedNodeIndex"),
+		},
 		nodeColors: {
 			concept: formValue(values, "conceptColor"),
 			document: formValue(values, "documentColor"),
@@ -84,7 +95,10 @@ function readState(): LabState {
 		scoreSize: formNumber(values, "scoreSize"),
 		theme: {
 			background: formValue(values, "background"),
+			dimmedNode: formValue(values, "dimmedNode"),
 			edge: formValue(values, "edge"),
+			focusedNode: formValue(values, "focusedNode"),
+			hoveredNode: formValue(values, "hoveredNode"),
 			node: formValue(values, "node"),
 			selectedNode: formValue(values, "selectedNode"),
 		},
@@ -272,6 +286,9 @@ function rebuild() {
 	graph?.destroy();
 	graph = new Graphraum<NodeAttributes, EdgeAttributes>(container, graphOptions());
 	graph.setData(createFixture(state));
+	for (const [nodeState, index] of Object.entries(state.nodeStates) as [GraphraumNodeState, number][]) {
+		graph.setNodeState(nodeState, index >= 0 && index < state.nodeCount ? [`node-${index}`] : []);
+	}
 	createOverlay();
 	const encodingLabel = state.encoding === "mapper" ? "typed mapper" : "direct snapshot";
 	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encodingLabel}`;
