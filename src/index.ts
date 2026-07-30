@@ -1,5 +1,6 @@
 export { Graphraum } from "./graphraum";
 export { graphraumNodeShapes } from "./node-shapes";
+export { GraphraumOverlay } from "./overlay";
 export { graphraumTheme } from "./theme";
 export type {
 	CompiledGraphraumPresentation,
@@ -18,11 +19,14 @@ export type {
 	GraphraumNodeUpdate,
 	GraphraumNodeVisual,
 	GraphraumOptions,
+	GraphraumOverlayNode,
+	GraphraumOverlayOptions,
 	GraphraumPosition,
 	GraphraumPresentation,
 	GraphraumPresentationAction,
 	GraphraumPresentationProperty,
 	GraphraumPropertyValue,
+	GraphraumScreenPosition,
 	GraphraumTheme,
 	GraphraumVisualMapper,
 } from "./types";

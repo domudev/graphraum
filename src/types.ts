@@ -86,6 +86,23 @@ export interface CompiledGraphraumPresentation extends GraphraumPresentation {
 	properties: readonly Readonly<GraphraumPresentationProperty>[];
 }
 
+export interface GraphraumScreenPosition {
+	visible: boolean;
+	x: number;
+	y: number;
+}
+
+export interface GraphraumOverlayNode {
+	id: string;
+	presentation: CompiledGraphraumPresentation | null;
+}
+
+export interface GraphraumOverlayOptions {
+	maxLabels?: number;
+	renderLabel?: (node: GraphraumOverlayNode) => HTMLElement | null;
+	renderToolbar?: (node: GraphraumOverlayNode) => HTMLElement | null;
+}
+
 export interface GraphraumNodeEncoding {
 	presentation?: GraphraumPresentation;
 	visual?: GraphraumNodeVisual;
