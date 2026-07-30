@@ -38,6 +38,12 @@ bun run check
 bun run build
 ```
 
+## Local feature notes
+
+- New benchmark controls now expose random edge distribution, force mode, live-force mode, and force tuning (`cycles`, `repulsion`, `distance`, `spring`, `gravity`, `maxFps`).
+- Overlay styling is now configurable directly from CSS by passing `overlayClassName`, `labelClassName`, and `toolbarClassName` to `createOverlay()`.
+
+
 Repository decisions and agent instructions live in [`AGENTS.md`](./AGENTS.md). Changes use [Conventional Commits](https://www.conventionalcommits.org/) and require a matching PR title because squash merges become release commits.
 
 ## Install

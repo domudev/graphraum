@@ -15,8 +15,11 @@ import {
   defineVisuals,
   graphraumTheme,
   type GraphraumData,
+  GraphraumOverlay,
   type GraphraumDiagnostics,
+  type GraphraumOverlayOptions,
   type GraphraumLayoutPositions,
+  type GraphraumOverlayNode,
   type GraphraumNodeUpdate,
   type GraphraumOptions,
 } from "@domudev/graphraum";
@@ -40,6 +43,15 @@ interface GraphraumOptions {
   viewportOverscan?: number;        // default: 16 world units
   theme?: Partial<GraphraumTheme>;
   visuals?: GraphraumVisualMapper<NodeAttributes, EdgeAttributes>;
+}
+
+interface GraphraumOverlayOptions {
+  overlayClassName?: string;
+  labelClassName?: string;
+  toolbarClassName?: string;
+  maxLabels?: number;
+  renderLabel?: (node: GraphraumOverlayNode) => HTMLElement | null;
+  renderToolbar?: (node: GraphraumOverlayNode) => HTMLElement | null;
 }
 ```
 
@@ -82,8 +94,43 @@ Supply generic attribute types and `defineVisuals()` to compile domain data into
   <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
   <div><code>getNodePresentation(id)</code><p>Returns the compiled title, subtitle, properties, and action descriptors for a node, or <code>null</code>.</p></div>
   <div><code>getEdgePresentation(id)</code><p>Returns the compiled presentation for an edge, or <code>null</code>.</p></div>
+  <div><code>createOverlay(options)</code><p>Builds a DOM layer that tracks camera movement and renders user-owned label/toolbar HTML for selected/focused nodes.</p></div>
   <div><code>render()</code><p>Schedules one render on the next animation frame. Repeated calls in the same frame are coalesced.</p></div>
 </div>
+
+```ts
+const overlay = graph.createOverlay({
+  overlayClassName: "graphraum-overlay-host",
+  labelClassName: "graph-label",
+  toolbarClassName: "graph-toolbar",
+  maxLabels: 50,
+  renderLabel: ({ id, presentation }) => {
+    const label = document.createElement("span");
+    label.textContent = presentation?.title ?? id;
+    return label;
+  },
+  renderToolbar: ({ id, presentation }) => {
+    if (!presentation) return null;
+    const toolbar = document.createElement("div");
+    for (const action of presentation.actions) {
+      const button = document.createElement("button");
+      button.textContent = action.label;
+      button.type = "button";
+      button.disabled = action.disabled ?? false;
+      toolbar.append(button);
+    }
+    return toolbar;
+  },
+});
+```
+
+`createOverlay` returns a `GraphraumOverlay` with:
+
+```ts
+overlay.setLabels(["person:ada", "place:london"]);
+overlay.setToolbar("person:ada");
+overlay.destroy();
+```
 
 ```ts
 const updates: readonly GraphraumNodeUpdate[] = [
