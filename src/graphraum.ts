@@ -23,15 +23,17 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
+import { prepareLayoutPositions } from "./layout-positions";
 import { createNodeGeometry, createNodeMaterial, setNodeShapeAt } from "./node-rendering";
 import { containsNodePoint } from "./node-shapes";
-import { prepareNodeUpdates } from "./node-updates";
+import { type PreparedNodeUpdate, prepareNodeUpdates } from "./node-updates";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
 import { graphraumTheme } from "./theme";
 import type {
 	CompiledGraphraumPresentation,
 	GraphraumData,
 	GraphraumDiagnostics,
+	GraphraumLayoutPositions,
 	GraphraumMode,
 	GraphraumNodeUpdate,
 	GraphraumOptions,
@@ -41,6 +43,11 @@ import type {
 import { applyEdgeBudget, collectIncidentEdges } from "./viewport-lod";
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
+type GraphraumGraphObjects = {
+	edgeLines: LineSegments;
+	nodeMesh: InstancedMesh;
+	nodePickMesh: InstancedMesh;
+};
 
 function disposeMaterial(material: Material | Material[]) {
 	for (const item of Array.isArray(material) ? material : [material]) item.dispose();
@@ -188,14 +195,34 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	updateNodes(updates: readonly GraphraumNodeUpdate[]) {
 		if (updates.length === 0) return;
-		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) {
-			throw new Error("Cannot update nodes before graph data is set");
-		}
+		const objects = this.getGraphObjects("update nodes");
 		const prepared = prepareNodeUpdates(this.data.nodes, this.nodeIndices, updates);
+		this.applyPreparedNodeUpdates(prepared, objects);
+	}
+
+	/** Applies a transferable XYZ layout batch. Call repeatedly as a worker produces progressive positions. */
+	applyLayout(layout: GraphraumLayoutPositions) {
+		const prepared = prepareLayoutPositions(this.data.nodes, this.nodeIndices, layout);
+		if (prepared.length === 0) return;
+		const objects = this.getGraphObjects("apply a layout");
+		this.applyPreparedNodeUpdates(prepared, objects);
+	}
+
+	private getGraphObjects(action: string): GraphraumGraphObjects {
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) {
+			throw new Error(`Cannot ${action} before graph data is set`);
+		}
+		return { edgeLines: this.edgeLines, nodeMesh: this.nodeMesh, nodePickMesh: this.nodePickMesh };
+	}
+
+	private applyPreparedNodeUpdates(
+		prepared: readonly PreparedNodeUpdate<NodeAttributes>[],
+		{ edgeLines, nodeMesh, nodePickMesh }: GraphraumGraphObjects,
+	) {
 		const nodes = [...this.data.nodes];
 		const matrix = new Matrix4();
-		const edgePosition = this.edgeLines.geometry.getAttribute("position") as BufferAttribute;
-		const nodeShape = this.nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
+		const edgePosition = edgeLines.geometry.getAttribute("position") as BufferAttribute;
+		const nodeShape = nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
 		const renderedEdgePositions = edgePosition.array as Float32Array;
 		const viewportBounds = this.getViewportBounds2d();
 		let visibilityChanged = false;
@@ -213,18 +240,18 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 					const size = update.next.size ?? 4;
 					matrix.makeScale(size, size, size);
 					matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
-					this.nodeMesh.setMatrixAt(nodeSlot, matrix);
-					this.nodeMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
+					nodeMesh.setMatrixAt(nodeSlot, matrix);
+					nodeMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
 					const pickSize = size * Math.SQRT2;
 					matrix.makeScale(pickSize, pickSize, pickSize);
 					matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
-					this.nodePickMesh.setMatrixAt(nodeSlot, matrix);
-					this.nodePickMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
+					nodePickMesh.setMatrixAt(nodeSlot, matrix);
+					nodePickMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
 				}
 			}
 			if (update.colorChanged && !this.selectedNodeIds.has(update.next.id) && nodeSlot !== undefined) {
-				this.nodeMesh.setColorAt(nodeSlot, new Color(update.next.color ?? this.theme.node));
-				this.nodeMesh.instanceColor?.addUpdateRange(nodeSlot * 3, 3);
+				nodeMesh.setColorAt(nodeSlot, new Color(update.next.color ?? this.theme.node));
+				nodeMesh.instanceColor?.addUpdateRange(nodeSlot * 3, 3);
 			}
 			if (update.shapeChanged && nodeSlot !== undefined) {
 				setNodeShapeAt(nodeShape, nodeSlot, update.next.shape);
@@ -253,11 +280,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			return;
 		}
 		if (prepared.some((update) => update.positionChanged || update.sizeChanged)) {
-			this.nodeMesh.instanceMatrix.needsUpdate = true;
-			this.nodePickMesh.instanceMatrix.needsUpdate = true;
+			nodeMesh.instanceMatrix.needsUpdate = true;
+			nodePickMesh.instanceMatrix.needsUpdate = true;
 		}
-		if (prepared.some((update) => update.colorChanged) && this.nodeMesh.instanceColor) {
-			this.nodeMesh.instanceColor.needsUpdate = true;
+		if (prepared.some((update) => update.colorChanged) && nodeMesh.instanceColor) {
+			nodeMesh.instanceColor.needsUpdate = true;
 		}
 		if (prepared.some((update) => update.shapeChanged)) nodeShape.needsUpdate = true;
 		if (prepared.some((update) => update.positionChanged)) edgePosition.needsUpdate = true;

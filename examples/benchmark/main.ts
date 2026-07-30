@@ -8,8 +8,14 @@ import {
 
 import { createFixture, type EdgeAttributes, type Encoding, type FixtureOptions, type NodeAttributes } from "./fixture";
 
+type LayoutName = "circle" | "grid";
+type LayoutWorkerMessage =
+	| { end: number; positions: Float32Array; run: number; type: "positions" }
+	| { run: number; type: "complete" };
+
 interface LabState extends FixtureOptions {
 	antialias: boolean;
+	layout: LayoutName;
 	maxPixelRatio: number;
 	maxVisibleEdges: number;
 	mode: GraphraumMode;
@@ -58,6 +64,7 @@ function readState(): LabState {
 		},
 		edgeMultiplier: formNumber(values, "edgeMultiplier"),
 		encoding: formValue(values, "encoding") as Encoding,
+		layout: formValue(values, "layout") as LayoutName,
 		maxPixelRatio: formNumber(values, "maxPixelRatio"),
 		maxVisibleEdges: formNumber(values, "maxVisibleEdges"),
 		mode: formValue(values, "mode") as GraphraumMode,
@@ -87,7 +94,9 @@ function readState(): LabState {
 
 let state = readState();
 let graph: Graphraum<NodeAttributes, EdgeAttributes>;
+let layoutRun = 0;
 let updateCount = 0;
+const layoutWorker = new Worker(new URL("./layout-worker.ts", import.meta.url), { type: "module" });
 
 const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 	node: (node) => ({
@@ -185,7 +194,40 @@ function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 	};
 }
 
+function applyLayoutProgressively(layout: LayoutName) {
+	const run = ++layoutRun;
+	status.textContent = `Computing ${layout} layout in worker`;
+	layoutWorker.postMessage({
+		batchSize: Math.max(500, Math.ceil(state.nodeCount / 30)),
+		layout,
+		nodeCount: state.nodeCount,
+		run,
+		type: "start",
+	});
+}
+
+layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMessage>) => {
+	if (data.run !== layoutRun) return;
+	if (data.type === "positions") {
+		const start = data.end - data.positions.length / 3;
+		const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
+		graph.applyLayout({ nodeIds, positions: data.positions });
+		status.textContent = `Applying circle layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
+		requestAnimationFrame(() => {
+			if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
+		});
+		return;
+	}
+	graph.fitView();
+	const encoding = state.encoding === "mapper" ? "typed mapper" : "direct snapshot";
+	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · circle`;
+	requestAnimationFrame(renderDiagnostics);
+});
+
+window.addEventListener("beforeunload", () => layoutWorker.terminate());
+
 function rebuild() {
+	layoutRun += 1;
 	state = readState();
 	graph?.destroy();
 	graph = new Graphraum<NodeAttributes, EdgeAttributes>(container, graphOptions());
@@ -197,6 +239,7 @@ function rebuild() {
 	presentationProperties.replaceChildren();
 	presentationActions.replaceChildren();
 	requestAnimationFrame(renderDiagnostics);
+	if (state.layout !== "grid") applyLayoutProgressively(state.layout);
 }
 
 controls.addEventListener("change", rebuild);

@@ -32,6 +32,12 @@ export interface GraphraumNodeUpdate {
 	size?: number | undefined;
 }
 
+/** A transferable XYZ position batch in the same order as `nodeIds`. */
+export interface GraphraumLayoutPositions {
+	nodeIds: readonly string[];
+	positions: Float32Array;
+}
+
 export type GraphraumEdge<EdgeAttributes = undefined> = {
 	color?: GraphraumColor;
 	id: string;
