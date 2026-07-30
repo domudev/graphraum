@@ -20,6 +20,8 @@ flowchart LR
 
 This keeps layout work independently replaceable and prevents a complete force simulation from blocking the first useful render.
 
+Layout producers can send `GraphraumLayoutPositions` batches: node IDs plus transferable XYZ `Float32Array` data. The host calls `applyLayout()` for each batch, so useful positions can appear before full convergence without making a layout algorithm part of graphraum.
+
 ## On-demand rendering
 
 graphraum renders when data, selection, camera controls, mode, or container size changes. It does not keep an idle animation loop alive. Calls within one browser frame are coalesced through `requestAnimationFrame`.

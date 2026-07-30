@@ -9,6 +9,7 @@ export type {
 	GraphraumEdge,
 	GraphraumEdgeEncoding,
 	GraphraumEdgeVisual,
+	GraphraumLayoutPositions,
 	GraphraumMode,
 	GraphraumNode,
 	GraphraumNodeEncoding,
