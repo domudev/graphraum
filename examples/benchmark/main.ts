@@ -8,14 +8,28 @@ import {
 	type GraphraumOverlay,
 } from "../../src";
 
-import { createFixture, type EdgeAttributes, type Encoding, type FixtureOptions, type NodeAttributes } from "./fixture";
+import {
+	createFixture,
+	type EdgeAttributes,
+	type EdgeDistribution,
+	type Encoding,
+	type FixtureOptions,
+	type NodeAttributes,
+} from "./fixture";
 
-type LayoutName = "circle" | "grid";
+type LayoutName = "circle" | "force" | "force-live" | "grid";
 type LayoutWorkerMessage =
 	| { end: number; positions: Float32Array; run: number; type: "positions" }
 	| { run: number; type: "complete" };
 
 interface LabState extends FixtureOptions {
+	layoutBatchSize: number;
+	forceCycles: number;
+	forceRepulsion: number;
+	forceDist: number;
+	forceSpring: number;
+	forceGravity: number;
+	forceMaxFps: number;
 	antialias: boolean;
 	layout: LayoutName;
 	maxPixelRatio: number;
@@ -60,9 +74,57 @@ function formNumber(values: FormData, name: string) {
 	return Number(formValue(values, name));
 }
 
+function clamp(value: number, min: number, max: number) {
+	return Math.min(Math.max(Number.isFinite(value) ? value : min, min), max);
+}
+
+function clampInt(value: number, min: number, max: number) {
+	return Math.round(clamp(value, min, max));
+}
+
+function nodeIndexFromId(nodeId: string, nodeCount: number) {
+	if (!nodeId.startsWith("node-")) return -1;
+	const index = Number(nodeId.slice(5));
+	return Number.isSafeInteger(index) && index >= 0 && index < nodeCount ? index : -1;
+}
+
+function createForceEdges(nodeCount: number, edges: readonly { source: string; target: string }[]) {
+	const candidate = new Uint32Array(edges.length * 2);
+	let edgeCursor = 0;
+	for (const edge of edges) {
+		const sourceIndex = nodeIndexFromId(edge.source, nodeCount);
+		const targetIndex = nodeIndexFromId(edge.target, nodeCount);
+		if (sourceIndex < 0 || targetIndex < 0) continue;
+		candidate[edgeCursor++] = sourceIndex;
+		candidate[edgeCursor++] = targetIndex;
+	}
+	return edgeCursor === candidate.length ? candidate : candidate.slice(0, edgeCursor);
+}
+
+function layoutLabel(layout: LayoutName) {
+	switch (layout) {
+		case "circle":
+			return "progressive circle";
+		case "force-live":
+			return "live force";
+		case "force":
+			return "force";
+		default:
+			return layout;
+	}
+}
+
 function readState(): LabState {
 	const values = new FormData(controls);
 	return {
+		forceGravity: clamp(formNumber(values, "forceGravity"), 0, 0.5),
+		forceMaxFps: clampInt(formNumber(values, "forceMaxFps"), 1, 240),
+		edgeDistribution: formValue(values, "edgeDistribution") as EdgeDistribution,
+		forceCycles: clampInt(formNumber(values, "forceCycles"), 10, 5000),
+		forceDist: clamp(formNumber(values, "forceDist"), 2, 512),
+		forceSpring: clamp(formNumber(values, "forceSpring"), 0, 0.05),
+		forceRepulsion: clamp(formNumber(values, "forceRepulsion"), 0.1, 1_000_000),
+		layoutBatchSize: clampInt(formNumber(values, "layoutBatchSize"), 100, 4000),
 		antialias: values.has("antialias"),
 		edgeColors: {
 			mentions: formValue(values, "mentionsColor"),
@@ -112,6 +174,9 @@ let graph: Graphraum<NodeAttributes, EdgeAttributes>;
 let overlay: GraphraumOverlay<NodeAttributes, EdgeAttributes> | undefined;
 let layoutRun = 0;
 let updateCount = 0;
+let activeLayoutRun = -1;
+let dragNodeId: string | null = null;
+let dragPointerId = -1;
 const layoutWorker = new Worker(new URL("./layout-worker.ts", import.meta.url), { type: "module" });
 
 const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
@@ -206,16 +271,17 @@ function labelNodeIds(selectedNodeId?: string) {
 
 function createOverlay() {
 	overlay = graph.createOverlay({
+		overlayClassName: "graphraum-overlay-host",
+		labelClassName: "graph-label",
+		toolbarClassName: "graph-action-toolbar",
 		renderLabel: ({ id, presentation }) => {
 			const label = document.createElement("span");
-			label.className = "graph-label";
 			label.textContent = presentation?.title ?? id;
 			return label;
 		},
 		renderToolbar: ({ id, presentation }) => {
 			if (!presentation) return null;
 			const toolbar = document.createElement("div");
-			toolbar.className = "graph-action-toolbar";
 			toolbar.setAttribute("aria-label", `${presentation.title} actions`);
 			for (const action of presentation.actions) {
 				const button = document.createElement("button");
@@ -234,6 +300,30 @@ function createOverlay() {
 	overlay.setLabels(labelNodeIds());
 }
 
+function graphPositionForPointer(event: PointerEvent) {
+	return graph.screenToWorld(event.clientX, event.clientY);
+}
+
+function pinDraggedNode(nodeId: string, event: PointerEvent) {
+	const position = graphPositionForPointer(event);
+	if (!position) return;
+	graph.updateNodes([{ id: nodeId, position }]);
+	const nodeIndex = nodeIndexFromId(nodeId, state.nodeCount);
+	if (nodeIndex < 0) return;
+	layoutWorker.postMessage({
+		nodeIndex,
+		position: [position.x, position.y, position.z],
+		run: layoutRun,
+		type: "pin-node",
+	});
+}
+
+function unpinDraggedNode(nodeId: string) {
+	const nodeIndex = nodeIndexFromId(nodeId, state.nodeCount);
+	if (nodeIndex < 0) return;
+	layoutWorker.postMessage({ nodeIndex, run: layoutRun, type: "unpin-node" });
+}
+
 function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 	return {
 		antialias: state.antialias,
@@ -247,16 +337,35 @@ function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 	};
 }
 
-function applyLayoutProgressively(layout: LayoutName) {
+function applyLayoutProgressively(layout: LayoutName, forceEdges?: Uint32Array) {
 	const run = ++layoutRun;
-	status.textContent = `Computing ${layout} layout in worker`;
-	layoutWorker.postMessage({
-		batchSize: Math.max(500, Math.ceil(state.nodeCount / 30)),
-		layout,
-		nodeCount: state.nodeCount,
-		run,
-		type: "start",
-	});
+	status.textContent = `Computing ${layoutLabel(layout)} layout in worker`;
+	const useForce = layout === "force" || layout === "force-live";
+	const transferable: Transferable[] = [];
+	if (useForce && forceEdges) {
+		transferable.push(forceEdges.buffer);
+	}
+	layoutWorker.postMessage(
+		{
+			batchSize: state.layoutBatchSize,
+			layout,
+			nodeCount: state.nodeCount,
+			run,
+			...(useForce && forceEdges
+				? {
+						forceCycles: state.forceCycles,
+						forceDist: state.forceDist,
+						forceSpring: state.forceSpring,
+						edges: forceEdges,
+						forceGravity: state.forceGravity,
+						forceRepulsion: state.forceRepulsion,
+						...(layout === "force-live" ? { maxFps: state.forceMaxFps } : {}),
+					}
+				: {}),
+			type: "start",
+		},
+		transferable,
+	);
 }
 
 layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMessage>) => {
@@ -265,15 +374,24 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 		const start = data.end - data.positions.length / 3;
 		const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
 		graph.applyLayout({ nodeIds, positions: data.positions });
-		status.textContent = `Applying circle layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
-		requestAnimationFrame(() => {
-			if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
-		});
+		if (activeLayoutRun !== data.run) {
+			if (data.end === state.nodeCount) {
+				graph.fitView();
+				activeLayoutRun = data.run;
+			}
+		}
+		status.textContent = `Applying ${layoutLabel(state.layout)} layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
+		if (state.layout !== "force-live") {
+			requestAnimationFrame(() => {
+				if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
+			});
+		}
 		return;
 	}
 	graph.fitView();
+	activeLayoutRun = -1;
 	const encoding = state.encoding === "mapper" ? "typed mapper" : "direct snapshot";
-	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · circle`;
+	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · ${layoutLabel(state.layout)}`;
 	requestAnimationFrame(renderDiagnostics);
 });
 
@@ -282,10 +400,12 @@ window.addEventListener("beforeunload", () => layoutWorker.terminate());
 function rebuild() {
 	layoutRun += 1;
 	state = readState();
+	activeLayoutRun = -1;
 	overlay?.destroy();
 	graph?.destroy();
 	graph = new Graphraum<NodeAttributes, EdgeAttributes>(container, graphOptions());
-	graph.setData(createFixture(state));
+	const data = createFixture(state);
+	graph.setData(data);
 	for (const [nodeState, index] of Object.entries(state.nodeStates) as [GraphraumNodeState, number][]) {
 		graph.setNodeState(nodeState, index >= 0 && index < state.nodeCount ? [`node-${index}`] : []);
 	}
@@ -297,12 +417,24 @@ function rebuild() {
 	presentationProperties.replaceChildren();
 	presentationActions.replaceChildren();
 	requestAnimationFrame(renderDiagnostics);
-	if (state.layout !== "grid") applyLayoutProgressively(state.layout);
+	if (state.layout !== "grid") {
+		const forceEdges =
+			state.layout === "force" || state.layout === "force-live"
+				? createForceEdges(state.nodeCount, data.edges)
+				: undefined;
+		applyLayoutProgressively(state.layout, forceEdges);
+	}
+	dragNodeId = null;
+	dragPointerId = -1;
 }
 
 controls.addEventListener("change", rebuild);
 
 container.addEventListener("click", (event) => {
+	if (dragNodeId !== null) {
+		dragNodeId = null;
+		return;
+	}
 	const selectedNode = graph.pick(event.clientX, event.clientY);
 	graph.setSelection(selectedNode ? [selectedNode] : []);
 	overlay?.setLabels(labelNodeIds(selectedNode ?? undefined));
@@ -311,9 +443,57 @@ container.addEventListener("click", (event) => {
 	requestAnimationFrame(renderDiagnostics);
 });
 
-for (const eventName of ["pointerup", "wheel"]) {
+for (const eventName of ["wheel"]) {
 	container.addEventListener(eventName, () => requestAnimationFrame(renderDiagnostics));
 }
+
+container.addEventListener("pointerdown", (event) => {
+	const selectedNode = graph.pick(event.clientX, event.clientY);
+	if (!selectedNode) return;
+	if (state.layout !== "force-live") {
+		graph.setSelection([selectedNode]);
+		overlay?.setLabels(labelNodeIds(selectedNode));
+		overlay?.setToolbar(selectedNode);
+		renderPresentation("Node", selectedNode);
+		requestAnimationFrame(renderDiagnostics);
+		return;
+	}
+	event.preventDefault();
+	dragNodeId = selectedNode;
+	dragPointerId = event.pointerId;
+	graph.setSelection([selectedNode]);
+	overlay?.setLabels(labelNodeIds(selectedNode));
+	overlay?.setToolbar(selectedNode);
+	renderPresentation("Node", selectedNode);
+	pinDraggedNode(selectedNode, event);
+	requestAnimationFrame(renderDiagnostics);
+	if (container.hasPointerCapture(event.pointerId)) return;
+	container.setPointerCapture(event.pointerId);
+});
+
+container.addEventListener("pointermove", (event) => {
+	if (dragNodeId === null || event.pointerId !== dragPointerId || state.layout !== "force-live") return;
+	pinDraggedNode(dragNodeId, event);
+});
+
+container.addEventListener("pointercancel", () => {
+	if (dragNodeId !== null) {
+		unpinDraggedNode(dragNodeId);
+		dragNodeId = null;
+	}
+	dragPointerId = -1;
+	requestAnimationFrame(renderDiagnostics);
+});
+
+container.addEventListener("pointerup", (event) => {
+	if (dragNodeId !== null && event.pointerId === dragPointerId) {
+		unpinDraggedNode(dragNodeId);
+		if (container.hasPointerCapture(dragPointerId)) container.releasePointerCapture(dragPointerId);
+		dragNodeId = null;
+		dragPointerId = -1;
+	}
+	requestAnimationFrame(renderDiagnostics);
+});
 
 requireElement<HTMLButtonElement>("#fit").addEventListener("click", () => {
 	graph.fitView();

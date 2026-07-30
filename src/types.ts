@@ -100,7 +100,10 @@ export interface GraphraumOverlayNode {
 }
 
 export interface GraphraumOverlayOptions {
+	overlayClassName?: string;
 	maxLabels?: number;
+	labelClassName?: string;
+	toolbarClassName?: string;
 	renderLabel?: (node: GraphraumOverlayNode) => HTMLElement | null;
 	renderToolbar?: (node: GraphraumOverlayNode) => HTMLElement | null;
 }

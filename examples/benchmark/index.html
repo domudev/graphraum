@@ -207,20 +207,39 @@
 							</select>
 						</label>
 						<label>Edges / node <input name="edgeMultiplier" type="number" min="0" max="10" value="3" /></label>
+						<label>Edge mode
+							<select name="edgeDistribution">
+								<option value="linear" selected>Linear</option>
+								<option value="random">Random</option>
+							</select>
+						</label>
 						<label>Encoding
 							<select name="encoding">
 								<option value="mapper">Typed mapper</option>
 								<option value="snapshot">Direct snapshot</option>
 							</select>
 						</label>
-						<label>Layout
-							<select name="layout">
-								<option value="grid">Grid</option>
-								<option value="circle">Progressive circle</option>
-							</select>
-						</label>
+							<label>Layout
+								<select name="layout">
+									<option value="grid">Grid</option>
+									<option value="force">Force</option>
+									<option value="force-live">Live force</option>
+									<option value="circle">Progressive circle</option>
+								</select>
+							</label>
+						<label>Batch size <input name="layoutBatchSize" type="number" min="100" max="4000" step="100" value="500" /></label>
 						<label>Base size <input name="nodeSize" type="range" min="1" max="12" step="0.5" value="3" /></label>
 						<label>Score scale <input name="scoreSize" type="range" min="0" max="10" step="0.5" value="4" /></label>
+					</fieldset>
+
+					<fieldset>
+						<legend>Force layout</legend>
+						<label>Cycles <input name="forceCycles" type="number" min="10" max="5000" step="10" value="140" /></label>
+						<label>Repulsion <input name="forceRepulsion" type="number" min="0.1" max="1000000" step="100" value="750" /></label>
+						<label>Dist <input name="forceDist" type="number" min="2" max="512" step="1" value="26" /></label>
+						<label>Spring <input name="forceSpring" type="number" min="0" max="0.05" step="0.0005" value="0.0016" /></label>
+						<label>Gravity <input name="forceGravity" type="number" min="0" max="0.5" step="0.01" value="0.01" /></label>
+						<label>Max FPS <input name="forceMaxFps" type="number" min="1" max="240" step="1" value="60" /></label>
 					</fieldset>
 
 					<fieldset>
