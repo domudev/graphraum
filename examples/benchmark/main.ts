@@ -4,6 +4,7 @@ import {
 	type GraphraumMode,
 	type GraphraumNodeShape,
 	type GraphraumOptions,
+	type GraphraumOverlay,
 } from "../../src";
 
 import { createFixture, type EdgeAttributes, type Encoding, type FixtureOptions, type NodeAttributes } from "./fixture";
@@ -94,6 +95,7 @@ function readState(): LabState {
 
 let state = readState();
 let graph: Graphraum<NodeAttributes, EdgeAttributes>;
+let overlay: GraphraumOverlay<NodeAttributes, EdgeAttributes> | undefined;
 let layoutRun = 0;
 let updateCount = 0;
 const layoutWorker = new Worker(new URL("./layout-worker.ts", import.meta.url), { type: "module" });
@@ -181,6 +183,43 @@ function renderPresentation(kind: "Edge" | "Node", id: string) {
 	);
 }
 
+function labelNodeIds(selectedNodeId?: string) {
+	return [
+		...Array.from({ length: Math.min(state.nodeCount, 8) }, (_, index) => `node-${index}`),
+		...(selectedNodeId ? [selectedNodeId] : []),
+	];
+}
+
+function createOverlay() {
+	overlay = graph.createOverlay({
+		renderLabel: ({ id, presentation }) => {
+			const label = document.createElement("span");
+			label.className = "graph-label";
+			label.textContent = presentation?.title ?? id;
+			return label;
+		},
+		renderToolbar: ({ id, presentation }) => {
+			if (!presentation) return null;
+			const toolbar = document.createElement("div");
+			toolbar.className = "graph-action-toolbar";
+			toolbar.setAttribute("aria-label", `${presentation.title} actions`);
+			for (const action of presentation.actions) {
+				const button = document.createElement("button");
+				button.disabled = action.disabled ?? false;
+				button.textContent = action.label;
+				button.type = "button";
+				button.addEventListener("click", () => {
+					status.textContent = `${action.label} requested for ${id}`;
+					renderPresentation("Node", id);
+				});
+				toolbar.append(button);
+			}
+			return toolbar;
+		},
+	});
+	overlay.setLabels(labelNodeIds());
+}
+
 function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 	return {
 		antialias: state.antialias,
@@ -229,9 +268,11 @@ window.addEventListener("beforeunload", () => layoutWorker.terminate());
 function rebuild() {
 	layoutRun += 1;
 	state = readState();
+	overlay?.destroy();
 	graph?.destroy();
 	graph = new Graphraum<NodeAttributes, EdgeAttributes>(container, graphOptions());
 	graph.setData(createFixture(state));
+	createOverlay();
 	const encodingLabel = state.encoding === "mapper" ? "typed mapper" : "direct snapshot";
 	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encodingLabel}`;
 	presentationTitle.textContent = "Select a node";
@@ -247,6 +288,8 @@ controls.addEventListener("change", rebuild);
 container.addEventListener("click", (event) => {
 	const selectedNode = graph.pick(event.clientX, event.clientY);
 	graph.setSelection(selectedNode ? [selectedNode] : []);
+	overlay?.setLabels(labelNodeIds(selectedNode ?? undefined));
+	overlay?.setToolbar(selectedNode);
 	if (selectedNode) renderPresentation("Node", selectedNode);
 	requestAnimationFrame(renderDiagnostics);
 });
@@ -276,6 +319,8 @@ requireElement<HTMLButtonElement>("#update-node").addEventListener("click", () =
 		},
 	]);
 	graph.setSelection(["node-0"]);
+	overlay?.setLabels(labelNodeIds("node-0"));
+	overlay?.setToolbar("node-0");
 	renderPresentation("Node", "node-0");
 	requestAnimationFrame(renderDiagnostics);
 });

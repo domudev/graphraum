@@ -27,6 +27,7 @@ import { prepareLayoutPositions } from "./layout-positions";
 import { createNodeGeometry, createNodeMaterial, setNodeShapeAt } from "./node-rendering";
 import { containsNodePoint } from "./node-shapes";
 import { type PreparedNodeUpdate, prepareNodeUpdates } from "./node-updates";
+import { GraphraumOverlay } from "./overlay";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
 import { graphraumTheme } from "./theme";
 import type {
@@ -37,6 +38,8 @@ import type {
 	GraphraumMode,
 	GraphraumNodeUpdate,
 	GraphraumOptions,
+	GraphraumOverlayOptions,
+	GraphraumScreenPosition,
 	GraphraumTheme,
 	GraphraumVisualMapper,
 } from "./types";
@@ -92,6 +95,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private visibleEdgeCandidateCount = 0;
 	private mode: GraphraumMode;
 	private frameRequest: number | null = null;
+	private readonly viewListeners = new Set<() => void>();
 
 	constructor(container: HTMLElement, options: GraphraumOptions<NodeAttributes, EdgeAttributes> = {}) {
 		this.container = container;
@@ -326,6 +330,39 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		return this.nodePresentations.get(nodeId) ?? null;
 	}
 
+	/** Returns canvas-relative screen coordinates for a node, or null when the node does not exist. */
+	getNodeScreenPosition(nodeId: string): GraphraumScreenPosition | null {
+		const index = this.nodeIndices.get(nodeId);
+		const node = index === undefined ? undefined : this.data.nodes[index];
+		if (!node) return null;
+		const projected = new Vector3(node.position.x, node.position.y, node.position.z ?? 0).project(this.camera);
+		const width = this.renderer.domElement.clientWidth;
+		const height = this.renderer.domElement.clientHeight;
+		return {
+			visible:
+				projected.x >= -1 &&
+				projected.x <= 1 &&
+				projected.y >= -1 &&
+				projected.y <= 1 &&
+				projected.z >= -1 &&
+				projected.z <= 1,
+			x: ((projected.x + 1) * width) / 2,
+			y: ((1 - projected.y) * height) / 2,
+		};
+	}
+
+	/** Creates a bounded DOM layer for styled labels and a focused-node toolbar. */
+	createOverlay(options: GraphraumOverlayOptions = {}) {
+		return new GraphraumOverlay(this, this.container, options);
+	}
+
+	/** Subscribes to camera and viewport changes. Returns an unsubscribe function. */
+	onViewChange(listener: () => void) {
+		this.viewListeners.add(listener);
+		listener();
+		return () => this.viewListeners.delete(listener);
+	}
+
 	getEdgePresentation(edgeId: string): CompiledGraphraumPresentation | null {
 		return this.edgePresentations.get(edgeId) ?? null;
 	}
@@ -451,6 +488,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.frameRequest = requestAnimationFrame(() => {
 			this.frameRequest = null;
 			this.renderer.render(this.scene, this.camera);
+			for (const listener of this.viewListeners) listener();
 		});
 	};
 
