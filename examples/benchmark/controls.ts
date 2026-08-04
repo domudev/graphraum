@@ -53,8 +53,7 @@ export function renderControls(form: HTMLFormElement) {
 			SelectField("Layout", "layout", "grid", [
 				{ label: "Grid", value: "grid" },
 				{ label: "Progressive circle", value: "circle" },
-				{ label: "ForceAtlas2 worker", value: "forceatlas2" },
-				{ label: "Custom force worker", value: "force-custom" },
+				{ label: "Force directed", value: "force" },
 			]),
 		),
 		Section(

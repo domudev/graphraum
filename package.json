@@ -41,7 +41,6 @@
 	},
 	"dependencies": {
 		"graphology": "^0.26.0",
-		"graphology-layout-forceatlas2": "^0.10.1",
 		"three": "^0.185.1"
 	},
 	"devDependencies": {
