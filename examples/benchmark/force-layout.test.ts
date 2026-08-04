@@ -16,3 +16,13 @@ test("reduces force iterations as node count grows", () => {
 	expect(forceIterationCount(10_000)).toBeGreaterThan(forceIterationCount(100_000));
 	expect(forceIterationCount(1_000_000)).toBeGreaterThanOrEqual(8);
 });
+
+test("keeps a 10k-node force layout finite", () => {
+	const nodeCount = 10_000;
+	const edges = new Uint32Array((nodeCount - 1) * 2);
+	for (let index = 0; index < nodeCount - 1; index += 1) edges.set([index, index + 1], index * 2);
+
+	const positions = computeForcePositions({ dimensions: 3, edges, nodeCount });
+
+	expect(positions.every(Number.isFinite)).toBe(true);
+});
