@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { computeForcePositions, forceIterationCount } from "./force-layout";
+import { computeClusteredForcePositions, computeForcePositions, forceIterationCount } from "./force-layout";
 
 test("keeps 2D force positions flat and gives 3D positions depth", () => {
 	const edges = new Uint32Array([0, 1, 1, 2]);
@@ -34,4 +34,18 @@ test("does not preserve a circular seed", () => {
 	);
 
 	expect(new Set(radii).size).toBeGreaterThan(10);
+});
+
+test("expands a coarse force layout from data cluster indices", () => {
+	const positions = computeClusteredForcePositions({
+		clusters: new Uint32Array([0, 0, 1, 1]),
+		dimensions: 2,
+		edges: new Uint32Array([0, 1, 2, 3, 1, 2]),
+		nodeCount: 4,
+	});
+	const distance = (left: number, right: number) =>
+		Math.hypot(positions[left * 3] - positions[right * 3], positions[left * 3 + 1] - positions[right * 3 + 1]);
+
+	expect(distance(0, 1)).toBeLessThan(distance(0, 2));
+	expect(positions.filter((_, index) => index % 3 === 2).every((value) => value === 0)).toBe(true);
 });

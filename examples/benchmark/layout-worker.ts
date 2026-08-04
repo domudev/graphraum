@@ -1,12 +1,14 @@
-import { computeForcePositions } from "./force-layout";
+import { computeClusteredForcePositions, computeForcePositions, createForceSimulation } from "./force-layout";
 
-type LayoutName = "circle" | "force" | "grid";
+type LayoutName = "circle" | "force" | "force-live" | "grid";
 
 type LayoutRequest = {
 	batchSize: number;
+	clusters?: Uint32Array;
 	dimensions: 2 | 3;
 	edges?: Uint32Array;
 	layout: LayoutName;
+	maxFps: number;
 	nodeCount: number;
 	run: number;
 };
@@ -19,7 +21,31 @@ type WorkerScope = {
 };
 
 const workerScope = self as unknown as WorkerScope;
-let activeLayout: { nextStart: number; positions?: Float32Array; request: LayoutRequest } | undefined;
+let activeLayout: { nextStart: number; positions?: Float32Array; request: LayoutRequest; timer?: number } | undefined;
+
+function stopLiveLayout() {
+	if (activeLayout?.timer !== undefined) clearTimeout(activeLayout.timer);
+}
+
+function startLiveLayout(request: LayoutRequest) {
+	const simulation = createForceSimulation({
+		dimensions: request.dimensions,
+		edges: request.edges ?? new Uint32Array(),
+		nodeCount: request.nodeCount,
+	});
+	const state: NonNullable<typeof activeLayout> = { nextStart: 0, request };
+	activeLayout = state;
+	const tick = () => {
+		if (activeLayout !== state) return;
+		simulation.step(0.35);
+		const positions = simulation.positions.slice();
+		workerScope.postMessage({ end: request.nodeCount, positions, run: request.run, type: "positions" }, [
+			positions.buffer,
+		]);
+		state.timer = setTimeout(tick, Math.max(1, Math.round(1_000 / request.maxFps)));
+	};
+	tick();
+}
 
 function positionsFor(request: LayoutRequest, start: number, end: number) {
 	const positions = new Float32Array((end - start) * 3);
@@ -55,15 +81,27 @@ function postNextBatch(run: number) {
 
 workerScope.addEventListener("message", ({ data }) => {
 	if (data.type === "start") {
+		stopLiveLayout();
+		if (data.layout === "force-live") {
+			startLiveLayout(data);
+			return;
+		}
 		activeLayout = {
 			nextStart: 0,
 			positions:
 				data.layout === "force"
-					? computeForcePositions({
-							dimensions: data.dimensions,
-							edges: data.edges ?? new Uint32Array(),
-							nodeCount: data.nodeCount,
-						})
+					? data.clusters
+						? computeClusteredForcePositions({
+								clusters: data.clusters,
+								dimensions: data.dimensions,
+								edges: data.edges ?? new Uint32Array(),
+								nodeCount: data.nodeCount,
+							})
+						: computeForcePositions({
+								dimensions: data.dimensions,
+								edges: data.edges ?? new Uint32Array(),
+								nodeCount: data.nodeCount,
+							})
 					: undefined,
 			request: data,
 		};

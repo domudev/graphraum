@@ -19,7 +19,7 @@ import {
 import { measurePerformance, renderPerformanceChart } from "./performance";
 import { renderDataList } from "./ui";
 
-type LayoutName = "circle" | "force" | "grid";
+type LayoutName = "circle" | "force" | "force-live" | "grid";
 type ScaleMode = "million-density" | "million-literal" | "standard";
 type LayoutWorkerMessage =
 	| { end: number; positions: Float32Array; run: number; type: "positions" }
@@ -27,6 +27,7 @@ type LayoutWorkerMessage =
 
 interface LabState extends FixtureOptions {
 	antialias: boolean;
+	forceMaxFps: number;
 	layout: LayoutName;
 	maxPixelRatio: number;
 	maxVisibleEdges: number;
@@ -74,6 +75,10 @@ function forceEdges(edges: readonly { source: string; target: string }[]) {
 	return result;
 }
 
+function forceClusters(nodes: readonly { attributes: NodeAttributes }[]) {
+	return Uint32Array.from(nodes, (node) => node.attributes.cluster);
+}
+
 function readState(): LabState {
 	const values = new FormData(controls);
 	const fixture = formValue(values, "fixture");
@@ -87,6 +92,7 @@ function readState(): LabState {
 		},
 		edgeMultiplier: scaleMode === "million-density" ? 0.1 : scaleMode === "million-literal" ? 0 : 3,
 		encoding: formValue(values, "encoding") as Encoding,
+		forceMaxFps: formNumber(values, "forceMaxFps"),
 		layout: formValue(values, "layout") as LayoutName,
 		maxPixelRatio: formNumber(values, "maxPixelRatio"),
 		maxVisibleEdges: 100_000,
@@ -231,25 +237,39 @@ function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 	};
 }
 
-function applyLayoutProgressively(layout: LayoutName, edges: readonly { source: string; target: string }[]) {
-	if (state.scaleMode !== "standard" && layout === "force") {
-		status.textContent = "Force layouts are disabled for million-node stress fixtures.";
+function applyLayoutProgressively(
+	layout: LayoutName,
+	edges: readonly { source: string; target: string }[],
+	nodes: readonly { attributes: NodeAttributes }[],
+) {
+	if (state.scaleMode !== "standard" && layout === "force-live") {
+		status.textContent = "Live force is disabled for million-node fixtures; use the static density layout.";
+		return;
+	}
+	if (state.scaleMode === "million-literal" && layout === "force") {
+		status.textContent = "Force layout is disabled for the literal million-node stress fixture.";
 		return;
 	}
 	const run = ++layoutRun;
 	status.textContent = `Computing ${layout} layout in worker`;
-	const packedEdges = layout === "force" ? forceEdges(edges) : undefined;
+	const packedEdges = layout === "force" || layout === "force-live" ? forceEdges(edges) : undefined;
+	const clusters = layout === "force" && state.scaleMode === "million-density" ? forceClusters(nodes) : undefined;
+	const transfer = [packedEdges?.buffer, clusters?.buffer].filter(
+		(buffer): buffer is ArrayBuffer => buffer !== undefined,
+	);
 	layoutWorker.postMessage(
 		{
 			batchSize: Math.max(1_000, Math.ceil(state.nodeCount / 8)),
+			clusters,
 			dimensions: state.mode === "2d" ? 2 : 3,
 			edges: packedEdges,
+			maxFps: state.forceMaxFps,
 			layout,
 			nodeCount: state.nodeCount,
 			run,
 			type: "start",
 		},
-		packedEdges ? [packedEdges.buffer] : [],
+		transfer,
 	);
 }
 
@@ -260,9 +280,11 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 		const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
 		graph.applyLayout({ nodeIds, positions: data.positions });
 		status.textContent = `Applying ${state.layout} layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
-		requestAnimationFrame(() => {
-			if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
-		});
+		if (state.layout !== "force-live") {
+			requestAnimationFrame(() => {
+				if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
+			});
+		}
 		return;
 	}
 	graph.fitView();
@@ -290,7 +312,7 @@ function rebuild() {
 	selectedNodeId = null;
 	updateNode.disabled = true;
 	requestAnimationFrame(renderDiagnostics);
-	if (state.layout !== "grid") applyLayoutProgressively(state.layout, data.edges);
+	if (state.layout !== "grid") applyLayoutProgressively(state.layout, data.edges, data.nodes);
 }
 
 controls.addEventListener("change", rebuild);

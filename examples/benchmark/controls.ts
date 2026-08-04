@@ -58,7 +58,9 @@ export function renderControls(form: HTMLFormElement) {
 				{ label: "Grid", value: "grid" },
 				{ label: "Progressive circle", value: "circle" },
 				{ label: "Force directed", value: "force" },
+				{ label: "Live force directed", value: "force-live" },
 			]),
+			NumberField("Live force FPS", "forceMaxFps", 30, 1, 60, 1),
 		),
 		Section(
 			"Appearance",

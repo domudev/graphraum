@@ -36,69 +36,115 @@ function random(seed: number) {
 	return ((value ^ (value >>> 16)) >>> 0) / 0x1_0000_0000;
 }
 
-export function computeForcePositions(request: ForceLayoutRequest) {
+export function createForceSimulation(request: ForceLayoutRequest) {
 	const positions = initialPositions(request);
 	const velocities = new Float32Array(positions.length);
 	const forces = new Float32Array(positions.length);
+	let iteration = 0;
+	return {
+		positions,
+		step(alpha: number) {
+			forces.fill(0);
+			for (let index = 0; index < request.nodeCount; index += 1) {
+				const offset = index * 3;
+				forces[offset] = -(positions[offset] ?? 0) * 0.002 * alpha;
+				forces[offset + 1] = -(positions[offset + 1] ?? 0) * 0.002 * alpha;
+				forces[offset + 2] = request.dimensions === 3 ? -(positions[offset + 2] ?? 0) * 0.002 * alpha : 0;
+				for (let sample = 0; sample < 8; sample += 1) {
+					const targetIndex = Math.floor(random(index * 97 + sample * 17 + iteration * 13) * request.nodeCount);
+					if (targetIndex === index) continue;
+					const target = targetIndex * 3;
+					const dx = (positions[offset] ?? 0) - (positions[target] ?? 0);
+					const dy = (positions[offset + 1] ?? 0) - (positions[target + 1] ?? 0);
+					const dz = request.dimensions === 3 ? (positions[offset + 2] ?? 0) - (positions[target + 2] ?? 0) : 0;
+					const distanceSquared = dx * dx + dy * dy + dz * dz + 16;
+					const scale = (Math.min(2, 400 / distanceSquared) * alpha) / Math.sqrt(distanceSquared);
+					forces[offset] += dx * scale;
+					forces[offset + 1] += dy * scale;
+					if (request.dimensions === 3) forces[offset + 2] += dz * scale;
+				}
+			}
+			for (let index = 0; index < request.edges.length; index += 2) {
+				const source = (request.edges[index] ?? 0) * 3;
+				const target = (request.edges[index + 1] ?? 0) * 3;
+				const dx = (positions[target] ?? 0) - (positions[source] ?? 0);
+				const dy = (positions[target + 1] ?? 0) - (positions[source + 1] ?? 0);
+				const dz = request.dimensions === 3 ? (positions[target + 2] ?? 0) - (positions[source + 2] ?? 0) : 0;
+				const distance = Math.sqrt(Math.max(dx * dx + dy * dy + dz * dz, 0.0001));
+				const force = Math.max(-1, Math.min(1, (distance - 24) * 0.005 * alpha)) / distance;
+				forces[source] += dx * force;
+				forces[source + 1] += dy * force;
+				forces[target] -= dx * force;
+				forces[target + 1] -= dy * force;
+				if (request.dimensions === 3) {
+					forces[source + 2] += dz * force;
+					forces[target + 2] -= dz * force;
+				}
+			}
+			for (let index = 0; index < request.nodeCount; index += 1) {
+				const offset = index * 3;
+				let vx = ((velocities[offset] ?? 0) + (forces[offset] ?? 0)) * 0.82;
+				let vy = ((velocities[offset + 1] ?? 0) + (forces[offset + 1] ?? 0)) * 0.82;
+				let vz = request.dimensions === 3 ? ((velocities[offset + 2] ?? 0) + (forces[offset + 2] ?? 0)) * 0.82 : 0;
+				const speed = Math.hypot(vx, vy, vz);
+				const maxSpeed = 0.5 + alpha * 8;
+				if (speed > maxSpeed) {
+					const scale = maxSpeed / speed;
+					vx *= scale;
+					vy *= scale;
+					vz *= scale;
+				}
+				velocities[offset] = vx;
+				velocities[offset + 1] = vy;
+				velocities[offset + 2] = vz;
+				positions[offset] = (positions[offset] ?? 0) + vx;
+				positions[offset + 1] = (positions[offset + 1] ?? 0) + vy;
+				positions[offset + 2] = request.dimensions === 3 ? (positions[offset + 2] ?? 0) + vz : 0;
+			}
+			iteration += 1;
+		},
+	};
+}
+
+export function computeForcePositions(request: ForceLayoutRequest) {
+	const simulation = createForceSimulation(request);
 	const iterations = forceIterationCount(request.nodeCount);
-	for (let iteration = 0; iteration < iterations; iteration += 1) {
-		const alpha = 1 - iteration / iterations;
-		forces.fill(0);
-		for (let index = 0; index < request.nodeCount; index += 1) {
-			const offset = index * 3;
-			forces[offset] = -(positions[offset] ?? 0) * 0.002 * alpha;
-			forces[offset + 1] = -(positions[offset + 1] ?? 0) * 0.002 * alpha;
-			forces[offset + 2] = request.dimensions === 3 ? -(positions[offset + 2] ?? 0) * 0.002 * alpha : 0;
-			for (let sample = 0; sample < 8; sample += 1) {
-				const targetIndex = Math.floor(random(index * 97 + sample * 17 + iteration * 13) * request.nodeCount);
-				if (targetIndex === index) continue;
-				const target = targetIndex * 3;
-				const dx = (positions[offset] ?? 0) - (positions[target] ?? 0);
-				const dy = (positions[offset + 1] ?? 0) - (positions[target + 1] ?? 0);
-				const dz = request.dimensions === 3 ? (positions[offset + 2] ?? 0) - (positions[target + 2] ?? 0) : 0;
-				const distanceSquared = dx * dx + dy * dy + dz * dz + 16;
-				const scale = (Math.min(2, 400 / distanceSquared) * alpha) / Math.sqrt(distanceSquared);
-				forces[offset] += dx * scale;
-				forces[offset + 1] += dy * scale;
-				if (request.dimensions === 3) forces[offset + 2] += dz * scale;
-			}
-		}
-		for (let index = 0; index < request.edges.length; index += 2) {
-			const source = (request.edges[index] ?? 0) * 3;
-			const target = (request.edges[index + 1] ?? 0) * 3;
-			const dx = (positions[target] ?? 0) - (positions[source] ?? 0);
-			const dy = (positions[target + 1] ?? 0) - (positions[source + 1] ?? 0);
-			const dz = request.dimensions === 3 ? (positions[target + 2] ?? 0) - (positions[source + 2] ?? 0) : 0;
-			const distance = Math.sqrt(Math.max(dx * dx + dy * dy + dz * dz, 0.0001));
-			const force = Math.max(-1, Math.min(1, (distance - 24) * 0.005 * alpha)) / distance;
-			forces[source] += dx * force;
-			forces[source + 1] += dy * force;
-			forces[target] -= dx * force;
-			forces[target + 1] -= dy * force;
-			if (request.dimensions === 3) {
-				forces[source + 2] += dz * force;
-				forces[target + 2] -= dz * force;
-			}
-		}
-		for (let index = 0; index < request.nodeCount; index += 1) {
-			const offset = index * 3;
-			let vx = ((velocities[offset] ?? 0) + (forces[offset] ?? 0)) * 0.82;
-			let vy = ((velocities[offset + 1] ?? 0) + (forces[offset + 1] ?? 0)) * 0.82;
-			let vz = request.dimensions === 3 ? ((velocities[offset + 2] ?? 0) + (forces[offset + 2] ?? 0)) * 0.82 : 0;
-			const speed = Math.hypot(vx, vy, vz);
-			const maxSpeed = 0.5 + alpha * 8;
-			if (speed > maxSpeed) {
-				const scale = maxSpeed / speed;
-				vx *= scale;
-				vy *= scale;
-				vz *= scale;
-			}
-			velocities[offset] = vx;
-			velocities[offset + 1] = vy;
-			velocities[offset + 2] = vz;
-			positions[offset] = (positions[offset] ?? 0) + vx;
-			positions[offset + 1] = (positions[offset + 1] ?? 0) + vy;
-			positions[offset + 2] = request.dimensions === 3 ? (positions[offset + 2] ?? 0) + vz : 0;
+	for (let iteration = 0; iteration < iterations; iteration += 1) simulation.step(1 - iteration / iterations);
+	return simulation.positions;
+}
+
+export function computeClusteredForcePositions(request: ForceLayoutRequest & { clusters: Uint32Array }) {
+	if (request.clusters.length !== request.nodeCount) throw new Error("Cluster index count must match node count.");
+	let clusterCount = 0;
+	for (const cluster of request.clusters) clusterCount = Math.max(clusterCount, cluster + 1);
+	const clusterEdges = new Uint32Array(request.edges.length);
+	let edgeCursor = 0;
+	for (let index = 0; index < request.edges.length; index += 2) {
+		const source = request.clusters[request.edges[index] ?? 0];
+		const target = request.clusters[request.edges[index + 1] ?? 0];
+		if (source === undefined || target === undefined || source === target) continue;
+		clusterEdges[edgeCursor++] = source;
+		clusterEdges[edgeCursor++] = target;
+	}
+	const centers = computeForcePositions({
+		dimensions: request.dimensions,
+		edges: clusterEdges.subarray(0, edgeCursor),
+		nodeCount: clusterCount,
+	});
+	const clusterSizes = new Uint32Array(clusterCount);
+	for (const cluster of request.clusters) clusterSizes[cluster] += 1;
+	const positions = new Float32Array(request.nodeCount * 3);
+	for (let index = 0; index < request.nodeCount; index += 1) {
+		const offset = index * 3;
+		const cluster = request.clusters[index] ?? 0;
+		const center = cluster * 3;
+		const radius = Math.sqrt(clusterSizes[cluster] ?? 1) * Math.sqrt(random(index * 4 + 2)) * 2;
+		const angle = random(index * 4 + 1) * Math.PI * 2;
+		positions[offset] = (centers[center] ?? 0) * 12 + Math.cos(angle) * radius;
+		positions[offset + 1] = (centers[center + 1] ?? 0) * 12 + Math.sin(angle) * radius;
+		if (request.dimensions === 3) {
+			const zDirection = random(index * 4 + 3) * 2 - 1;
+			positions[offset + 2] = (centers[center + 2] ?? 0) * 12 + zDirection * radius;
 		}
 	}
 	return positions;
