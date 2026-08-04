@@ -5,7 +5,7 @@ description: The choices that keep graphraum graph-shaped, measurable, and small
 
 ## Rendering contract
 
-graphraum consumes positioned nodes and edges. It does not run a force layout, fetch data, or infer graph semantics.
+graphraum consumes positioned nodes and edges. It does not fetch data or infer graph semantics. Its optional force helpers produce positions independently from the renderer.
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,7 @@ flowchart LR
 
 This keeps layout work independently replaceable and prevents a complete force simulation from blocking the first useful render.
 
-Layout producers can send `GraphraumLayoutPositions` batches: node IDs plus transferable XYZ `Float32Array` data. The host calls `applyLayout()` for each batch, so useful positions can appear before full convergence without making a layout algorithm part of graphraum.
+Layout producers can send `GraphraumLayoutPositions` batches: node IDs plus transferable XYZ `Float32Array` data. The host calls `applyLayout()` for each batch, so useful positions can appear before full convergence. The package also exports dimension-aware static, clustered, and incremental force helpers; applications still decide where and when they run.
 
 ## On-demand rendering
 

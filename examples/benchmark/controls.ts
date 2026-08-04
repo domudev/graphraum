@@ -1,3 +1,4 @@
+import { DEFAULT_FORCE_SETTINGS } from "../../src";
 import { Checkbox, Color, Field, Input, Section, Select, Slider } from "./ui";
 
 const shapes = [
@@ -58,7 +59,9 @@ export function renderControls(form: HTMLFormElement) {
 				{ label: "Grid", value: "grid" },
 				{ label: "Progressive circle", value: "circle" },
 				{ label: "Force directed", value: "force" },
+				{ label: "Live force directed", value: "force-live" },
 			]),
+			NumberField("Live force FPS", "forceMaxFps", 30, 1, 60, 1),
 		),
 		Section(
 			"Appearance",
@@ -69,6 +72,28 @@ export function renderControls(form: HTMLFormElement) {
 			VisualField("Person", "personShape", "circle", "personColor", "#fcfffc"),
 			Color("Mentions edge", "mentionsColor", "#2d8b6a"),
 			Color("Related edge", "relatedColor", "#226f54"),
+		),
+		Section(
+			"Force layout",
+			NumberField("Repulsion", "forceRepulsion", DEFAULT_FORCE_SETTINGS.repulsion, 0, 5000, 25),
+			NumberField("Link distance", "forceLinkDistance", DEFAULT_FORCE_SETTINGS.linkDistance, 1, 500, 1),
+			NumberField(
+				"Spring strength",
+				"forceSpringStrength",
+				DEFAULT_FORCE_SETTINGS.springStrength,
+				0.0001,
+				0.05,
+				0.0005,
+			),
+			NumberField(
+				"Center attraction",
+				"forceCenterAttraction",
+				DEFAULT_FORCE_SETTINGS.centerAttraction,
+				0,
+				0.05,
+				0.0005,
+			),
+			NumberField("Damping", "forceDamping", DEFAULT_FORCE_SETTINGS.damping, 0.1, 0.99, 0.01),
 		),
 	);
 }
