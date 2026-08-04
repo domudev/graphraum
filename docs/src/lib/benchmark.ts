@@ -1,23 +1,50 @@
 import type { GraphraumData } from "@domudev/graphraum";
 
 export interface BenchmarkStatistics {
+	coefficientOfVariation: number | null;
 	count: number;
+	max: number | null;
+	mean: number | null;
+	min: number | null;
 	p50: number | null;
 	p95: number | null;
-	max: number | null;
+	p99: number | null;
+	standardDeviation: number | null;
 }
 
 export const BENCHMARK_NODE_COLORS = ["#226f54", "#347f63", "#469878", "#5caf8d", "#73c7a5"] as const;
 
 export function summarize(samples: readonly number[]): BenchmarkStatistics {
-	if (samples.length === 0) return { count: 0, p50: null, p95: null, max: null };
+	if (samples.some((sample) => !Number.isFinite(sample) || sample < 0))
+		throw new Error("Benchmark samples must be finite, non-negative numbers.");
+	if (samples.length === 0)
+		return {
+			coefficientOfVariation: null,
+			count: 0,
+			max: null,
+			mean: null,
+			min: null,
+			p50: null,
+			p95: null,
+			p99: null,
+			standardDeviation: null,
+		};
 	const sorted = samples.toSorted((left, right) => left - right);
 	const percentile = (value: number) => sorted[Math.ceil((value / 100) * sorted.length) - 1] ?? null;
+	const mean = sorted.reduce((total, sample) => total + sample, 0) / sorted.length;
+	const standardDeviation = Math.sqrt(
+		sorted.reduce((total, sample) => total + (sample - mean) ** 2, 0) / sorted.length,
+	);
 	return {
+		coefficientOfVariation: mean === 0 ? 0 : standardDeviation / mean,
 		count: sorted.length,
+		max: sorted.at(-1) ?? null,
+		mean,
+		min: sorted[0] ?? null,
 		p50: percentile(50),
 		p95: percentile(95),
-		max: sorted.at(-1) ?? null,
+		p99: percentile(99),
+		standardDeviation,
 	};
 }
 

@@ -45,7 +45,7 @@ import type {
 	GraphraumTheme,
 	GraphraumVisualMapper,
 } from "./types";
-import { applyEdgeBudget, collectIncidentEdges } from "./viewport-lod";
+import { applyEdgeBudget, collectIncidentEdges, shouldUseDensityLod } from "./viewport-lod";
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
 type GraphraumGraphObjects = {
@@ -53,6 +53,20 @@ type GraphraumGraphObjects = {
 	nodeMesh: InstancedMesh;
 	nodePickMesh: InstancedMesh;
 };
+
+interface MaterializedNode {
+	index: number;
+	size: number;
+	x: number;
+	y: number;
+	z: number;
+}
+
+interface GpuTimer {
+	extension: { GPU_DISJOINT_EXT: number; TIME_ELAPSED_EXT: number };
+	context: WebGL2RenderingContext;
+	pending: WebGLQuery[];
+}
 
 function disposeMaterial(material: Material | Material[]) {
 	for (const item of Array.isArray(material) ? material : [material]) item.dispose();
@@ -70,6 +84,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private readonly theme: GraphraumTheme;
 	private readonly resizeObserver: ResizeObserver;
 	private readonly maxVisibleEdges: number;
+	private readonly maxVisibleNodes: number;
 	private readonly viewportCulling: boolean;
 	private readonly viewportOverscan: number;
 	private readonly visuals: GraphraumVisualMapper<NodeAttributes, EdgeAttributes> | undefined;
@@ -96,21 +111,30 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private visibleEdgeSlots = new Map<number, number>();
 	private visibleNodeIndices: readonly number[] = [];
 	private visibleNodeCount = 0;
+	private visibleNodeCandidateCount = 0;
+	private densityLodActive = false;
 	private visibleEdgeCount = 0;
 	private visibleEdgeCandidateCount = 0;
 	private mode: GraphraumMode;
 	private frameRequest: number | null = null;
+	private cpuFrameMilliseconds = 0;
+	private gpuFrameMilliseconds: number | null = null;
+	private gpuTimer: GpuTimer | null = null;
 	private readonly viewListeners = new Set<() => void>();
 
 	constructor(container: HTMLElement, options: GraphraumOptions<NodeAttributes, EdgeAttributes> = {}) {
 		this.container = container;
 		this.mode = options.mode ?? "2d";
 		this.maxVisibleEdges = options.maxVisibleEdges ?? 100_000;
+		this.maxVisibleNodes = options.maxVisibleNodes ?? 100_000;
 		this.viewportCulling = options.viewportCulling ?? true;
 		this.viewportOverscan = options.viewportOverscan ?? 16;
 		this.visuals = options.visuals;
 		if (!Number.isSafeInteger(this.maxVisibleEdges) || this.maxVisibleEdges < 1) {
 			throw new Error("Maximum visible edges must be a positive integer.");
+		}
+		if (!Number.isSafeInteger(this.maxVisibleNodes) || this.maxVisibleNodes < 1) {
+			throw new Error("Maximum visible nodes must be a positive integer.");
 		}
 		if (!Number.isFinite(this.viewportOverscan) || this.viewportOverscan < 0) {
 			throw new Error("Viewport overscan must be a non-negative finite number.");
@@ -118,6 +142,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.theme = { ...graphraumTheme, ...options.theme };
 		this.scene.background = new Color(this.theme.background);
 		this.renderer = new WebGLRenderer({ antialias: options.antialias ?? false });
+		const context = this.renderer.getContext();
+		if (typeof WebGL2RenderingContext !== "undefined" && context instanceof WebGL2RenderingContext) {
+			const extension = context.getExtension("EXT_disjoint_timer_query_webgl2");
+			if (extension) this.gpuTimer = { context, extension, pending: [] };
+		}
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, options.maxPixelRatio ?? 2));
 		this.renderer.domElement.style.display = "block";
 		this.renderer.domElement.style.height = "100%";
@@ -158,32 +187,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.spatialGrid2d = new SpatialGrid2D();
 		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
 
-		const nodeGeometry = createNodeGeometry(data.nodes.length);
-		const nodeMaterial = createNodeMaterial();
-		const nodeMesh = new InstancedMesh(nodeGeometry, nodeMaterial, data.nodes.length);
-		const matrix = new Matrix4();
-		for (const [index, node] of this.data.nodes.entries()) {
-			const size = node.size ?? 4;
-			matrix.makeScale(size, size, size);
-			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
-			nodeMesh.setMatrixAt(index, matrix);
-			nodeMesh.setColorAt(index, this.getNodeColor(node));
-			setNodeShapeAt(nodeGeometry.getAttribute("instanceShape") as InstancedBufferAttribute, index, node.shape);
-		}
-		nodeMesh.instanceMatrix.needsUpdate = true;
-		if (nodeMesh.instanceColor) nodeMesh.instanceColor.needsUpdate = true;
-		nodeGeometry.getAttribute("instanceShape").needsUpdate = true;
+		const nodeCapacity = Math.min(data.nodes.length, this.maxVisibleNodes);
+		const nodeGeometry = createNodeGeometry(nodeCapacity);
+		const nodeMaterial = createNodeMaterial(this.mode === "3d");
+		const nodeMesh = new InstancedMesh(nodeGeometry, nodeMaterial, nodeCapacity);
+		nodeMesh.renderOrder = this.mode === "2d" ? 1 : 0;
 		this.nodeMesh = nodeMesh;
 		this.scene.add(nodeMesh);
 
-		const nodePickMesh = new InstancedMesh(new SphereGeometry(1, 8, 6), new MeshBasicMaterial(), data.nodes.length);
-		for (const [index, node] of this.data.nodes.entries()) {
-			const size = (node.size ?? 4) * Math.SQRT2;
-			matrix.makeScale(size, size, size);
-			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
-			nodePickMesh.setMatrixAt(index, matrix);
-		}
-		nodePickMesh.instanceMatrix.needsUpdate = true;
+		const nodePickMesh = new InstancedMesh(new SphereGeometry(1, 8, 6), new MeshBasicMaterial(), nodeCapacity);
 		this.nodePickMesh = nodePickMesh;
 
 		const edgeGeometry = new BufferGeometry();
@@ -278,6 +290,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				}
 			}
 		}
+		if (this.densityLodActive && prepared.some((update) => update.positionChanged || update.sizeChanged)) {
+			visibilityChanged = true;
+		}
 
 		this.data = { ...this.data, nodes };
 		if (visibilityChanged) {
@@ -327,6 +342,12 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.controls.dispose();
 		this.camera = this.createCamera();
 		this.controls = this.createControls();
+		if (this.nodeMesh && !Array.isArray(this.nodeMesh.material)) {
+			this.nodeMesh.material.depthTest = mode === "3d";
+			this.nodeMesh.material.depthWrite = mode === "3d";
+			this.nodeMesh.material.needsUpdate = true;
+			this.nodeMesh.renderOrder = mode === "2d" ? 1 : 0;
+		}
 		this.fitView();
 	}
 
@@ -395,12 +416,24 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	getDiagnostics(): GraphraumDiagnostics {
 		return {
+			aggregatedNodeClusters: this.densityLodActive ? this.visibleNodeCount : 0,
+			cpuFrameMilliseconds: this.cpuFrameMilliseconds,
+			gpuFrameMilliseconds: this.gpuFrameMilliseconds,
 			gpuDrawCalls: this.renderer.info.render.calls,
-			lodLevel: this.visibleEdgeCandidateCount > this.visibleEdgeCount ? "overview" : "detail",
+			gpuGeometries: this.renderer.info.memory.geometries,
+			gpuTextures: this.renderer.info.memory.textures,
+			lodLevel: this.densityLodActive
+				? "density"
+				: this.visibleEdgeCandidateCount > this.visibleEdgeCount
+					? "overview"
+					: "detail",
 			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
+			totalEdges: this.data.edges.length,
+			totalNodes: this.data.nodes.length,
 			visibleEdgeCandidates: this.visibleEdgeCandidateCount,
 			visibleEdges: this.visibleEdgeCount,
 			visibleNodes: this.visibleNodeCount,
+			visibleNodeCandidates: this.visibleNodeCandidateCount,
 		};
 	}
 
@@ -504,6 +537,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.controls.removeEventListener("change", this.handleViewChange);
 		this.controls.dispose();
 		if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
+		if (this.gpuTimer) {
+			for (const query of this.gpuTimer.pending) this.gpuTimer.context.deleteQuery(query);
+		}
 		this.disposeGraphObjects();
 		this.renderer.dispose();
 		this.renderer.domElement.remove();
@@ -513,10 +549,34 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (this.frameRequest !== null) return;
 		this.frameRequest = requestAnimationFrame(() => {
 			this.frameRequest = null;
+			this.readGpuTimers();
+			const timer = this.gpuTimer;
+			const query = timer?.context.createQuery() ?? null;
+			if (timer && query) timer.context.beginQuery(timer.extension.TIME_ELAPSED_EXT, query);
+			const startedAt = performance.now();
 			this.renderer.render(this.scene, this.camera);
+			this.cpuFrameMilliseconds = performance.now() - startedAt;
+			if (timer && query) {
+				timer.context.endQuery(timer.extension.TIME_ELAPSED_EXT);
+				timer.pending.push(query);
+			}
 			for (const listener of this.viewListeners) listener();
 		});
 	};
+
+	private readGpuTimers() {
+		const timer = this.gpuTimer;
+		if (!timer) return;
+		while (timer.pending.length > 0) {
+			const query = timer.pending[0];
+			if (!query || !timer.context.getQueryParameter(query, timer.context.QUERY_RESULT_AVAILABLE)) return;
+			timer.pending.shift();
+			if (!timer.context.getParameter(timer.extension.GPU_DISJOINT_EXT)) {
+				this.gpuFrameMilliseconds = timer.context.getQueryParameter(query, timer.context.QUERY_RESULT) / 1_000_000;
+			}
+			timer.context.deleteQuery(query);
+		}
+	}
 
 	private readonly handleViewChange = () => {
 		this.materializeViewport();
@@ -534,7 +594,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		controls.enableDamping = false;
 		controls.enableRotate = this.mode === "3d";
 		controls.screenSpacePanning = true;
-		if (this.mode === "2d") controls.mouseButtons.LEFT = MOUSE.PAN;
+		if (this.mode === "2d") {
+			controls.minZoom = 0.01;
+			controls.mouseButtons.LEFT = MOUSE.PAN;
+		}
 		controls.addEventListener("change", this.handleViewChange);
 		return controls;
 	}
@@ -614,9 +677,16 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private materializeViewport() {
 		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) return;
 		const bounds = this.getViewportBounds2d();
-		const visibleNodeIndices = bounds
+		const visibleNodeCandidates = bounds
 			? this.spatialGrid2d.queryBounds(bounds, this.viewportOverscan)
 			: this.data.nodes.map((_, index) => index);
+		this.densityLodActive = shouldUseDensityLod(
+			visibleNodeCandidates.length,
+			this.maxVisibleNodes,
+			this.densityLodActive,
+		);
+		const materializedNodes = this.materializeNodes(visibleNodeCandidates, bounds);
+		const visibleNodeIndices = materializedNodes.map(({ index }) => index);
 		const edgeCandidates = bounds
 			? collectIncidentEdges(visibleNodeIndices, this.incidentEdgeIndices)
 			: this.data.edges.map((_, index) => index);
@@ -629,32 +699,33 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.nodeMesh.instanceColor?.clearUpdateRanges();
 		const nodeShape = this.nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
 		nodeShape.clearUpdateRanges();
-		for (const [slot, nodeIndex] of visibleNodeIndices.entries()) {
+		for (const [slot, materialized] of materializedNodes.entries()) {
+			const nodeIndex = materialized.index;
 			const node = this.data.nodes[nodeIndex];
 			if (!node) continue;
 			this.visibleNodeSlots.set(nodeIndex, slot);
-			const size = node.size ?? 4;
+			const size = materialized.size;
 			matrix.makeScale(size, size, size);
-			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
+			matrix.setPosition(materialized.x, materialized.y, materialized.z);
 			this.nodeMesh.setMatrixAt(slot, matrix);
 			const pickSize = size * Math.SQRT2;
 			matrix.makeScale(pickSize, pickSize, pickSize);
-			matrix.setPosition(node.position.x, node.position.y, node.position.z ?? 0);
+			matrix.setPosition(materialized.x, materialized.y, materialized.z);
 			this.nodePickMesh.setMatrixAt(slot, matrix);
 			this.nodeMesh.setColorAt(slot, this.getNodeColor(node));
 			setNodeShapeAt(nodeShape, slot, node.shape);
 		}
-		this.nodeMesh.count = visibleNodeIndices.length;
-		this.nodePickMesh.count = visibleNodeIndices.length;
-		this.nodeMesh.instanceMatrix.addUpdateRange(0, visibleNodeIndices.length * 16);
+		this.nodeMesh.count = materializedNodes.length;
+		this.nodePickMesh.count = materializedNodes.length;
+		this.nodeMesh.instanceMatrix.addUpdateRange(0, materializedNodes.length * 16);
 		this.nodeMesh.instanceMatrix.needsUpdate = true;
-		this.nodePickMesh.instanceMatrix.addUpdateRange(0, visibleNodeIndices.length * 16);
+		this.nodePickMesh.instanceMatrix.addUpdateRange(0, materializedNodes.length * 16);
 		this.nodePickMesh.instanceMatrix.needsUpdate = true;
 		if (this.nodeMesh.instanceColor) {
-			this.nodeMesh.instanceColor.addUpdateRange(0, visibleNodeIndices.length * 3);
+			this.nodeMesh.instanceColor.addUpdateRange(0, materializedNodes.length * 3);
 			this.nodeMesh.instanceColor.needsUpdate = true;
 		}
-		nodeShape.addUpdateRange(0, visibleNodeIndices.length);
+		nodeShape.addUpdateRange(0, materializedNodes.length);
 		nodeShape.needsUpdate = true;
 
 		const edgePosition = this.edgeLines.geometry.getAttribute("position") as BufferAttribute;
@@ -675,9 +746,52 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		edgeColor.addUpdateRange(0, visibleEdgeIndices.length * 6);
 		edgeColor.needsUpdate = true;
 
-		this.visibleNodeCount = visibleNodeIndices.length;
+		this.visibleNodeCandidateCount = visibleNodeCandidates.length;
+		this.visibleNodeCount = materializedNodes.length;
 		this.visibleEdgeCandidateCount = edgeCandidates.length;
 		this.visibleEdgeCount = visibleEdgeIndices.length;
+	}
+
+	private materializeNodes(indices: readonly number[], bounds: Bounds2D | null): readonly MaterializedNode[] {
+		if (!this.densityLodActive || !bounds) {
+			return indices.slice(0, this.maxVisibleNodes).flatMap((index) => {
+				const node = this.data.nodes[index];
+				return node
+					? [{ index, size: node.size ?? 4, x: node.position.x, y: node.position.y, z: node.position.z ?? 0 }]
+					: [];
+			});
+		}
+		const aspect = Math.max(this.container.clientWidth, 1) / Math.max(this.container.clientHeight, 1);
+		const columns = Math.max(1, Math.floor(Math.sqrt(this.maxVisibleNodes * aspect)));
+		const rows = Math.max(1, Math.floor(this.maxVisibleNodes / columns));
+		const cellWidth = Math.max((bounds.right - bounds.left) / columns, Number.EPSILON);
+		const cellHeight = Math.max((bounds.top - bounds.bottom) / rows, Number.EPSILON);
+		const clusters = new Map<string, MaterializedNode & { count: number }>();
+		for (const index of indices) {
+			const node = this.data.nodes[index];
+			if (!node) continue;
+			const x = Math.min(columns - 1, Math.max(0, Math.floor((node.position.x - bounds.left) / cellWidth)));
+			const y = Math.min(rows - 1, Math.max(0, Math.floor((node.position.y - bounds.bottom) / cellHeight)));
+			const key = `${x}:${y}`;
+			const cluster = clusters.get(key);
+			if (!cluster) {
+				clusters.set(key, {
+					count: 1,
+					index,
+					size: node.size ?? 4,
+					x: node.position.x,
+					y: node.position.y,
+					z: node.position.z ?? 0,
+				});
+				continue;
+			}
+			cluster.count += 1;
+			cluster.x += (node.position.x - cluster.x) / cluster.count;
+			cluster.y += (node.position.y - cluster.y) / cluster.count;
+			cluster.z += ((node.position.z ?? 0) - cluster.z) / cluster.count;
+			cluster.size = Math.min(Math.max(cluster.size, node.size ?? 4) + 0.25, 16);
+		}
+		return [...clusters.values()].slice(0, this.maxVisibleNodes);
 	}
 
 	private disposeGraphObjects() {

@@ -15,8 +15,33 @@ describe("live benchmark helpers", () => {
 	});
 
 	test("summarizes empty and populated samples honestly", () => {
-		expect(summarize([])).toEqual({ count: 0, p50: null, p95: null, max: null });
-		expect(summarize([40, 10, 30, 20])).toEqual({ count: 4, p50: 20, p95: 40, max: 40 });
+		expect(summarize([])).toEqual({
+			coefficientOfVariation: null,
+			count: 0,
+			max: null,
+			mean: null,
+			min: null,
+			p50: null,
+			p95: null,
+			p99: null,
+			standardDeviation: null,
+		});
+		expect(summarize([40, 10, 30, 20])).toEqual({
+			coefficientOfVariation: Math.sqrt(125) / 25,
+			count: 4,
+			max: 40,
+			mean: 25,
+			min: 10,
+			p50: 20,
+			p95: 40,
+			p99: 40,
+			standardDeviation: Math.sqrt(125),
+		});
+	});
+
+	test("rejects invalid timing samples", () => {
+		expect(() => summarize([12, Number.NaN])).toThrow("finite, non-negative");
+		expect(() => summarize([-1])).toThrow("finite, non-negative");
 	});
 
 	test("reports the effective renderer pixel ratio", () => {

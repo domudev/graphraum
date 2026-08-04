@@ -4,286 +4,53 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>graphraum laboratory</title>
-		<style>
-			:root {
-				color-scheme: dark;
-				font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-				background: #040f0f;
-				color: #fcfffc;
-			}
-			* { box-sizing: border-box; }
-			body { margin: 0; min-width: 320px; }
-			button, input, select { font: inherit; }
-			button, select, input[type="number"] {
-				background: #0c2420;
-				border: 1px solid #2d8b6a;
-				border-radius: 0.45rem;
-				color: #fcfffc;
-				min-height: 2.25rem;
-				padding: 0.4rem 0.65rem;
-			}
-			button { cursor: pointer; }
-			button:hover, button:focus-visible { background: #164539; outline: none; }
-			input[type="color"] {
-				background: transparent;
-				border: 0;
-				height: 2rem;
-				padding: 0;
-				width: 2.5rem;
-			}
-			input[type="range"] { accent-color: #73c7a5; width: 100%; }
-			.lab-shell {
-				background: #061513;
-				display: grid;
-				height: 100vh;
-				min-height: 38rem;
-				overflow: hidden;
-			}
-			.toolbar {
-				align-items: center;
-				background: color-mix(in srgb, #071b18 94%, transparent);
-				border-bottom: 1px solid #173a33;
-				display: flex;
-				gap: 0.65rem;
-				padding: 0.75rem 1rem;
-				z-index: 4;
-			}
-			.brand { font-size: 1.05rem; letter-spacing: -0.02em; }
-			.eyebrow {
-				color: #73c7a5;
-				font-size: 0.68rem;
-				font-weight: 700;
-				letter-spacing: 0.12em;
-				text-transform: uppercase;
-			}
-			.toolbar-copy { display: grid; gap: 0.15rem; margin-right: auto; }
-			.status { color: #b8c9c1; font-size: 0.78rem; }
-			.panel {
-				background: #081d19;
-				border-color: #173a33;
-				color: #dce9e4;
-				min-width: 0;
-				overflow: auto;
-			}
-			.controls { padding: 0.9rem; }
-			.controls form { display: grid; gap: 0.8rem; }
-			fieldset {
-				border: 1px solid #204b42;
-				border-radius: 0.65rem;
-				display: grid;
-				gap: 0.65rem;
-				margin: 0;
-				min-width: 0;
-				padding: 0.75rem;
-			}
-			legend {
-				color: #73c7a5;
-				font-size: 0.72rem;
-				font-weight: 700;
-				letter-spacing: 0.08em;
-				padding: 0 0.3rem;
-				text-transform: uppercase;
-			}
-			label, .control-row {
-				align-items: center;
-				display: grid;
-				font-size: 0.78rem;
-				gap: 0.4rem;
-				grid-template-columns: minmax(6.5rem, 1fr) minmax(5rem, 1fr);
-			}
-			.toggle { grid-template-columns: 1fr auto; }
-			.kind-row {
-				align-items: center;
-				display: grid;
-				gap: 0.4rem;
-				grid-template-columns: minmax(4.5rem, 1fr) minmax(5rem, 1fr) auto;
-			}
-			.kind-row span { font-size: 0.78rem; text-transform: capitalize; }
-			.canvas-panel { min-height: 0; min-width: 0; position: relative; }
-			#graph { height: 100%; min-height: 18rem; width: 100%; }
-			.canvas-badge {
-				background: color-mix(in srgb, #071b18 88%, transparent);
-				border: 1px solid #204b42;
-				border-radius: 999px;
-				color: #b8c9c1;
-				font-size: 0.72rem;
-				left: 0.75rem;
-				padding: 0.35rem 0.55rem;
-				pointer-events: none;
-				position: absolute;
-				top: 0.75rem;
-			}
-			.graph-label {
-				background: color-mix(in srgb, #071b18 92%, transparent);
-				border: 1px solid #2d8b6a;
-				border-radius: 999px;
-				color: #fcfffc;
-				font-size: 0.68rem;
-				padding: 0.2rem 0.4rem;
-				white-space: nowrap;
-			}
-			.graph-action-toolbar {
-				display: flex;
-				gap: 0.35rem;
-				transform: translateY(-0.55rem);
-			}
-			.graph-action-toolbar button { font-size: 0.7rem; min-height: 1.8rem; padding: 0.2rem 0.45rem; }
-			.inspector { padding: 1rem; }
-			.inspector h2 { font-size: 1rem; margin: 0.2rem 0; overflow-wrap: anywhere; }
-			.inspector p { color: #b8c9c1; font-size: 0.8rem; margin: 0.3rem 0 1rem; }
-			.inspector dl {
-				display: grid;
-				font-size: 0.76rem;
-				gap: 0.35rem 0.75rem;
-				grid-template-columns: auto 1fr;
-				margin: 0 0 1rem;
-			}
-			.inspector dt { color: #73c7a5; }
-			.inspector dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
-			.inspector-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-			.inspector-actions button { font-size: 0.76rem; }
-			.lab-shell {
-				grid-template-columns: 18rem minmax(0, 1fr) 18rem;
-				grid-template-rows: auto minmax(0, 1fr);
-			}
-			.toolbar { grid-column: 1 / -1; }
-			.controls { border-right: 1px solid #173a33; }
-			.inspector { border-left: 1px solid #173a33; }
-
-			@media (max-width: 800px) {
-				.lab-shell {
-					display: flex;
-					height: auto;
-					min-height: 100vh;
-					overflow: visible;
-					flex-direction: column;
-				}
-				.toolbar { align-items: flex-start; flex-wrap: wrap; position: static; }
-				.toolbar-copy { flex-basis: 100%; order: -1; }
-				.canvas-panel { height: 55vh; min-height: 24rem; order: 1; }
-				.controls { border: 0; order: 2; }
-				.inspector { border: 0; order: 3; }
-			}
-		</style>
+		<link rel="stylesheet" href="./ui.css" />
+		<link rel="stylesheet" href="./explorer.css" />
 	</head>
 	<body>
 		<main class="lab-shell">
 			<header class="toolbar">
-				<div class="toolbar-copy">
-					<span class="eyebrow">Experimental playground</span>
-					<strong class="brand">graphraum laboratory</strong>
-					<span class="status" id="status">Preparing graph…</span>
+				<div class="brand-mark">
+					<div class="toolbar-copy">
+						<strong class="brand">graphraum / explorer</strong>
+						<span class="eyebrow">WebGL graph observatory</span>
+					</div>
 				</div>
-				<button type="button" id="fit">Fit view</button>
-				<button type="button" id="update-node">Update node</button>
-				<button type="button" id="inspect-edge">Inspect edge</button>
+				<span class="status" id="status">Preparing graph…</span>
+				<button class="button button--secondary secondary-action" type="button" id="inspect-edge">Inspect edge</button>
+				<button class="button button--secondary secondary-action" type="button" id="update-node" disabled>Edit selected</button>
+				<button class="button button--primary" type="button" id="fit">Fit view</button>
 			</header>
 
 			<aside class="controls panel" aria-label="Graph controls">
-				<form id="controls">
-					<fieldset>
-						<legend>Renderer</legend>
-						<label>Mode
-							<select name="mode">
-								<option value="2d">2D</option>
-								<option value="3d">3D</option>
-							</select>
-						</label>
-						<label class="toggle">Antialias <input name="antialias" type="checkbox" /></label>
-						<label class="toggle">Viewport culling <input name="viewportCulling" type="checkbox" checked /></label>
-						<label>Pixel ratio <input name="maxPixelRatio" type="number" min="0.5" max="4" step="0.5" value="2" /></label>
-						<label>Edge budget <input name="maxVisibleEdges" type="number" min="1" step="1000" value="100000" /></label>
-						<label>Overscan <input name="viewportOverscan" type="number" min="0" step="4" value="16" /></label>
-					</fieldset>
-
-					<fieldset>
-						<legend>Dataset</legend>
-						<label>Nodes
-							<select name="nodeCount">
-								<option value="100">100</option>
-								<option value="1000" selected>1,000</option>
-								<option value="10000">10,000</option>
-								<option value="100000">100,000</option>
-							</select>
-						</label>
-						<label>Edges / node <input name="edgeMultiplier" type="number" min="0" max="10" value="3" /></label>
-						<label>Edge mode
-							<select name="edgeDistribution">
-								<option value="linear" selected>Linear</option>
-								<option value="random">Random</option>
-							</select>
-						</label>
-						<label>Encoding
-							<select name="encoding">
-								<option value="mapper">Typed mapper</option>
-								<option value="snapshot">Direct snapshot</option>
-							</select>
-						</label>
-							<label>Layout
-								<select name="layout">
-									<option value="grid">Grid</option>
-									<option value="force">Force</option>
-									<option value="force-live">Live force</option>
-									<option value="circle">Progressive circle</option>
-								</select>
-							</label>
-						<label>Batch size <input name="layoutBatchSize" type="number" min="100" max="4000" step="100" value="500" /></label>
-						<label>Base size <input name="nodeSize" type="range" min="1" max="12" step="0.5" value="3" /></label>
-						<label>Score scale <input name="scoreSize" type="range" min="0" max="10" step="0.5" value="4" /></label>
-					</fieldset>
-
-					<fieldset>
-						<legend>Force layout</legend>
-						<label>Cycles <input name="forceCycles" type="number" min="10" max="5000" step="10" value="140" /></label>
-						<label>Repulsion <input name="forceRepulsion" type="number" min="0.1" max="1000000" step="100" value="750" /></label>
-						<label>Dist <input name="forceDist" type="number" min="2" max="512" step="1" value="26" /></label>
-						<label>Spring <input name="forceSpring" type="number" min="0" max="0.05" step="0.0005" value="0.0016" /></label>
-						<label>Gravity <input name="forceGravity" type="number" min="0" max="0.5" step="0.01" value="0.01" /></label>
-						<label>Max FPS <input name="forceMaxFps" type="number" min="1" max="240" step="1" value="60" /></label>
-					</fieldset>
-
-					<fieldset>
-						<legend>Node visuals</legend>
-						<div class="kind-row"><span>Concept</span><select name="conceptShape"><option>circle</option><option>square</option><option selected>diamond</option></select><input aria-label="Concept color" name="conceptColor" type="color" value="#e4a853" /></div>
-						<div class="kind-row"><span>Document</span><select name="documentShape"><option>circle</option><option selected>square</option><option>diamond</option></select><input aria-label="Document color" name="documentColor" type="color" value="#73c7a5" /></div>
-						<div class="kind-row"><span>Person</span><select name="personShape"><option selected>circle</option><option>square</option><option>diamond</option></select><input aria-label="Person color" name="personColor" type="color" value="#fcfffc" /></div>
-						<label>Mentions edge <input name="mentionsColor" type="color" value="#2d8b6a" /></label>
-						<label>Related edge <input name="relatedColor" type="color" value="#226f54" /></label>
-					</fieldset>
-					<fieldset>
-						<legend>Interaction states</legend>
-						<label>Selected node <input name="selectedNodeIndex" type="number" min="-1" value="0" /></label>
-						<label>Hovered node <input name="hoveredNodeIndex" type="number" min="-1" value="1" /></label>
-						<label>Focused node <input name="focusedNodeIndex" type="number" min="-1" value="2" /></label>
-						<label>Dimmed node <input name="dimmedNodeIndex" type="number" min="-1" value="3" /></label>
-					</fieldset>
-
-					<fieldset>
-						<legend>Theme fallbacks</legend>
-						<label>Background <input name="background" type="color" value="#040f0f" /></label>
-						<label>Node <input name="node" type="color" value="#226f54" /></label>
-						<label>Edge <input name="edge" type="color" value="#226f54" /></label>
-						<label>Selection <input name="selectedNode" type="color" value="#fcfffc" /></label>
-						<label>Hover <input name="hoveredNode" type="color" value="#e4a853" /></label>
-						<label>Focus <input name="focusedNode" type="color" value="#73c7a5" /></label>
-						<label>Dimmed <input name="dimmedNode" type="color" value="#315a51" /></label>
-					</fieldset>
-				</form>
+				<form id="controls"></form>
 			</aside>
 
 			<section class="canvas-panel">
 				<div id="graph"></div>
-				<div class="canvas-badge">Pan · zoom · click a node</div>
+				<div class="canvas-badge"><strong>Viewport 01</strong><span>Drag to pan</span><span>Scroll to zoom</span><span>Click to inspect</span></div>
 			</section>
 
 			<aside class="inspector panel" aria-live="polite">
-				<span class="eyebrow">Presentation</span>
-				<h2 id="presentation-title">Select a node</h2>
-				<p id="presentation-subtitle">Compiled metadata appears here.</p>
-				<dl id="presentation-properties"></dl>
-				<div class="inspector-actions" id="presentation-actions"></div>
-				<span class="eyebrow">Diagnostics</span>
-				<dl id="diagnostics"></dl>
+				<section class="inspector-section">
+					<span class="eyebrow">Selection / presentation</span>
+					<h2 id="presentation-title">No node selected</h2>
+					<p id="presentation-subtitle">Choose a node in the viewport to inspect its compiled metadata.</p>
+					<dl class="data-list" id="presentation-properties"></dl>
+				</section>
+				<section class="inspector-section performance-panel">
+					<span class="eyebrow">Measured performance</span>
+					<h2>Frame benchmark</h2>
+					<p id="performance-status">Run 120 rendered frames on this device.</p>
+					<button class="button button--primary performance-run" id="performance-run" type="button">Run benchmark</button>
+					<dl class="data-list performance-values" id="performance-values"></dl>
+					<svg id="performance-chart" viewBox="0 0 240 90" role="img" aria-label="Frame, CPU, and GPU time across the benchmark samples"></svg>
+					<div class="performance-legend"><span>Frame</span><span>CPU</span><span>GPU</span></div>
+				</section>
+				<section class="inspector-section diagnostics">
+					<span class="eyebrow">Live telemetry</span>
+					<dl class="data-list" id="diagnostics"></dl>
+				</section>
 			</aside>
 		</main>
 
