@@ -34,7 +34,7 @@ export function renderControls(form: HTMLFormElement) {
 				{ label: "3D", value: "3d" },
 			]),
 			Checkbox("Antialias", "antialias"),
-			NumberField("Pixel ratio", "maxPixelRatio", 2, 0.5, 4, 0.5),
+			NumberField("Pixel ratio", "maxPixelRatio", 1, 0.5, 4, 0.5),
 		),
 		Section(
 			"Graph",
@@ -50,11 +50,14 @@ export function renderControls(form: HTMLFormElement) {
 				{ label: "Typed mapper", value: "mapper" },
 				{ label: "Direct snapshot", value: "snapshot" },
 			]),
+			SelectField("Topology", "topology", "clustered", [
+				{ label: "Clustered communities", value: "clustered" },
+				{ label: "Uniform", value: "linear" },
+			]),
 			SelectField("Layout", "layout", "grid", [
 				{ label: "Grid", value: "grid" },
 				{ label: "Progressive circle", value: "circle" },
-				{ label: "ForceAtlas2 worker", value: "forceatlas2" },
-				{ label: "Custom force worker", value: "force-custom" },
+				{ label: "Force directed", value: "force" },
 			]),
 		),
 		Section(

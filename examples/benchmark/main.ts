@@ -8,11 +8,18 @@ import {
 } from "../../src";
 
 import { renderControls } from "./controls";
-import { createFixture, type EdgeAttributes, type Encoding, type FixtureOptions, type NodeAttributes } from "./fixture";
+import {
+	createFixture,
+	type EdgeAttributes,
+	type EdgeDistribution,
+	type Encoding,
+	type FixtureOptions,
+	type NodeAttributes,
+} from "./fixture";
 import { measurePerformance, renderPerformanceChart } from "./performance";
 import { renderDataList } from "./ui";
 
-type LayoutName = "circle" | "force-custom" | "forceatlas2" | "grid";
+type LayoutName = "circle" | "force" | "grid";
 type ScaleMode = "million-density" | "million-literal" | "standard";
 type LayoutWorkerMessage =
 	| { end: number; positions: Float32Array; run: number; type: "positions" }
@@ -73,7 +80,7 @@ function readState(): LabState {
 	const scaleMode: ScaleMode = fixture === "million-density" || fixture === "million-literal" ? fixture : "standard";
 	return {
 		antialias: values.has("antialias"),
-		edgeDistribution: "linear",
+		edgeDistribution: formValue(values, "topology") as EdgeDistribution,
 		edgeColors: {
 			mentions: formValue(values, "mentionsColor"),
 			related: formValue(values, "relatedColor"),
@@ -114,6 +121,7 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 	node: (node) => ({
 		presentation: {
 			properties: [
+				{ id: "cluster", label: "Cluster", value: node.attributes.cluster },
 				{ id: "kind", label: "Kind", value: node.attributes.kind },
 				{ id: "score", label: "Score", value: node.attributes.score },
 				{ id: "theme", label: "Theme fallback", value: node.attributes.useTheme },
@@ -224,16 +232,17 @@ function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 }
 
 function applyLayoutProgressively(layout: LayoutName, edges: readonly { source: string; target: string }[]) {
-	if (state.scaleMode !== "standard" && (layout === "forceatlas2" || layout === "force-custom")) {
+	if (state.scaleMode !== "standard" && layout === "force") {
 		status.textContent = "Force layouts are disabled for million-node stress fixtures.";
 		return;
 	}
 	const run = ++layoutRun;
 	status.textContent = `Computing ${layout} layout in worker`;
-	const packedEdges = layout === "forceatlas2" || layout === "force-custom" ? forceEdges(edges) : undefined;
+	const packedEdges = layout === "force" ? forceEdges(edges) : undefined;
 	layoutWorker.postMessage(
 		{
-			batchSize: Math.max(500, Math.ceil(state.nodeCount / 30)),
+			batchSize: Math.max(1_000, Math.ceil(state.nodeCount / 8)),
+			dimensions: state.mode === "2d" ? 2 : 3,
 			edges: packedEdges,
 			layout,
 			nodeCount: state.nodeCount,
@@ -250,7 +259,7 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 		const start = data.end - data.positions.length / 3;
 		const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
 		graph.applyLayout({ nodeIds, positions: data.positions });
-		status.textContent = `Applying circle layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
+		status.textContent = `Applying ${state.layout} layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
 		requestAnimationFrame(() => {
 			if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
 		});
@@ -258,7 +267,7 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 	}
 	graph.fitView();
 	const encoding = state.encoding === "mapper" ? "typed mapper" : "direct snapshot";
-	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · circle`;
+	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · ${state.layout}`;
 	requestAnimationFrame(renderDiagnostics);
 });
 
