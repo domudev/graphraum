@@ -1,0 +1,72 @@
+---
+title: Why I built graphraum
+description: The product and engineering decisions behind a dedicated WebGL renderer for interactive graphs and networks.
+---
+
+I built graphraum because a graph is not just a scatterplot with lines added.
+
+In an interactive network, nodes and edges have identity. Edges must follow node updates. Picking must return stable graph IDs. Selection, focus, hover, labels, layouts, and level of detail all depend on graph topology. A general visualization engine can draw the primitives, but the application still has to build and maintain this graph-specific contract around it.
+
+graphraum makes that contract the product. It is a small, framework-neutral WebGL engine for interactive node-edge graphs in 2D and 3D—not a charting suite, map application, graph database, or complete analysis UI.
+
+## What I needed
+
+### Graph-native customization
+
+The visual API maps typed node and edge attributes to size, shape, color, and presentation metadata. The renderer preserves stable IDs, incident-edge relationships, selection states, picking, and incremental position updates. Applications keep ownership of domain semantics and can build their own labels, inspectors, accessibility tree, and actions above the canvas.
+
+That separation matters. A knowledge graph, fraud investigation, dependency map, and biological network may all use circles and lines, but they do not mean the same thing and should not inherit the same product UI.
+
+### Layouts without locking the renderer to one algorithm
+
+Positioned data remains the renderer input. `applyLayout()` accepts transferable XYZ batches, so layouts can run in a worker, on a server, or incrementally.
+
+The package also provides a dimension-aware force simulation for applications that need a default. It supports static, live, and data-clustered operation with tunable repulsion, link distance, spring strength, center attraction, and damping. In 2D, Z stays zero; in 3D, the same contract operates across XYZ. The helper is optional rather than embedded in the render loop.
+
+### Predictable graph performance
+
+The baseline renderer uses one instanced node mesh and one edge line geometry: two draw calls. It updates affected buffers instead of building a component or scene object per entity. In 2D, viewport materialization and density LOD bound the visible node and edge work; diagnostics expose candidates, visible counts, LOD decisions, draw calls, CPU frame time, and GPU timing when the browser supports timer queries.
+
+These choices do not prove that graphraum is universally faster than another library. Performance depends on fixture topology, update frequency, node size, overdraw, pixel ratio, browser, and hardware. The [live benchmark](../benchmark/) reports its protocol and lets the claim be tested on the machine that matters.
+
+## How the alternatives differ
+
+| Project | Primary abstraction | Where it is stronger | Why it did not replace graphraum |
+| --- | --- | --- | --- |
+| [deck.gl](https://deck.gl/) | GPU-accelerated visualization layers | Large geospatial and general-purpose visual layers, map projections, a mature layer lifecycle, binary attributes, and custom layers | Nodes and edges remain separate layer data. Graph identity, incident-edge updates, graph layouts, graph-aware LOD, and presentation semantics must be assembled by the application. |
+| [Kepler.gl](https://kepler.gl/) | Complete geospatial exploration application and React component | Uploading, filtering, styling, aggregating, and exploring large location datasets with a ready-made map UI | Its product boundary is geospatial analysis, with MapLibre/deck.gl layers and Redux-managed application state. graphraum needs no basemap, latitude/longitude contract, React, or prescribed explorer UI. |
+| [Plotly](https://plotly.com/javascript/) | Declarative scientific and business charts | Axes, legends, annotations, statistical charts, notebooks, dashboards, and publication-oriented output | A network is typically assembled from scatter and line traces after layout is computed elsewhere. That is useful for presenting a graph, but it is not a graph-native mutable rendering contract. |
+| [Sigma.js](https://www.sigmajs.org/) | WebGL graph renderer backed by Graphology | Mature 2D network rendering, Graphology integration, extensible node and edge programs, reducers, and graph-focused interaction | Sigma is the closest conventional renderer, and it is often the better choice for a Graphology-first 2D application. graphraum was built for one typed contract spanning 2D and 3D, bounded viewport materialization, and a deliberately small two-draw-call baseline. |
+| [Cytoscape.js](https://js.cytoscape.org/) | Graph theory, analysis, visualization, and layout ecosystem | Rich graph operations, selectors, styles, compound graphs, and a broad layout extension ecosystem | Its larger graph-analysis and styling surface is valuable when those features are required. graphraum keeps analysis and product semantics outside the renderer to make the hot path smaller and more predictable. |
+| [Cosmograph](https://cosmograph.app/) | Large-scale GPU graph visualization and GPU force simulation | GPU-accelerated force layout and an integrated exploration stack aimed at hundreds of thousands or millions of graph elements | Cosmograph is the stronger choice when GPU force simulation is the central requirement. graphraum instead prioritizes a framework-neutral rendering primitive, application-owned UI, interchangeable layouts, typed visual compilation, 2D/3D parity, and observable render decisions. |
+
+## The important trade-offs
+
+graphraum deliberately gives up breadth:
+
+- It does not provide a complete analysis application like Kepler.gl or Cosmograph.
+- It does not provide chart grammar, axes, or publication output like Plotly.
+- It does not provide the graph-algorithm and layout-extension breadth of Cytoscape.js.
+- It does not provide deck.gl's map projections and general layer ecosystem.
+- Its force simulation is CPU-based and bounded; it is not a substitute for Cosmograph's GPU simulation at million-node live-layout scale.
+
+In return, the engine can make graph-specific decisions directly: stable identity, topology-aware updates, node picking, two-dimensional viewport culling, density LOD, 2D/3D rendering, transferable layout batches, and diagnostics that explain what was actually drawn.
+
+## When to choose graphraum
+
+Choose graphraum when the graph is part of a product rather than the whole product: you need a fast graph canvas, but want to own the application state, layout strategy, semantics, controls, labels, and accessibility experience.
+
+Choose another tool when its primary abstraction already matches the job. A map should usually start with deck.gl or Kepler.gl; a dashboard chart with Plotly; a feature-rich 2D Graphology explorer with Sigma; graph analysis with Cytoscape.js; and a million-node live GPU force simulation with Cosmograph.
+
+## Sources and comparison basis
+
+This comparison is based on the projects' official documentation, accessed in August 2026:
+
+- deck.gl documents its [performance model](https://deck.gl/docs/developer-guide/performance), [layer architecture](https://deck.gl/docs/developer-guide/using-layers), and [custom layer options](https://deck.gl/docs/developer-guide/custom-layers).
+- Kepler.gl describes itself as a [geospatial analysis application built on MapLibre GL and deck.gl](https://docs.kepler.gl/) and documents its [geospatial layer types](https://docs.kepler.gl/docs/user-guides/c-types-of-layers).
+- Plotly documents [WebGL trace performance](https://dash.plotly.com/performance) and its [network-graph construction](https://plotly.com/python/network-graphs/).
+- Sigma documents its [WebGL renderer and extensible programs](https://www.sigmajs.org/docs/advanced/renderers/).
+- Cytoscape.js documents its [graph model, layouts, styling, and performance considerations](https://js.cytoscape.org/).
+- Cosmograph documents its [GPU force-layout architecture](https://cosmograph.app/docs-general/concept/).
+
+No cross-library FPS ranking is claimed here because the repository does not yet contain a controlled, like-for-like benchmark of these systems.
