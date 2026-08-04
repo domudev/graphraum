@@ -26,3 +26,12 @@ test("keeps a 10k-node force layout finite", () => {
 
 	expect(positions.every(Number.isFinite)).toBe(true);
 });
+
+test("does not preserve a circular seed", () => {
+	const positions = computeForcePositions({ dimensions: 2, edges: new Uint32Array(), nodeCount: 64 });
+	const radii = Array.from({ length: 64 }, (_, index) =>
+		Math.round(Math.hypot(positions[index * 3] ?? 0, positions[index * 3 + 1] ?? 0)),
+	);
+
+	expect(new Set(radii).size).toBeGreaterThan(10);
+});
