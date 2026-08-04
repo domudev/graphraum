@@ -55,7 +55,7 @@ export function computeForcePositions(request: ForceLayoutRequest) {
 			const dy = (positions[target + 1] ?? 0) - (positions[source + 1] ?? 0);
 			const dz = request.dimensions === 3 ? (positions[target + 2] ?? 0) - (positions[source + 2] ?? 0) : 0;
 			const distance = Math.sqrt(Math.max(dx * dx + dy * dy + dz * dz, 0.0001));
-			const force = (distance - 24) * 0.002 * alpha;
+			const force = Math.max(-0.1, Math.min(0.1, ((distance - 24) / distance) * 0.02 * alpha));
 			positions[source] = (positions[source] ?? 0) + dx * force;
 			positions[source + 1] = (positions[source + 1] ?? 0) + dy * force;
 			positions[target] = (positions[target] ?? 0) - dx * force;
