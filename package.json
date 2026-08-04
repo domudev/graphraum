@@ -40,6 +40,7 @@
 		"bun": ">=1.2.0"
 	},
 	"dependencies": {
+		"graphology": "^0.26.0",
 		"three": "^0.185.1"
 	},
 	"devDependencies": {

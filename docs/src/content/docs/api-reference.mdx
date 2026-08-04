@@ -105,6 +105,40 @@ const layout: GraphraumLayoutPositions = {
 graph.applyLayout(layout);
 ```
 
+## Graphology binding
+
+Use `bindGraphology()` when Graphology owns the mutable graph. The adapter renders the current graph immediately, maps node visual attributes (`x`, `y`, `z`, `color`, `shape`, and `size`), preserves all attributes for `defineVisuals()`, and subscribes to later mutations.
+
+```ts
+import Graph from "graphology";
+import { Graphraum, bindGraphology } from "@domudev/graphraum";
+
+type NodeAttributes = {
+  kind: "person" | "place";
+  x?: number;
+  y?: number;
+};
+type EdgeAttributes = Record<string, never>;
+
+const source = new Graph<NodeAttributes, EdgeAttributes>();
+source.addNode("person:ada", { kind: "person" });
+source.addNode("place:london", { kind: "place", x: 20, y: 12 });
+source.addEdgeWithKey("born-in", "person:ada", "place:london");
+
+const container = document.querySelector<HTMLElement>("#graph");
+if (!container) throw new Error("Missing #graph container");
+const graph = new Graphraum<NodeAttributes, EdgeAttributes>(container);
+const unbind = bindGraphology(graph, source);
+
+source.mergeNodeAttributes("person:ada", { x: -20, y: 12 });
+
+// Stop Graphology mutations from reaching this renderer.
+unbind();
+graph.destroy();
+```
+
+Missing coordinates default to zero so layout does not block the first render. Mutations are coalesced into one snapshot replacement per microtask, which reruns `defineVisuals()` for changed domain attributes. The source graph and renderer remain application-owned; `unbind()` only removes the adapter's listeners.
+
 ## Camera and interaction
 
 <div class="api-grid not-content">

@@ -50,6 +50,6 @@ graphraum provides the rendering primitive, not a replacement application archit
 
 ## Graphology direction
 
-Graphology is the planned canonical mutable graph input ([PRO-248](https://linear.app/yggdra/issue/PRO-248/add-a-graphology-backed-graphraum-graph-adapter)). Its core graph object supplies node/edge identity, typed attributes, events, traversal, and serialization. graphraum will subscribe to that contract and render visual attributes; it will not require Graphology's optional layout or algorithm packages.
+Graphology is the canonical mutable graph input ([PRO-248](https://linear.app/yggdra/issue/PRO-248/add-a-graphology-backed-graphraum-graph-adapter)). Its core graph object supplies node/edge identity, typed attributes, events, traversal, and serialization. `bindGraphology()` subscribes to that contract and renders visual attributes; graphraum does not require Graphology's optional layout or algorithm packages.
 
 The existing array snapshot remains useful for static data, transport boundaries, fixtures, and one-shot rendering.
