@@ -1,4 +1,9 @@
-import { computeClusteredForcePositions, computeForcePositions, createForceSimulation } from "./force-layout";
+import {
+	computeClusteredForcePositions,
+	computeForcePositions,
+	createForceSimulation,
+	type ForceSettings,
+} from "../../src/force-layout";
 
 type LayoutName = "circle" | "force" | "force-live" | "grid";
 
@@ -11,6 +16,7 @@ type LayoutRequest = {
 	maxFps: number;
 	nodeCount: number;
 	run: number;
+	settings: ForceSettings;
 };
 
 type LayoutWorkerMessage = ({ type: "start" } & LayoutRequest) | { run: number; type: "next" };
@@ -32,6 +38,7 @@ function startLiveLayout(request: LayoutRequest) {
 		dimensions: request.dimensions,
 		edges: request.edges ?? new Uint32Array(),
 		nodeCount: request.nodeCount,
+		settings: request.settings,
 	});
 	const state: NonNullable<typeof activeLayout> = { nextStart: 0, request };
 	activeLayout = state;
@@ -96,11 +103,13 @@ workerScope.addEventListener("message", ({ data }) => {
 								dimensions: data.dimensions,
 								edges: data.edges ?? new Uint32Array(),
 								nodeCount: data.nodeCount,
+								settings: data.settings,
 							})
 						: computeForcePositions({
 								dimensions: data.dimensions,
 								edges: data.edges ?? new Uint32Array(),
 								nodeCount: data.nodeCount,
+								settings: data.settings,
 							})
 					: undefined,
 			request: data,

@@ -1,6 +1,12 @@
 import { expect, test } from "vitest";
 
-import { computeClusteredForcePositions, computeForcePositions, forceIterationCount } from "./force-layout";
+import {
+	computeClusteredForcePositions,
+	computeForcePositions,
+	createForceSimulation,
+	DEFAULT_FORCE_SETTINGS,
+	forceIterationCount,
+} from "./force-layout";
 
 test("keeps 2D force positions flat and gives 3D positions depth", () => {
 	const edges = new Uint32Array([0, 1, 1, 2]);
@@ -48,4 +54,24 @@ test("expands a coarse force layout from data cluster indices", () => {
 
 	expect(distance(0, 1)).toBeLessThan(distance(0, 2));
 	expect(positions.filter((_, index) => index % 3 === 2).every((value) => value === 0)).toBe(true);
+});
+
+test("applies force settings and recenters every live step", () => {
+	const request = { dimensions: 2 as const, edges: new Uint32Array([0, 1, 1, 2]), nodeCount: 4 };
+	const baseline = computeForcePositions(request);
+	const tuned = computeForcePositions({
+		...request,
+		settings: { ...DEFAULT_FORCE_SETTINGS, repulsion: 2_000, springStrength: 0.02 },
+	});
+	const simulation = createForceSimulation(request);
+	simulation.step(0.35);
+	const center = [0, 0];
+	for (let index = 0; index < request.nodeCount; index += 1) {
+		center[0] += simulation.positions[index * 3] ?? 0;
+		center[1] += simulation.positions[index * 3 + 1] ?? 0;
+	}
+
+	expect(tuned).not.toEqual(baseline);
+	expect(center[0] / request.nodeCount).toBeCloseTo(0, 5);
+	expect(center[1] / request.nodeCount).toBeCloseTo(0, 5);
 });

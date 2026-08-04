@@ -1,3 +1,11 @@
+export type { ForceLayoutRequest, ForceSettings } from "./force-layout";
+export {
+	computeClusteredForcePositions,
+	computeForcePositions,
+	createForceSimulation,
+	DEFAULT_FORCE_SETTINGS,
+	forceIterationCount,
+} from "./force-layout";
 export type { GraphologyEdgeAttributes, GraphologyNodeAttributes, GraphologyRenderer } from "./graphology";
 export { bindGraphology } from "./graphology";
 export { Graphraum } from "./graphraum";
