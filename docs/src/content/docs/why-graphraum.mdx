@@ -29,6 +29,18 @@ The baseline renderer uses one instanced node mesh and one edge line geometry: t
 
 These choices do not prove that graphraum is universally faster than another library. Performance depends on fixture topology, update frequency, node size, overdraw, pixel ratio, browser, and hardware. The [live benchmark](../benchmark/) reports its protocol and lets the claim be tested on the machine that matters.
 
+### Open source deliberately, under Apache-2.0
+
+graphraum is deliberately released under the permissive [Apache License 2.0](https://github.com/domudev/graphraum/blob/main/LICENSE). The renderer is infrastructure: applications should be able to inspect it, profile it, fork it, replace parts of it, and ship it without a framework, hosted-service, or reciprocal-license commitment. Apache-2.0 also provides an explicit patent grant.
+
+Open source is not a unique advantage over every alternative. deck.gl, Kepler.gl, Plotly.js, Sigma.js, and Cytoscape.js are also open-source projects, and several use MIT. The decision is about graphraum's own contract: the rendering hot path, limits, diagnostics, and benchmark protocol stay inspectable, and product teams are not asked to trust an opaque performance claim.
+
+### Shift graph and performance decisions left
+
+graphraum treats validation and observability as development-time tools rather than production surprises. Public inputs fail with actionable errors. Diagnostics report draw calls, resource counts, visible candidates, LOD state, CPU frame time, and GPU timing when available. The executable benchmark records fixture size, browser, pixel ratio, protocol, and distributions instead of publishing one context-free FPS number.
+
+That is the “shift left” goal: discover invalid topology, unstable layouts, excessive overdraw, memory pressure, and unsuitable LOD thresholds while designing and testing the graph experience. It does not mean every workload is fast by default; it means the decisions and their consequences are visible early enough to change them.
+
 ## How the alternatives differ
 
 | Project | Primary abstraction | Where it is stronger | Why it did not replace graphraum |
