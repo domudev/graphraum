@@ -50,6 +50,10 @@ export function renderControls(form: HTMLFormElement) {
 				{ label: "Typed mapper", value: "mapper" },
 				{ label: "Direct snapshot", value: "snapshot" },
 			]),
+			SelectField("Topology", "topology", "clustered", [
+				{ label: "Clustered communities", value: "clustered" },
+				{ label: "Uniform", value: "linear" },
+			]),
 			SelectField("Layout", "layout", "grid", [
 				{ label: "Grid", value: "grid" },
 				{ label: "Progressive circle", value: "circle" },

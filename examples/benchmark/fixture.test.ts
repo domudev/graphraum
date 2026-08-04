@@ -80,4 +80,25 @@ describe("createFixture", () => {
 
 		expect(first).toEqual(second);
 	});
+
+	test("creates dense communities with sparse bridge edges", () => {
+		const nodeCount = 1_000;
+		const fixture = createFixture({
+			...options("mapper"),
+			edgeDistribution: "clustered",
+			edgeMultiplier: 3,
+			nodeCount,
+		});
+		const clusterCount = Math.max(2, Math.ceil(Math.sqrt(nodeCount / 100)));
+		const clusterSize = Math.ceil(nodeCount / clusterCount);
+		const bridges = fixture.edges.filter(
+			(edge) =>
+				Math.floor(Number(edge.source.slice(5)) / clusterSize) !==
+				Math.floor(Number(edge.target.slice(5)) / clusterSize),
+		);
+
+		expect(new Set(fixture.nodes.map((node) => node.attributes.cluster))).toHaveLength(clusterCount);
+		expect(bridges.length).toBeGreaterThan(0);
+		expect(bridges.length).toBeLessThan(fixture.edges.length / 5);
+	});
 });

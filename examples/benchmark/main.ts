@@ -8,7 +8,14 @@ import {
 } from "../../src";
 
 import { renderControls } from "./controls";
-import { createFixture, type EdgeAttributes, type Encoding, type FixtureOptions, type NodeAttributes } from "./fixture";
+import {
+	createFixture,
+	type EdgeAttributes,
+	type EdgeDistribution,
+	type Encoding,
+	type FixtureOptions,
+	type NodeAttributes,
+} from "./fixture";
 import { measurePerformance, renderPerformanceChart } from "./performance";
 import { renderDataList } from "./ui";
 
@@ -73,7 +80,7 @@ function readState(): LabState {
 	const scaleMode: ScaleMode = fixture === "million-density" || fixture === "million-literal" ? fixture : "standard";
 	return {
 		antialias: values.has("antialias"),
-		edgeDistribution: "linear",
+		edgeDistribution: formValue(values, "topology") as EdgeDistribution,
 		edgeColors: {
 			mentions: formValue(values, "mentionsColor"),
 			related: formValue(values, "relatedColor"),
@@ -114,6 +121,7 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 	node: (node) => ({
 		presentation: {
 			properties: [
+				{ id: "cluster", label: "Cluster", value: node.attributes.cluster },
 				{ id: "kind", label: "Kind", value: node.attributes.kind },
 				{ id: "score", label: "Score", value: node.attributes.score },
 				{ id: "theme", label: "Theme fallback", value: node.attributes.useTheme },
