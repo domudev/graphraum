@@ -1,3 +1,4 @@
+import type { ForceSettings } from "../../src";
 import {
 	defineVisuals,
 	Graphraum,
@@ -6,7 +7,6 @@ import {
 	type GraphraumOptions,
 	type GraphraumOverlay,
 } from "../../src";
-
 import { renderControls } from "./controls";
 import {
 	createFixture,
@@ -28,6 +28,7 @@ type LayoutWorkerMessage =
 interface LabState extends FixtureOptions {
 	antialias: boolean;
 	forceMaxFps: number;
+	forceSettings: ForceSettings;
 	layout: LayoutName;
 	maxPixelRatio: number;
 	maxVisibleEdges: number;
@@ -93,6 +94,13 @@ function readState(): LabState {
 		edgeMultiplier: scaleMode === "million-density" ? 0.1 : scaleMode === "million-literal" ? 0 : 3,
 		encoding: formValue(values, "encoding") as Encoding,
 		forceMaxFps: formNumber(values, "forceMaxFps"),
+		forceSettings: {
+			centerAttraction: formNumber(values, "forceCenterAttraction"),
+			damping: formNumber(values, "forceDamping"),
+			linkDistance: formNumber(values, "forceLinkDistance"),
+			repulsion: formNumber(values, "forceRepulsion"),
+			springStrength: formNumber(values, "forceSpringStrength"),
+		},
 		layout: formValue(values, "layout") as LayoutName,
 		maxPixelRatio: formNumber(values, "maxPixelRatio"),
 		maxVisibleEdges: 100_000,
@@ -119,6 +127,7 @@ let state = readState();
 let graph: Graphraum<NodeAttributes, EdgeAttributes>;
 let overlay: GraphraumOverlay<NodeAttributes, EdgeAttributes> | undefined;
 let layoutRun = 0;
+let liveFittedRun = -1;
 let updateCount = 0;
 let selectedNodeId: string | null = null;
 const layoutWorker = new Worker(new URL("./layout-worker.ts", import.meta.url), { type: "module" });
@@ -267,6 +276,7 @@ function applyLayoutProgressively(
 			layout,
 			nodeCount: state.nodeCount,
 			run,
+			settings: state.forceSettings,
 			type: "start",
 		},
 		transfer,
@@ -279,6 +289,10 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 		const start = data.end - data.positions.length / 3;
 		const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
 		graph.applyLayout({ nodeIds, positions: data.positions });
+		if (state.layout === "force-live" && liveFittedRun !== data.run) {
+			liveFittedRun = data.run;
+			graph.fitView();
+		}
 		status.textContent = `Applying ${state.layout} layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
 		if (state.layout !== "force-live") {
 			requestAnimationFrame(() => {
@@ -297,6 +311,7 @@ window.addEventListener("beforeunload", () => layoutWorker.terminate());
 
 function rebuild() {
 	layoutRun += 1;
+	liveFittedRun = -1;
 	state = readState();
 	overlay?.destroy();
 	graph?.destroy();

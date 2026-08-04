@@ -106,6 +106,25 @@ const layout: GraphraumLayoutPositions = {
 graph.applyLayout(layout);
 ```
 
+## Force layout
+
+The package exports `computeForcePositions()` for a static layout, `computeClusteredForcePositions()` for data-defined coarse communities, and `createForceSimulation()` for incremental or worker-driven layouts. All accept `ForceSettings`; omitted settings use `DEFAULT_FORCE_SETTINGS`.
+
+```ts
+import { createForceSimulation, DEFAULT_FORCE_SETTINGS } from "@domudev/graphraum";
+
+const simulation = createForceSimulation({
+  dimensions: 3,
+  edges: new Uint32Array([0, 1, 1, 2]),
+  nodeCount: 3,
+  settings: { ...DEFAULT_FORCE_SETTINGS, damping: 0.75, repulsion: 800 },
+});
+
+simulation.step(0.35);
+```
+
+The simulation recalculates and recenters its centroid after every step, so a live renderer can keep orbit controls focused without refitting the camera. In 2D every Z coordinate remains zero.
+
 ## Graphology binding
 
 Use `bindGraphology()` when Graphology owns the mutable graph. The adapter renders the current graph immediately, maps node visual attributes (`x`, `y`, `z`, `color`, `shape`, and `size`), preserves all attributes for `defineVisuals()`, and subscribes to later mutations.

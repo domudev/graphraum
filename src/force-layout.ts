@@ -1,7 +1,35 @@
+/** Input for graphraum's dimension-aware force layout helpers. */
 export interface ForceLayoutRequest {
 	dimensions: 2 | 3;
 	edges: Uint32Array;
 	nodeCount: number;
+	settings?: ForceSettings;
+}
+
+export interface ForceSettings {
+	centerAttraction: number;
+	damping: number;
+	linkDistance: number;
+	repulsion: number;
+	springStrength: number;
+}
+
+export const DEFAULT_FORCE_SETTINGS: ForceSettings = {
+	centerAttraction: 0.002,
+	damping: 0.82,
+	linkDistance: 24,
+	repulsion: 400,
+	springStrength: 0.005,
+};
+
+function normalizeForceSettings(settings = DEFAULT_FORCE_SETTINGS): ForceSettings {
+	return {
+		centerAttraction: Math.max(0, Math.min(0.05, settings.centerAttraction)),
+		damping: Math.max(0.1, Math.min(0.99, settings.damping)),
+		linkDistance: Math.max(1, Math.min(500, settings.linkDistance)),
+		repulsion: Math.max(0, Math.min(5_000, settings.repulsion)),
+		springStrength: Math.max(0.0001, Math.min(0.05, settings.springStrength)),
+	};
 }
 
 export function forceIterationCount(nodeCount: number) {
@@ -37,6 +65,7 @@ function random(seed: number) {
 }
 
 export function createForceSimulation(request: ForceLayoutRequest) {
+	const settings = normalizeForceSettings(request.settings);
 	const positions = initialPositions(request);
 	const velocities = new Float32Array(positions.length);
 	const forces = new Float32Array(positions.length);
@@ -47,9 +76,10 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 			forces.fill(0);
 			for (let index = 0; index < request.nodeCount; index += 1) {
 				const offset = index * 3;
-				forces[offset] = -(positions[offset] ?? 0) * 0.002 * alpha;
-				forces[offset + 1] = -(positions[offset + 1] ?? 0) * 0.002 * alpha;
-				forces[offset + 2] = request.dimensions === 3 ? -(positions[offset + 2] ?? 0) * 0.002 * alpha : 0;
+				forces[offset] = -(positions[offset] ?? 0) * settings.centerAttraction * alpha;
+				forces[offset + 1] = -(positions[offset + 1] ?? 0) * settings.centerAttraction * alpha;
+				forces[offset + 2] =
+					request.dimensions === 3 ? -(positions[offset + 2] ?? 0) * settings.centerAttraction * alpha : 0;
 				for (let sample = 0; sample < 8; sample += 1) {
 					const targetIndex = Math.floor(random(index * 97 + sample * 17 + iteration * 13) * request.nodeCount);
 					if (targetIndex === index) continue;
@@ -58,7 +88,7 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 					const dy = (positions[offset + 1] ?? 0) - (positions[target + 1] ?? 0);
 					const dz = request.dimensions === 3 ? (positions[offset + 2] ?? 0) - (positions[target + 2] ?? 0) : 0;
 					const distanceSquared = dx * dx + dy * dy + dz * dz + 16;
-					const scale = (Math.min(2, 400 / distanceSquared) * alpha) / Math.sqrt(distanceSquared);
+					const scale = (Math.min(2, settings.repulsion / distanceSquared) * alpha) / Math.sqrt(distanceSquared);
 					forces[offset] += dx * scale;
 					forces[offset + 1] += dy * scale;
 					if (request.dimensions === 3) forces[offset + 2] += dz * scale;
@@ -71,7 +101,8 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 				const dy = (positions[target + 1] ?? 0) - (positions[source + 1] ?? 0);
 				const dz = request.dimensions === 3 ? (positions[target + 2] ?? 0) - (positions[source + 2] ?? 0) : 0;
 				const distance = Math.sqrt(Math.max(dx * dx + dy * dy + dz * dz, 0.0001));
-				const force = Math.max(-1, Math.min(1, (distance - 24) * 0.005 * alpha)) / distance;
+				const force =
+					Math.max(-1, Math.min(1, (distance - settings.linkDistance) * settings.springStrength * alpha)) / distance;
 				forces[source] += dx * force;
 				forces[source + 1] += dy * force;
 				forces[target] -= dx * force;
@@ -83,9 +114,10 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 			}
 			for (let index = 0; index < request.nodeCount; index += 1) {
 				const offset = index * 3;
-				let vx = ((velocities[offset] ?? 0) + (forces[offset] ?? 0)) * 0.82;
-				let vy = ((velocities[offset + 1] ?? 0) + (forces[offset + 1] ?? 0)) * 0.82;
-				let vz = request.dimensions === 3 ? ((velocities[offset + 2] ?? 0) + (forces[offset + 2] ?? 0)) * 0.82 : 0;
+				let vx = ((velocities[offset] ?? 0) + (forces[offset] ?? 0)) * settings.damping;
+				let vy = ((velocities[offset + 1] ?? 0) + (forces[offset + 1] ?? 0)) * settings.damping;
+				let vz =
+					request.dimensions === 3 ? ((velocities[offset + 2] ?? 0) + (forces[offset + 2] ?? 0)) * settings.damping : 0;
 				const speed = Math.hypot(vx, vy, vz);
 				const maxSpeed = 0.5 + alpha * 8;
 				if (speed > maxSpeed) {
@@ -100,6 +132,18 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 				positions[offset] = (positions[offset] ?? 0) + vx;
 				positions[offset + 1] = (positions[offset + 1] ?? 0) + vy;
 				positions[offset + 2] = request.dimensions === 3 ? (positions[offset + 2] ?? 0) + vz : 0;
+			}
+			const center = [0, 0, 0];
+			for (let index = 0; index < request.nodeCount; index += 1) {
+				const offset = index * 3;
+				center[0] += positions[offset] ?? 0;
+				center[1] += positions[offset + 1] ?? 0;
+				if (request.dimensions === 3) center[2] += positions[offset + 2] ?? 0;
+			}
+			for (let axis = 0; axis < request.dimensions; axis += 1) center[axis] /= request.nodeCount;
+			for (let index = 0; index < request.nodeCount; index += 1) {
+				const offset = index * 3;
+				for (let axis = 0; axis < request.dimensions; axis += 1) positions[offset + axis] -= center[axis];
 			}
 			iteration += 1;
 		},
@@ -130,6 +174,7 @@ export function computeClusteredForcePositions(request: ForceLayoutRequest & { c
 		dimensions: request.dimensions,
 		edges: clusterEdges.subarray(0, edgeCursor),
 		nodeCount: clusterCount,
+		settings: request.settings,
 	});
 	const clusterSizes = new Uint32Array(clusterCount);
 	for (const cluster of request.clusters) clusterSizes[cluster] += 1;
