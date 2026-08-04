@@ -24,6 +24,7 @@ export default defineConfig({
 					label: "Start",
 					items: [
 						{ label: "Overview", link: "/" },
+						{ label: "Why graphraum", link: "/why-graphraum/" },
 						{ label: "Get started", link: "/get-started/" },
 					],
 				},
