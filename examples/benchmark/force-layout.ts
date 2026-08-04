@@ -13,9 +13,19 @@ function initialPositions({ dimensions, nodeCount }: ForceLayoutRequest) {
 	const extent = Math.max(Math.sqrt(nodeCount) * 6, 24);
 	for (let index = 0; index < nodeCount; index += 1) {
 		const offset = index * 3;
-		positions[offset] = (random(index * 3 + 1) - 0.5) * extent;
-		positions[offset + 1] = (random(index * 3 + 2) - 0.5) * extent;
-		positions[offset + 2] = dimensions === 3 ? (random(index * 3 + 3) - 0.5) * extent : 0;
+		const angle = random(index * 4 + 1) * Math.PI * 2;
+		if (dimensions === 2) {
+			const radius = Math.sqrt(random(index * 4 + 2)) * extent * 0.5;
+			positions.set([Math.cos(angle) * radius, Math.sin(angle) * radius, 0], offset);
+			continue;
+		}
+		const zDirection = random(index * 4 + 2) * 2 - 1;
+		const planeRadius = Math.sqrt(1 - zDirection * zDirection);
+		const radius = Math.cbrt(random(index * 4 + 3)) * extent * 0.5;
+		positions.set(
+			[Math.cos(angle) * planeRadius * radius, Math.sin(angle) * planeRadius * radius, zDirection * radius],
+			offset,
+		);
 	}
 	return positions;
 }
