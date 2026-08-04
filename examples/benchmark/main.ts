@@ -12,7 +12,7 @@ import { createFixture, type EdgeAttributes, type Encoding, type FixtureOptions,
 import { measurePerformance, renderPerformanceChart } from "./performance";
 import { renderDataList } from "./ui";
 
-type LayoutName = "circle" | "force-custom" | "forceatlas2" | "grid";
+type LayoutName = "circle" | "force" | "grid";
 type ScaleMode = "million-density" | "million-literal" | "standard";
 type LayoutWorkerMessage =
 	| { end: number; positions: Float32Array; run: number; type: "positions" }
@@ -224,16 +224,17 @@ function graphOptions(): GraphraumOptions<NodeAttributes, EdgeAttributes> {
 }
 
 function applyLayoutProgressively(layout: LayoutName, edges: readonly { source: string; target: string }[]) {
-	if (state.scaleMode !== "standard" && (layout === "forceatlas2" || layout === "force-custom")) {
+	if (state.scaleMode !== "standard" && layout === "force") {
 		status.textContent = "Force layouts are disabled for million-node stress fixtures.";
 		return;
 	}
 	const run = ++layoutRun;
 	status.textContent = `Computing ${layout} layout in worker`;
-	const packedEdges = layout === "forceatlas2" || layout === "force-custom" ? forceEdges(edges) : undefined;
+	const packedEdges = layout === "force" ? forceEdges(edges) : undefined;
 	layoutWorker.postMessage(
 		{
 			batchSize: Math.max(500, Math.ceil(state.nodeCount / 30)),
+			dimensions: state.mode === "2d" ? 2 : 3,
 			edges: packedEdges,
 			layout,
 			nodeCount: state.nodeCount,
@@ -250,7 +251,7 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 		const start = data.end - data.positions.length / 3;
 		const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
 		graph.applyLayout({ nodeIds, positions: data.positions });
-		status.textContent = `Applying circle layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
+		status.textContent = `Applying ${state.layout} layout · ${data.end.toLocaleString()} / ${state.nodeCount.toLocaleString()} nodes`;
 		requestAnimationFrame(() => {
 			if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
 		});
@@ -258,7 +259,7 @@ layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMes
 	}
 	graph.fitView();
 	const encoding = state.encoding === "mapper" ? "typed mapper" : "direct snapshot";
-	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · circle`;
+	status.textContent = `${state.nodeCount.toLocaleString()} nodes · ${(state.nodeCount * state.edgeMultiplier).toLocaleString()} edges · ${state.mode.toUpperCase()} · ${encoding} · ${state.layout}`;
 	requestAnimationFrame(renderDiagnostics);
 });
 
