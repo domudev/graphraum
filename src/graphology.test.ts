@@ -8,7 +8,7 @@ test("projects a Graphology graph and renders nodes before layout is available",
 	graph.addNode("ada", { color: "#73c7a5" });
 	graph.addNode("london", { x: 10, y: 20 });
 	graph.addEdgeWithKey("born-in", "ada", "london", { color: "#469878" });
-	const renderer = { setData: vi.fn(), updateNodes: vi.fn() };
+	const renderer = { setData: vi.fn() };
 
 	bindGraphology(renderer, graph);
 
@@ -38,28 +38,30 @@ test("projects a Graphology graph and renders nodes before layout is available",
 	});
 });
 
-test("coalesces node attribute mutations into one renderer update", async () => {
-	const graph = new Graph<{ color?: string; size?: number; x?: number; y?: number }>();
+test("coalesces node and domain attribute mutations into one graph replacement", async () => {
+	const graph = new Graph<{ color?: string; kind?: string; size?: number; x?: number; y?: number }>();
 	graph.addNode("ada", { x: 0, y: 0 });
-	const renderer = { setData: vi.fn(), updateNodes: vi.fn() };
+	const renderer = { setData: vi.fn() };
 	bindGraphology(renderer, graph);
 	renderer.setData.mockClear();
 
-	graph.mergeNodeAttributes("ada", { color: "#73c7a5", x: 10 });
+	graph.mergeNodeAttributes("ada", { color: "#73c7a5", kind: "person", x: 10 });
 	graph.mergeNodeAttributes("ada", { size: 8, y: 20 });
 	await Promise.resolve();
 
-	expect(renderer.setData).not.toHaveBeenCalled();
-	expect(renderer.updateNodes).toHaveBeenCalledOnce();
-	expect(renderer.updateNodes).toHaveBeenCalledWith([
-		{ color: "#73c7a5", id: "ada", position: { x: 10, y: 20 }, shape: undefined, size: 8 },
-	]);
+	expect(renderer.setData).toHaveBeenCalledOnce();
+	expect(renderer.setData.mock.calls[0]?.[0].nodes[0]).toMatchObject({
+		attributes: { color: "#73c7a5", kind: "person", size: 8, x: 10, y: 20 },
+		color: "#73c7a5",
+		position: { x: 10, y: 20 },
+		size: 8,
+	});
 });
 
 test("coalesces topology mutations into one graph replacement", async () => {
 	const graph = new Graph<{ x?: number; y?: number }>();
 	graph.addNode("ada", { x: 0, y: 0 });
-	const renderer = { setData: vi.fn(), updateNodes: vi.fn() };
+	const renderer = { setData: vi.fn() };
 	bindGraphology(renderer, graph);
 	renderer.setData.mockClear();
 
@@ -67,7 +69,6 @@ test("coalesces topology mutations into one graph replacement", async () => {
 	graph.addEdgeWithKey("born-in", "ada", "london");
 	await Promise.resolve();
 
-	expect(renderer.updateNodes).not.toHaveBeenCalled();
 	expect(renderer.setData).toHaveBeenCalledOnce();
 	expect(renderer.setData.mock.calls[0]?.[0]).toMatchObject({
 		edges: [{ id: "born-in", source: "ada", target: "london" }],
@@ -78,7 +79,7 @@ test("coalesces topology mutations into one graph replacement", async () => {
 test("stops rendering mutations after disposal", async () => {
 	const graph = new Graph<{ x?: number; y?: number }>();
 	graph.addNode("ada", { x: 0, y: 0 });
-	const renderer = { setData: vi.fn(), updateNodes: vi.fn() };
+	const renderer = { setData: vi.fn() };
 	const dispose = bindGraphology(renderer, graph);
 	renderer.setData.mockClear();
 
@@ -88,21 +89,22 @@ test("stops rendering mutations after disposal", async () => {
 	await Promise.resolve();
 
 	expect(renderer.setData).not.toHaveBeenCalled();
-	expect(renderer.updateNodes).not.toHaveBeenCalled();
 });
 
 test("renders bulk node attribute mutations", async () => {
 	const graph = new Graph<{ x: number; y: number }>();
 	graph.addNode("ada", { x: 0, y: 0 });
 	graph.addNode("london", { x: 10, y: 20 });
-	const renderer = { setData: vi.fn(), updateNodes: vi.fn() };
+	const renderer = { setData: vi.fn() };
 	bindGraphology(renderer, graph);
+	renderer.setData.mockClear();
 
 	graph.updateEachNodeAttributes((_id, attributes) => ({ ...attributes, x: attributes.x + 5 }));
 	await Promise.resolve();
 
-	expect(renderer.updateNodes).toHaveBeenCalledWith([
-		{ color: undefined, id: "ada", position: { x: 5, y: 0, z: undefined }, shape: undefined, size: undefined },
-		{ color: undefined, id: "london", position: { x: 15, y: 20, z: undefined }, shape: undefined, size: undefined },
+	expect(renderer.setData).toHaveBeenCalledOnce();
+	expect(renderer.setData.mock.calls[0]?.[0].nodes).toMatchObject([
+		{ id: "ada", position: { x: 5, y: 0 } },
+		{ id: "london", position: { x: 15, y: 20 } },
 	]);
 });
