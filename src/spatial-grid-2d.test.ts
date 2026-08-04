@@ -39,4 +39,12 @@ describe("SpatialGrid2D", () => {
 		grid.set(3, { id: "intersecting", position: { x: 20, y: 5 }, size: 11 });
 		expect(grid.queryBounds({ bottom: 0, left: 0, right: 10, top: 10 }, 5)).toEqual([0, 1, 3]);
 	});
+
+	test("scans occupied cells instead of an enormous zoomed-out grid", () => {
+		const grid = new SpatialGrid2D();
+		grid.set(0, { id: "left", position: { x: -10, y: -10 }, size: 1 });
+		grid.set(1, { id: "right", position: { x: 10, y: 10 }, size: 1 });
+
+		expect(grid.queryBounds({ bottom: -1e12, left: -1e12, right: 1e12, top: 1e12 })).toEqual([0, 1]);
+	});
 });

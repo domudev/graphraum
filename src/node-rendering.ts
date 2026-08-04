@@ -48,8 +48,10 @@ export function createNodeGeometry(capacity: number) {
 	return geometry;
 }
 
-export function createNodeMaterial() {
+export function createNodeMaterial(depthTest: boolean) {
 	return new ShaderMaterial({
+		depthTest,
+		depthWrite: depthTest,
 		fragmentShader,
 		transparent: true,
 		vertexShader,

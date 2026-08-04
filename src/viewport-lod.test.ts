@@ -1,8 +1,15 @@
 import { describe, expect, test } from "vitest";
 
-import { applyEdgeBudget, collectIncidentEdges } from "./viewport-lod";
+import { applyEdgeBudget, collectIncidentEdges, shouldUseDensityLod } from "./viewport-lod";
 
 describe("viewport LOD", () => {
+	test("uses hysteresis around the visible-node budget", () => {
+		expect(shouldUseDensityLod(110, 100, false)).toBe(false);
+		expect(shouldUseDensityLod(111, 100, false)).toBe(true);
+		expect(shouldUseDensityLod(86, 100, true)).toBe(true);
+		expect(shouldUseDensityLod(85, 100, true)).toBe(false);
+	});
+
 	test("collects unique incident edges without a full edge scan", () => {
 		expect(
 			collectIncidentEdges(

@@ -36,6 +36,7 @@ interface GraphraumOptions {
   antialias?: boolean;              // default: false
   maxPixelRatio?: number;           // default: 2
   maxVisibleEdges?: number;         // default: 100_000
+  maxVisibleNodes?: number;         // default: 100_000
   viewportCulling?: boolean;        // default: true
   viewportOverscan?: number;        // default: 16 world units
   theme?: Partial<GraphraumTheme>;
@@ -43,7 +44,7 @@ interface GraphraumOptions {
 }
 ```
 
-Invalid edge budgets, overscan values, positions, and node sizes fail at the boundary with an actionable error.
+Invalid node and edge budgets, overscan values, positions, and node sizes fail at the boundary with an actionable error.
 
 ## Graph data
 
@@ -170,13 +171,21 @@ const diagnostics: GraphraumDiagnostics = graph.getDiagnostics();
 
 ```ts
 interface GraphraumDiagnostics {
+  aggregatedNodeClusters: number;
+  cpuFrameMilliseconds: number;
+  gpuFrameMilliseconds: number | null;
   gpuDrawCalls: number;
-  lodLevel: "detail" | "overview";
+  gpuGeometries: number;
+  gpuTextures: number;
+  lodLevel: "density" | "detail" | "overview";
   pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+  totalEdges: number;
+  totalNodes: number;
+  visibleNodeCandidates: number;
   visibleEdgeCandidates: number;
   visibleEdges: number;
   visibleNodes: number;
 }
 ```
 
-Diagnostics describe the final rendered frame. They make viewport materialization and edge-budget decisions observable instead of asking applications to re-derive them.
+Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them.

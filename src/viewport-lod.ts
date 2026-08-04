@@ -20,3 +20,12 @@ export function applyEdgeBudget(edgeIndices: readonly number[], maximum: number)
 		(edgeIndex): edgeIndex is number => edgeIndex !== undefined,
 	);
 }
+
+/** Keeps density LOD stable while camera movement hovers around the visible-node budget. */
+export function shouldUseDensityLod(candidateCount: number, maximum: number, active: boolean) {
+	if (!Number.isSafeInteger(candidateCount) || candidateCount < 0)
+		throw new Error("Visible node candidate count must be a non-negative integer.");
+	if (!Number.isSafeInteger(maximum) || maximum < 1)
+		throw new Error("Maximum visible nodes must be a positive integer.");
+	return candidateCount > maximum * (active ? 0.85 : 1.1);
+}

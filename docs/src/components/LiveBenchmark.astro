@@ -50,6 +50,21 @@
 		<div><span>Visible materialization</span><strong id="metric-visible">—</strong><small id="metric-lod">LOD and edge budget</small></div>
 		<div><span>GPU draw calls</span><strong id="metric-draw-calls">—</strong><small id="metric-picking">per rendered frame</small></div>
 	</div>
+	<section class="benchmark-statistics" aria-labelledby="benchmark-statistics-title">
+		<header>
+			<p class="benchmark-eyebrow">Sample distributions</p>
+			<h3 id="benchmark-statistics-title">Statistical analysis</h3>
+			<p id="statistics-protocol">Run the benchmark to populate distribution statistics.</p>
+		</header>
+		<div class="benchmark-statistics-grid">
+			<div><span>Frame mean</span><strong id="statistics-frame-mean">—</strong></div>
+			<div><span>Frame median</span><strong id="statistics-frame-p50">—</strong></div>
+			<div><span>Frame p99</span><strong id="statistics-frame-p99">—</strong></div>
+			<div><span>Frame σ</span><strong id="statistics-frame-deviation">—</strong></div>
+			<div><span>Frame CV</span><strong id="statistics-frame-variation">—</strong></div>
+			<div><span>Selection p99</span><strong id="statistics-selection-p99">—</strong></div>
+		</div>
+	</section>
 
 	<section class="benchmark-history" aria-labelledby="benchmark-history-title">
 		<header>
@@ -135,6 +150,10 @@
 		return `${value < 100 ? value.toFixed(1) : Math.round(value)} ms`;
 	}
 
+	function formatPercent(value: number) {
+		return `${(value * 100).toFixed(1)}%`;
+	}
+
 	const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 	const seriesColors = ["#73c7a5", "#fcfffc", "#e7b75f", "#b9a7e8"];
 
@@ -159,6 +178,13 @@
 	const metricLod = requireElement<HTMLElement>("#metric-lod");
 	const metricDrawCalls = requireElement<HTMLElement>("#metric-draw-calls");
 	const metricPicking = requireElement<HTMLElement>("#metric-picking");
+	const statisticsProtocol = requireElement<HTMLElement>("#statistics-protocol");
+	const statisticsFrameMean = requireElement<HTMLElement>("#statistics-frame-mean");
+	const statisticsFrameP50 = requireElement<HTMLElement>("#statistics-frame-p50");
+	const statisticsFrameP99 = requireElement<HTMLElement>("#statistics-frame-p99");
+	const statisticsFrameDeviation = requireElement<HTMLElement>("#statistics-frame-deviation");
+	const statisticsFrameVariation = requireElement<HTMLElement>("#statistics-frame-variation");
+	const statisticsSelectionP99 = requireElement<HTMLElement>("#statistics-selection-p99");
 	const historyMetric = requireElement<HTMLSelectElement>("#benchmark-history-metric");
 	const historyClear = requireElement<HTMLButtonElement>("#benchmark-history-clear");
 	const historyChart = requireElement<SVGSVGElement>("#benchmark-history-chart");
@@ -301,6 +327,7 @@
 		try {
 			const nodeCount = Number(sizeSelect.value);
 			const edgeCount = nodeCount * 3;
+			const warmupFrameCount = 10;
 			const frameSampleCount = nodeCount >= 100_000 ? 30 : 120;
 			const selectionSampleCount = nodeCount >= 100_000 ? 5 : 20;
 			const mode = modeSelect.value as GraphraumMode;
@@ -329,6 +356,8 @@
 			const firstVisibleFrameMilliseconds = performance.now() - firstFrameStartedAt;
 			const firstMeaningfulFrameMilliseconds = performance.now() - mountedAt;
 			const displayCadence = summarize(await measureFrames(() => {}, 30));
+			status.textContent = `Warming up with ${warmupFrameCount} rendered frames…`;
+			await measureFrames(() => graph?.render(), warmupFrameCount);
 			status.textContent = `Measuring ${frameSampleCount} rendered frames…`;
 			const frameTimes = summarize(await measureFrames(() => graph?.render(), frameSampleCount));
 			const selectionFeedback: number[] = [];
@@ -363,7 +392,7 @@
 			const payload = {
 				approach: "graphraum",
 				fixture: { nodeCount, edgeCount },
-				protocol: { frameSampleCount, selectionSampleCount },
+				protocol: { warmupFrameCount, frameSampleCount, selectionSampleCount },
 				mode,
 				devicePixelRatio: window.devicePixelRatio,
 				maxPixelRatio,
@@ -419,6 +448,13 @@
 			metricLod.textContent = `${diagnostics.lodLevel} · ${diagnostics.visibleEdges.toLocaleString()} edges`;
 			metricDrawCalls.textContent = String(diagnostics.gpuDrawCalls);
 			metricPicking.textContent = diagnostics.pickingStrategy;
+			statisticsProtocol.textContent = `${warmupFrameCount} warm-up frames · ${frameTimes.count} rendered frames · ${selectionSummary.count} selection changes`;
+			statisticsFrameMean.textContent = formatMilliseconds(frameTimes.mean ?? 0);
+			statisticsFrameP50.textContent = formatMilliseconds(frameTimes.p50 ?? 0);
+			statisticsFrameP99.textContent = formatMilliseconds(frameTimes.p99 ?? 0);
+			statisticsFrameDeviation.textContent = formatMilliseconds(frameTimes.standardDeviation ?? 0);
+			statisticsFrameVariation.textContent = formatPercent(frameTimes.coefficientOfVariation ?? 0);
+			statisticsSelectionP99.textContent = formatMilliseconds(selectionSummary.p99 ?? 0);
 			stageMode.textContent = `${mode.toUpperCase()} · complete`;
 			status.textContent = historyPersisted
 				? `Complete: ${nodeCount.toLocaleString()} nodes and ${edgeCount.toLocaleString()} edges in ${mode.toUpperCase()}. Saved to local history.`

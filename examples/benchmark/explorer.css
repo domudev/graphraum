@@ -1,0 +1,253 @@
+.lab-shell {
+	display: grid;
+	grid-template-columns: 17rem minmax(0, 1fr) 17rem;
+	grid-template-rows: 4.25rem minmax(0, 1fr);
+	height: 100vh;
+	min-height: 38rem;
+	overflow: hidden;
+	background: #ffffff;
+}
+.toolbar {
+	z-index: 4;
+	display: flex;
+	grid-column: 1 / -1;
+	gap: 0.5rem;
+	align-items: center;
+	padding: 0 1.25rem;
+	background: var(--panel);
+	border-bottom: 1px solid var(--line);
+}
+.brand-mark {
+	display: flex;
+	gap: 0.65rem;
+	align-items: center;
+	margin-right: 1.25rem;
+}
+.brand {
+	font:
+		600 1rem / 1.1 ui-sans-serif,
+		system-ui,
+		sans-serif;
+	letter-spacing: 0.02em;
+}
+.toolbar-copy {
+	display: grid;
+	gap: 0.1rem;
+}
+.status {
+	max-width: 42rem;
+	margin: 0 auto;
+	overflow: hidden;
+	color: #3f3d39;
+	font:
+		italic 0.9rem / 1.4 Georgia,
+		serif;
+	letter-spacing: 0.04em;
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.status::before {
+	content: "Reading: ";
+}
+.toolbar button {
+	min-height: 2.4rem;
+	padding-inline: 0.9rem;
+}
+.controls {
+	border-right: 1px solid var(--line);
+	scrollbar-color: #c5c2bc transparent;
+}
+.controls form {
+	display: grid;
+}
+.canvas-panel {
+	position: relative;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	background: var(--canvas);
+}
+.canvas-panel::after {
+	position: absolute;
+	inset: 2.5rem;
+	pointer-events: none;
+	content: "";
+	border: 1px solid #376759;
+}
+#graph {
+	width: 100%;
+	height: 100%;
+	min-height: 18rem;
+}
+.canvas-badge {
+	position: absolute;
+	bottom: 3.25rem;
+	left: 3.25rem;
+	display: flex;
+	gap: 0.65rem;
+	align-items: center;
+	padding: 0.6rem 0.7rem;
+	color: #a8bdb5;
+	font:
+		italic 0.72rem / 1 Georgia,
+		serif;
+	pointer-events: none;
+	background: rgba(11, 26, 23, 0.9);
+}
+.canvas-badge strong {
+	color: #ffffff;
+	font-family: ui-sans-serif, system-ui, sans-serif;
+	font-style: normal;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.graph-label {
+	padding: 0.2rem 0.4rem;
+	color: #ffffff;
+	font-size: 0.68rem;
+	white-space: nowrap;
+	background: rgba(11, 26, 23, 0.92);
+	border: 1px solid #73c7a5;
+	border-radius: 999px;
+}
+.inspector {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	border-left: 1px solid var(--line);
+}
+.inspector-section {
+	padding: 1.1rem 1rem;
+	border-bottom: 1px solid var(--line);
+}
+.inspector-section:last-child {
+	border-bottom: 0;
+}
+.inspector h2 {
+	margin: 0.45rem 0 0;
+	overflow-wrap: anywhere;
+	font:
+		500 1.35rem / 1.2 Georgia,
+		serif;
+	letter-spacing: -0.02em;
+}
+.inspector p {
+	margin: 0.35rem 0 1rem;
+	color: var(--muted);
+	font-size: 0.75rem;
+	line-height: 1.45;
+}
+.diagnostics {
+	margin-top: auto;
+}
+.diagnostics dd {
+	color: #171717;
+	font-weight: 700;
+}
+.performance-run {
+	width: 100%;
+	margin-bottom: 1rem;
+}
+.performance-values {
+	margin-bottom: 0.8rem;
+}
+.performance-panel svg {
+	display: block;
+	width: 100%;
+	height: auto;
+	background: #ffffff;
+	border-block: 1px solid var(--line);
+}
+.performance-budget {
+	stroke: #c9c6c0;
+	stroke-dasharray: 3 3;
+}
+.performance-legend {
+	display: flex;
+	gap: 0.75rem;
+	padding-top: 0.5rem;
+	color: var(--muted);
+	font-size: 0.68rem;
+}
+.performance-legend span::before {
+	display: inline-block;
+	width: 0.45rem;
+	height: 0.45rem;
+	margin-right: 0.25rem;
+	background: var(--accent);
+	content: "";
+}
+.performance-legend span:nth-child(2)::before {
+	background: #171717;
+}
+.performance-legend span:nth-child(3)::before {
+	background: #e4a853;
+}
+
+@media (max-width: 900px) {
+	.lab-shell {
+		display: flex;
+		flex-direction: column;
+		height: auto;
+		min-height: 100vh;
+		overflow: visible;
+	}
+	.toolbar {
+		position: static;
+		flex-wrap: wrap;
+		align-items: center;
+		min-height: 7.5rem;
+		padding-block: 0.75rem;
+	}
+	.brand-mark {
+		flex: 1;
+	}
+	.status {
+		order: 2;
+		flex-basis: 100%;
+	}
+	.canvas-panel {
+		order: 1;
+		height: 55vh;
+		min-height: 24rem;
+	}
+	.controls {
+		order: 2;
+		border: 0;
+	}
+	.inspector {
+		order: 3;
+		border: 0;
+	}
+	.canvas-panel::after {
+		inset: 1rem;
+	}
+	.canvas-badge {
+		bottom: 1.75rem;
+		left: 1.75rem;
+	}
+}
+
+@media (max-width: 540px) {
+	.toolbar button {
+		flex: 1;
+		padding-inline: 0.5rem;
+	}
+	.toolbar .secondary-action,
+	.canvas-badge span {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.canvas-panel::after {
+		animation: frame-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	}
+	@keyframes frame-in {
+		from {
+			inset: 48%;
+			opacity: 0;
+		}
+	}
+}

@@ -71,32 +71,37 @@ export class SpatialGrid2D {
 		const bottom = bounds.bottom - overscan;
 		const top = bounds.top + overscan;
 		const indices: number[] = [];
-		for (
-			let cellY = this.coordinate(bottom - this.maxRadius);
-			cellY <= this.coordinate(top + this.maxRadius);
-			cellY += 1
-		) {
-			for (
-				let cellX = this.coordinate(left - this.maxRadius);
-				cellX <= this.coordinate(right + this.maxRadius);
-				cellX += 1
-			) {
-				for (const index of this.cells.get(this.key(cellX, cellY)) ?? []) {
-					const node = this.nodes[index];
-					if (!node) continue;
-					const radius = node.size ?? 4;
-					if (
-						node.position.x + radius >= left &&
-						node.position.x - radius <= right &&
-						node.position.y + radius >= bottom &&
-						node.position.y - radius <= top
-					) {
-						indices.push(index);
-					}
+		const minimumCellX = this.coordinate(left - this.maxRadius);
+		const maximumCellX = this.coordinate(right + this.maxRadius);
+		const minimumCellY = this.coordinate(bottom - this.maxRadius);
+		const maximumCellY = this.coordinate(top + this.maxRadius);
+		const queriedCellCount = (maximumCellX - minimumCellX + 1) * (maximumCellY - minimumCellY + 1);
+		const candidateCells: Iterable<readonly number[]> =
+			Number.isSafeInteger(queriedCellCount) && queriedCellCount <= this.cells.size
+				? this.cellsInBounds(minimumCellX, maximumCellX, minimumCellY, maximumCellY)
+				: this.cells.values();
+		for (const cell of candidateCells) {
+			for (const index of cell) {
+				const node = this.nodes[index];
+				if (!node) continue;
+				const radius = node.size ?? 4;
+				if (
+					node.position.x + radius >= left &&
+					node.position.x - radius <= right &&
+					node.position.y + radius >= bottom &&
+					node.position.y - radius <= top
+				) {
+					indices.push(index);
 				}
 			}
 		}
 		return indices;
+	}
+
+	private *cellsInBounds(minimumX: number, maximumX: number, minimumY: number, maximumY: number) {
+		for (let y = minimumY; y <= maximumY; y += 1) {
+			for (let x = minimumX; x <= maximumX; x += 1) yield this.cells.get(this.key(x, y)) ?? [];
+		}
 	}
 
 	private coordinate(value: number) {

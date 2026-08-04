@@ -136,6 +136,7 @@ export interface GraphraumTheme {
 export interface GraphraumOptions<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	antialias?: boolean;
 	maxVisibleEdges?: number;
+	maxVisibleNodes?: number;
 	maxPixelRatio?: number;
 	mode?: GraphraumMode;
 	theme?: Partial<GraphraumTheme>;
@@ -145,10 +146,18 @@ export interface GraphraumOptions<NodeAttributes = undefined, EdgeAttributes = u
 }
 
 export interface GraphraumDiagnostics {
+	aggregatedNodeClusters: number;
+	cpuFrameMilliseconds: number;
+	gpuFrameMilliseconds: number | null;
 	gpuDrawCalls: number;
-	lodLevel: "detail" | "overview";
+	gpuGeometries: number;
+	gpuTextures: number;
+	lodLevel: "density" | "detail" | "overview";
 	pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+	totalEdges: number;
+	totalNodes: number;
 	visibleEdgeCandidates: number;
 	visibleEdges: number;
 	visibleNodes: number;
+	visibleNodeCandidates: number;
 }
