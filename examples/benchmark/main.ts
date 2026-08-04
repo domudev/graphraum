@@ -233,7 +233,7 @@ function applyLayoutProgressively(layout: LayoutName, edges: readonly { source: 
 	const packedEdges = layout === "force" ? forceEdges(edges) : undefined;
 	layoutWorker.postMessage(
 		{
-			batchSize: Math.max(500, Math.ceil(state.nodeCount / 30)),
+			batchSize: Math.max(1_000, Math.ceil(state.nodeCount / 8)),
 			dimensions: state.mode === "2d" ? 2 : 3,
 			edges: packedEdges,
 			layout,

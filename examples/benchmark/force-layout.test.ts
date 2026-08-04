@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { computeForcePositions } from "./force-layout";
+import { computeForcePositions, forceIterationCount } from "./force-layout";
 
 test("keeps 2D force positions flat and gives 3D positions depth", () => {
 	const edges = new Uint32Array([0, 1, 1, 2]);
@@ -9,4 +9,10 @@ test("keeps 2D force positions flat and gives 3D positions depth", () => {
 
 	expect(Array.from(flat.filter((_, index) => index % 3 === 2))).toEqual([0, 0, 0, 0]);
 	expect(Array.from(spatial.filter((_, index) => index % 3 === 2))).not.toEqual([0, 0, 0, 0]);
+});
+
+test("reduces force iterations as node count grows", () => {
+	expect(forceIterationCount(100)).toBeGreaterThan(forceIterationCount(10_000));
+	expect(forceIterationCount(10_000)).toBeGreaterThan(forceIterationCount(100_000));
+	expect(forceIterationCount(1_000_000)).toBeGreaterThanOrEqual(8);
 });
