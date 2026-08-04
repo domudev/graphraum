@@ -1,3 +1,5 @@
+export type { GraphologyEdgeAttributes, GraphologyNodeAttributes, GraphologyRenderer } from "./graphology";
+export { bindGraphology } from "./graphology";
 export { Graphraum } from "./graphraum";
 export { graphraumNodeShapes } from "./node-shapes";
 export { GraphraumOverlay } from "./overlay";
