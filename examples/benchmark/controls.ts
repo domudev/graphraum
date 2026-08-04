@@ -34,7 +34,7 @@ export function renderControls(form: HTMLFormElement) {
 				{ label: "3D", value: "3d" },
 			]),
 			Checkbox("Antialias", "antialias"),
-			NumberField("Pixel ratio", "maxPixelRatio", 2, 0.5, 4, 0.5),
+			NumberField("Pixel ratio", "maxPixelRatio", 1, 0.5, 4, 0.5),
 		),
 		Section(
 			"Graph",
