@@ -50,7 +50,6 @@ export function createFixture(options: FixtureOptions): GraphraumData<NodeAttrib
 	const columns = Math.ceil(Math.sqrt(options.nodeCount));
 	const clusterCount = Math.max(2, Math.ceil(Math.sqrt(options.nodeCount / 100)));
 	const clusterSize = Math.ceil(options.nodeCount / clusterCount);
-	const clusterColumns = Math.ceil(Math.sqrt(clusterCount));
 	const randomSeed = {
 		value:
 			(options.nodeCount * 17_827_199 +
@@ -60,7 +59,6 @@ export function createFixture(options: FixtureOptions): GraphraumData<NodeAttrib
 	};
 	const nodes = Array.from({ length: options.nodeCount }, (_, index) => {
 		const cluster = Math.min(Math.floor(index / clusterSize), clusterCount - 1);
-		const localIndex = index - cluster * clusterSize;
 		const kind = nodeKinds[index % nodeKinds.length];
 		const score = (index % 5) / 5;
 		const useTheme = index % 10 === 0;
@@ -74,18 +72,11 @@ export function createFixture(options: FixtureOptions): GraphraumData<NodeAttrib
 					}
 				: {}),
 			id: `node-${index}`,
-			position:
-				options.edgeDistribution === "clustered"
-					? {
-							x: (cluster % clusterColumns) * 240 + (localIndex % 10) * 8,
-							y: Math.floor(cluster / clusterColumns) * 240 + Math.floor(localIndex / 10) * 8,
-							z: (cluster % 5) * 80 + ((localIndex * 17) % 41) - 20,
-						}
-					: {
-							x: (index % columns) * 12,
-							y: Math.floor(index / columns) * 12,
-							z: ((index * 17) % 101) - 50,
-						},
+			position: {
+				x: (index % columns) * 12,
+				y: Math.floor(index / columns) * 12,
+				z: ((index * 17) % 101) - 50,
+			},
 		};
 	});
 	const edges = Array.from({ length: edgeCount }, (_, index) => {

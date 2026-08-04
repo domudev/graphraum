@@ -89,6 +89,7 @@ describe("createFixture", () => {
 			edgeMultiplier: 3,
 			nodeCount,
 		});
+		const uniform = createFixture({ ...options("mapper"), edgeDistribution: "linear", nodeCount });
 		const clusterCount = Math.max(2, Math.ceil(Math.sqrt(nodeCount / 100)));
 		const clusterSize = Math.ceil(nodeCount / clusterCount);
 		const bridges = fixture.edges.filter(
@@ -98,6 +99,7 @@ describe("createFixture", () => {
 		);
 
 		expect(new Set(fixture.nodes.map((node) => node.attributes.cluster))).toHaveLength(clusterCount);
+		expect(fixture.nodes.map((node) => node.position)).toEqual(uniform.nodes.map((node) => node.position));
 		expect(bridges.length).toBeGreaterThan(0);
 		expect(bridges.length).toBeLessThan(fixture.edges.length / 5);
 	});
