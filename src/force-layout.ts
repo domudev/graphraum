@@ -36,7 +36,7 @@ export function forceIterationCount(nodeCount: number) {
 	return Math.max(8, Math.min(32, Math.ceil(240 / Math.log2(nodeCount + 2))));
 }
 
-function initialPositions({ dimensions, nodeCount }: ForceLayoutRequest) {
+function initialPositions({ dimensions, nodeCount }: Pick<ForceLayoutRequest, "dimensions" | "nodeCount">) {
 	const positions = new Float32Array(nodeCount * 3);
 	const extent = Math.max(Math.sqrt(nodeCount) * 6, 24);
 	for (let index = 0; index < nodeCount; index += 1) {
@@ -66,22 +66,68 @@ function random(seed: number) {
 
 export function createForceSimulation(request: ForceLayoutRequest) {
 	const settings = normalizeForceSettings(request.settings);
-	const positions = initialPositions(request);
-	const velocities = new Float32Array(positions.length);
-	const forces = new Float32Array(positions.length);
+	let nodeCount = request.nodeCount;
+	let edges = new Uint32Array(request.edges);
+	let positions = initialPositions(request);
+	let velocities = new Float32Array(positions.length);
+	let forces = new Float32Array(positions.length);
 	let iteration = 0;
 	return {
-		positions,
+		get nodeCount() {
+			return nodeCount;
+		},
+		get edges() {
+			return edges;
+		},
+		get positions() {
+			return positions;
+		},
+		/** Add nodes while preserving every existing position and velocity. */
+		addNodes(count: number, initial?: Float32Array) {
+			if (!Number.isSafeInteger(count) || count < 1) throw new Error("Node count must be a positive integer.");
+			if (initial && initial.length !== count * 3) {
+				throw new Error("Initial positions must contain one XYZ triplet per added node.");
+			}
+			const start = nodeCount;
+			const nextPositions = new Float32Array((nodeCount + count) * 3);
+			nextPositions.set(positions);
+			const nextVelocities = new Float32Array(nextPositions.length);
+			nextVelocities.set(velocities);
+			const nextForces = new Float32Array(nextPositions.length);
+			nextForces.set(forces);
+			if (initial) nextPositions.set(initial, positions.length);
+			else {
+				const added = initialPositions({ dimensions: request.dimensions, nodeCount: count });
+				nextPositions.set(added, positions.length);
+			}
+			positions = nextPositions;
+			velocities = nextVelocities;
+			forces = nextForces;
+			nodeCount += count;
+			return start;
+		},
+		/** Append endpoint indices for new edges; existing edge indices remain stable. */
+		addEdges(nextEdges: Uint32Array) {
+			if (nextEdges.length % 2 !== 0) throw new Error("Force edges must contain source/target pairs.");
+			for (const index of nextEdges) {
+				if (index >= nodeCount) throw new Error(`Force edge references missing node index: ${index}`);
+			}
+			const merged = new Uint32Array(edges.length + nextEdges.length);
+			merged.set(edges);
+			merged.set(nextEdges, edges.length);
+			edges = merged;
+		},
 		step(alpha: number) {
+			if (nodeCount === 0) return;
 			forces.fill(0);
-			for (let index = 0; index < request.nodeCount; index += 1) {
+			for (let index = 0; index < nodeCount; index += 1) {
 				const offset = index * 3;
 				forces[offset] = -(positions[offset] ?? 0) * settings.centerAttraction * alpha;
 				forces[offset + 1] = -(positions[offset + 1] ?? 0) * settings.centerAttraction * alpha;
 				forces[offset + 2] =
 					request.dimensions === 3 ? -(positions[offset + 2] ?? 0) * settings.centerAttraction * alpha : 0;
 				for (let sample = 0; sample < 8; sample += 1) {
-					const targetIndex = Math.floor(random(index * 97 + sample * 17 + iteration * 13) * request.nodeCount);
+					const targetIndex = Math.floor(random(index * 97 + sample * 17 + iteration * 13) * nodeCount);
 					if (targetIndex === index) continue;
 					const target = targetIndex * 3;
 					const dx = (positions[offset] ?? 0) - (positions[target] ?? 0);
@@ -94,9 +140,9 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 					if (request.dimensions === 3) forces[offset + 2] += dz * scale;
 				}
 			}
-			for (let index = 0; index < request.edges.length; index += 2) {
-				const source = (request.edges[index] ?? 0) * 3;
-				const target = (request.edges[index + 1] ?? 0) * 3;
+			for (let index = 0; index < edges.length; index += 2) {
+				const source = (edges[index] ?? 0) * 3;
+				const target = (edges[index + 1] ?? 0) * 3;
 				const dx = (positions[target] ?? 0) - (positions[source] ?? 0);
 				const dy = (positions[target + 1] ?? 0) - (positions[source + 1] ?? 0);
 				const dz = request.dimensions === 3 ? (positions[target + 2] ?? 0) - (positions[source + 2] ?? 0) : 0;
@@ -112,7 +158,7 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 					forces[target + 2] -= dz * force;
 				}
 			}
-			for (let index = 0; index < request.nodeCount; index += 1) {
+			for (let index = 0; index < nodeCount; index += 1) {
 				const offset = index * 3;
 				let vx = ((velocities[offset] ?? 0) + (forces[offset] ?? 0)) * settings.damping;
 				let vy = ((velocities[offset + 1] ?? 0) + (forces[offset + 1] ?? 0)) * settings.damping;
@@ -134,14 +180,14 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 				positions[offset + 2] = request.dimensions === 3 ? (positions[offset + 2] ?? 0) + vz : 0;
 			}
 			const center = [0, 0, 0];
-			for (let index = 0; index < request.nodeCount; index += 1) {
+			for (let index = 0; index < nodeCount; index += 1) {
 				const offset = index * 3;
 				center[0] += positions[offset] ?? 0;
 				center[1] += positions[offset + 1] ?? 0;
 				if (request.dimensions === 3) center[2] += positions[offset + 2] ?? 0;
 			}
-			for (let axis = 0; axis < request.dimensions; axis += 1) center[axis] /= request.nodeCount;
-			for (let index = 0; index < request.nodeCount; index += 1) {
+			for (let axis = 0; axis < request.dimensions; axis += 1) center[axis] /= nodeCount;
+			for (let index = 0; index < nodeCount; index += 1) {
 				const offset = index * 3;
 				for (let axis = 0; axis < request.dimensions; axis += 1) positions[offset + axis] -= center[axis];
 			}

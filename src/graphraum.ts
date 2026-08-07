@@ -104,6 +104,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private nodeMesh: InstancedMesh | null = null;
 	private nodePickMesh: InstancedMesh | null = null;
 	private edgeLines: LineSegments | null = null;
+	private nodeCapacity = 0;
+	private edgeCapacity = 0;
 	private selectedNodeIds = new Set<string>();
 	private hoveredNodeIds = new Set<string>();
 	private focusedNodeIds = new Set<string>();
@@ -167,6 +169,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	/** Merge a topology patch without fitting or resetting the current camera. */
 	applyDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
+		const addedNodeIds = new Set((patch.addedNodes ?? []).map((node) => node.id));
+		const addedEdgeIds = new Set((patch.addedEdges ?? []).map((edge) => edge.id));
+		if (addedNodeIds.size !== (patch.addedNodes ?? []).length) throw new Error("Duplicate added node ID.");
+		if (addedEdgeIds.size !== (patch.addedEdges ?? []).length) throw new Error("Duplicate added edge ID.");
+		if (this.canAppendDataPatch(patch)) {
+			this.appendDataPatch(patch);
+			return;
+		}
 		const removedNodes = new Set(patch.removedNodeIds ?? []);
 		const removedEdges = new Set(patch.removedEdgeIds ?? []);
 		const nodes = new Map(this.data.nodes.map((node) => [node.id, node]));
@@ -179,6 +189,100 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 		const validEdges = [...edges.values()].filter((edge) => nodes.has(edge.source) && nodes.has(edge.target));
 		this.replaceData({ nodes: [...nodes.values()], edges: validEdges }, false);
+	}
+
+	private canAppendDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) return false;
+		if ((patch.removedNodeIds?.length ?? 0) > 0 || (patch.removedEdgeIds?.length ?? 0) > 0) return false;
+		const nodeIds = new Set(this.data.nodes.map((node) => node.id));
+		if ((patch.addedNodes ?? []).some((node) => nodeIds.has(node.id))) return false;
+		const edgeIds = new Set(this.data.edges.map((edge) => edge.id));
+		if ((patch.addedEdges ?? []).some((edge) => edgeIds.has(edge.id))) return false;
+		const allNodeIds = new Set([...nodeIds, ...(patch.addedNodes ?? []).map((node) => node.id)]);
+		return (
+			(patch.addedNodes?.length ?? 0) + this.data.nodes.length <= this.nodeCapacity &&
+			(patch.addedEdges?.length ?? 0) + this.data.edges.length <= this.edgeCapacity &&
+			(patch.addedEdges ?? []).every((edge) => allNodeIds.has(edge.source) && allNodeIds.has(edge.target))
+		);
+	}
+
+	private appendDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
+		const addedNodes = patch.addedNodes ?? [];
+		const addedEdges = patch.addedEdges ?? [];
+		if (addedNodes.length === 0 && addedEdges.length === 0) return;
+		const nodeById = new Map(this.data.nodes.map((node) => [node.id, node]));
+		for (const node of addedNodes) nodeById.set(node.id, node);
+		const edgeEndpointNodes = addedEdges.flatMap((edge) => {
+			const source = nodeById.get(edge.source);
+			const target = nodeById.get(edge.target);
+			return source && target ? [source, target] : [];
+		});
+		const patchNodes = [...addedNodes, ...edgeEndpointNodes].filter(
+			(node, index, all) => all.findIndex((candidate) => candidate.id === node.id) === index,
+		);
+		const compiled = compileGraph({ nodes: patchNodes, edges: addedEdges }, this.visuals);
+		const nodeVisuals = new Map(patchNodes.map((node, index) => [node.id, compiled.nodeVisuals[index]]));
+		const nextNodes = [...this.data.nodes, ...addedNodes.map((node) => ({ ...node, ...nodeVisuals.get(node.id) }))];
+		const nextNodeIndices = new Map(this.nodeIndices);
+		for (const [index, node] of nextNodes.entries()) nextNodeIndices.set(node.id, index);
+		const nextEdges = [
+			...this.data.edges,
+			...addedEdges.map((edge, index) => ({ ...edge, ...compiled.edgeVisuals[index] })),
+		];
+		const nextEdgeIndices = new Uint32Array(nextEdges.length * 2);
+		nextEdgeIndices.set(this.edgeNodeIndices);
+		const nextEdgePositions = new Float32Array(nextEdges.length * 6);
+		nextEdgePositions.set(this.canonicalEdgePositions);
+		const nextEdgeColors = new Float32Array(nextEdges.length * 6);
+		nextEdgeColors.set(this.canonicalEdgeColors);
+		const nextIncidentEdges = this.incidentEdgeIndices.map((indices) => [...indices]);
+		for (const [index, edge] of nextEdges.entries()) {
+			const source = nextNodeIndices.get(edge.source);
+			const target = nextNodeIndices.get(edge.target);
+			if (source === undefined || target === undefined) continue;
+			nextEdgeIndices[index * 2] = source;
+			nextEdgeIndices[index * 2 + 1] = target;
+			if (!nextIncidentEdges[source]) nextIncidentEdges[source] = [];
+			if (!nextIncidentEdges[target]) nextIncidentEdges[target] = [];
+			if (index >= this.data.edges.length) {
+				nextIncidentEdges[source]?.push(index);
+				nextIncidentEdges[target]?.push(index);
+				const sourceNode = nextNodes[source];
+				const targetNode = nextNodes[target];
+				if (sourceNode && targetNode) {
+					nextEdgePositions.set(
+						[
+							sourceNode.position.x,
+							sourceNode.position.y,
+							sourceNode.position.z ?? 0,
+							targetNode.position.x,
+							targetNode.position.y,
+							targetNode.position.z ?? 0,
+						],
+						index * 6,
+					);
+				}
+				const color = new Color(compiled.edgeVisuals[index - this.data.edges.length]?.color ?? this.theme.edge);
+				color.toArray(nextEdgeColors, index * 6);
+				color.toArray(nextEdgeColors, index * 6 + 3);
+			}
+		}
+		this.data = { nodes: nextNodes, edges: nextEdges };
+		this.nodeIds = nextNodes.map((node) => node.id);
+		this.nodeIndices = nextNodeIndices;
+		this.edgeNodeIndices = nextEdgeIndices;
+		this.canonicalEdgePositions = nextEdgePositions;
+		this.canonicalEdgeColors = nextEdgeColors;
+		this.incidentEdgeIndices = nextIncidentEdges;
+		for (const node of addedNodes) {
+			const index = nextNodeIndices.get(node.id);
+			const nextNode = index === undefined ? undefined : this.data.nodes[index];
+			if (index !== undefined && nextNode) this.spatialGrid2d.set(index, nextNode);
+		}
+		for (const [id, presentation] of compiled.nodePresentations) this.nodePresentations.set(id, presentation);
+		for (const [id, presentation] of compiled.edgePresentations) this.edgePresentations.set(id, presentation);
+		this.materializeViewport();
+		this.requestRender();
 	}
 
 	private replaceData(data: GraphraumData<NodeAttributes, EdgeAttributes>, fitView: boolean) {
@@ -208,7 +312,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.spatialGrid2d = new SpatialGrid2D();
 		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
 
-		const nodeCapacity = Math.min(data.nodes.length, this.maxVisibleNodes);
+		this.nodeCapacity = Math.min(this.maxVisibleNodes, nextCapacity(data.nodes.length));
+		this.edgeCapacity = Math.min(this.maxVisibleEdges, nextCapacity(data.edges.length));
+		const nodeCapacity = this.nodeCapacity;
 		const nodeGeometry = createNodeGeometry(nodeCapacity);
 		const nodeMaterial = createNodeMaterial(this.mode === "3d");
 		const nodeMesh = new InstancedMesh(nodeGeometry, nodeMaterial, nodeCapacity);
@@ -220,8 +326,12 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.nodePickMesh = nodePickMesh;
 
 		const edgeGeometry = new BufferGeometry();
-		edgeGeometry.setAttribute("position", new BufferAttribute(compiled.edgePositions.slice(), 3));
-		edgeGeometry.setAttribute("color", new BufferAttribute(this.canonicalEdgeColors.slice(), 3));
+		const edgePositions = new Float32Array(this.edgeCapacity * 6);
+		edgePositions.set(compiled.edgePositions);
+		const edgeColors = new Float32Array(this.edgeCapacity * 6);
+		edgeColors.set(this.canonicalEdgeColors);
+		edgeGeometry.setAttribute("position", new BufferAttribute(edgePositions, 3));
+		edgeGeometry.setAttribute("color", new BufferAttribute(edgeColors, 3));
 		const edgeLines = new LineSegments(
 			edgeGeometry,
 			new LineBasicMaterial({ color: "#ffffff", opacity: 0.55, transparent: true, vertexColors: true }),
@@ -835,4 +945,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.edgeLines = null;
 		}
 	}
+}
+
+function nextCapacity(length: number): number {
+	let capacity = 1;
+	while (capacity < length) capacity *= 2;
+	return capacity;
 }
