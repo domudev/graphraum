@@ -1,0 +1,14 @@
+<svg viewBox="0 0 1050 1050" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>graphraum</title>
+<style>
+	.frame { stroke: #040f0f; }
+	@media (prefers-color-scheme: dark) { .frame { stroke: #fcfffc; } }
+</style>
+<g class="frame" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="150 150">
+	<path d="M25 775L525 525V25L25 275V775Z"/>
+	<path d="M1025 774L525 524V25L1025 275V774Z"/>
+	<path d="M25 275L525 525V1025L25 775V275Z"/>
+	<path d="M1025 276L525 526V1025L1025 775V276Z"/>
+</g>
+<circle cx="525" cy="508" r="200" fill="#248a66"/>
+</svg>

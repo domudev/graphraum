@@ -1,0 +1,19 @@
+<svg width="1050" height="1050" viewBox="0 0 1050 1050" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>graphraum expanded graph logo</title>
+<path d="M25 775L525 525V25.0001L25 275V775Z" stroke="white" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="150 150"/>
+<path d="M1025 774L525 524.333V25.0001L1025 274.667V774Z" stroke="white" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="150 150"/>
+<circle cx="250.5" cy="694.5" r="122.5" fill="url(#a)"/>
+<circle cx="803" cy="372" r="96" fill="url(#b)"/>
+<circle cx="349.5" cy="336.5" r="74.5" fill="url(#c)"/>
+<circle cx="525" cy="508" r="200" fill="url(#d)"/>
+<circle cx="730" cy="741" r="169" fill="url(#e)"/>
+<path d="M25 275L525 525V1025L25 775V275Z" stroke="white" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="150 150"/>
+<path d="M1025 276L525 525.667V1025L1025 775.333V276Z" stroke="white" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="150 150"/>
+<defs>
+<linearGradient id="a" x1="128" y1="572" x2="373" y2="817" gradientUnits="userSpaceOnUse"><stop stop-color="#2FA57B"/><stop offset="1" stop-color="#094A33"/></linearGradient>
+<linearGradient id="b" x1="707" y1="276" x2="899" y2="468" gradientUnits="userSpaceOnUse"><stop stop-color="#2FA57B"/><stop offset="1" stop-color="#094A33"/></linearGradient>
+<linearGradient id="c" x1="275" y1="262" x2="424" y2="411" gradientUnits="userSpaceOnUse"><stop stop-color="#2FA57B"/><stop offset="1" stop-color="#094A33"/></linearGradient>
+<linearGradient id="d" x1="325" y1="308" x2="725" y2="708" gradientUnits="userSpaceOnUse"><stop stop-color="#2FA57B"/><stop offset="1" stop-color="#094A33"/></linearGradient>
+<linearGradient id="e" x1="561" y1="572" x2="899" y2="910" gradientUnits="userSpaceOnUse"><stop stop-color="#2FA57B"/><stop offset="1" stop-color="#094A33"/></linearGradient>
+</defs>
+</svg>

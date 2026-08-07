@@ -1,4 +1,9 @@
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/src/assets/logo-dark.svg">
+    <img src="./docs/src/assets/logo-light.svg" alt="graphraum logo" width="128" height="128">
+  </picture>
+  <br>
   <strong>graphraum</strong>
   <br>
   <sub>Nodes. Edges. Space.</sub>
