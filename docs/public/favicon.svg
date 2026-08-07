@@ -1,4 +1,5 @@
 <svg viewBox="0 0 1050 1050" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>graphraum</title>
 <style>
 	.frame { stroke: #040f0f; }
 	@media (prefers-color-scheme: dark) { .frame { stroke: #fcfffc; } }
