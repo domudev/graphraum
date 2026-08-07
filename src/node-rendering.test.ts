@@ -8,6 +8,7 @@ describe("node rendering buffers", () => {
 		const overlay = createNodeMaterial(false);
 		const spatial = createNodeMaterial(true);
 
+		expect(overlay.vertexShader).toContain("attribute vec3 instanceColor;");
 		expect(overlay.depthTest).toBe(false);
 		expect(overlay.depthWrite).toBe(false);
 		expect(spatial.depthTest).toBe(true);
