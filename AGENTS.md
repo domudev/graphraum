@@ -27,6 +27,16 @@ bun run docs:build
 
 Use Vitest for tests. Do not introduce a second formatter, linter, package manager, or test runner.
 
+## Changelog writing
+
+When editing changelogs, follow `.agents/skills/changelog/SKILL.md`:
+- use one file per month under `changelogs/YYYY-MM.md`
+- use day-level entries inside each monthly file
+- keep entries concise and customer facing
+- avoid internal engine internals, services, and implementation terms
+- include short commit SHAs only when they are helpful
+- curate entries instead of dumping commit logs
+
 ## Engineering baseline
 
 Apply these in order; later principles never override correctness or a clear public contract.
