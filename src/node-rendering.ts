@@ -4,6 +4,7 @@ import { encodeNodeShape } from "./node-shapes";
 import type { GraphraumNodeShape } from "./types";
 
 const vertexShader = `
+attribute vec3 instanceColor;
 attribute float instanceShape;
 varying vec3 nodeColor;
 varying vec2 nodePoint;
