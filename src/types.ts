@@ -52,6 +52,13 @@ export interface GraphraumData<NodeAttributes = undefined, EdgeAttributes = unde
 	edges: readonly GraphraumEdge<EdgeAttributes>[];
 }
 
+export interface GraphraumDataPatch<NodeAttributes = undefined, EdgeAttributes = undefined> {
+	addedNodes?: readonly GraphraumNode<NodeAttributes>[];
+	addedEdges?: readonly GraphraumEdge<EdgeAttributes>[];
+	removedNodeIds?: readonly string[];
+	removedEdgeIds?: readonly string[];
+}
+
 export interface GraphraumNodeVisual {
 	color?: GraphraumColor;
 	shape?: GraphraumNodeShape;
