@@ -169,6 +169,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	/** Merge a topology patch without fitting or resetting the current camera. */
 	applyDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
+		const addedNodeIds = new Set((patch.addedNodes ?? []).map((node) => node.id));
+		const addedEdgeIds = new Set((patch.addedEdges ?? []).map((edge) => edge.id));
+		if (addedNodeIds.size !== (patch.addedNodes ?? []).length) throw new Error("Duplicate added node ID.");
+		if (addedEdgeIds.size !== (patch.addedEdges ?? []).length) throw new Error("Duplicate added edge ID.");
 		if (this.canAppendDataPatch(patch)) {
 			this.appendDataPatch(patch);
 			return;
