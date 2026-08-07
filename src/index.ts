@@ -16,6 +16,7 @@ export type {
 	CompiledGraphraumPresentation,
 	GraphraumColor,
 	GraphraumData,
+	GraphraumDataPatch,
 	GraphraumDiagnostics,
 	GraphraumEdge,
 	GraphraumEdgeEncoding,

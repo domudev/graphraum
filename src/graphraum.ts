@@ -34,6 +34,7 @@ import { graphraumTheme } from "./theme";
 import type {
 	CompiledGraphraumPresentation,
 	GraphraumData,
+	GraphraumDataPatch,
 	GraphraumDiagnostics,
 	GraphraumLayoutPositions,
 	GraphraumMode,
@@ -161,6 +162,26 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	setData(data: GraphraumData<NodeAttributes, EdgeAttributes>) {
+		this.replaceData(data, true);
+	}
+
+	/** Merge a topology patch without fitting or resetting the current camera. */
+	applyDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
+		const removedNodes = new Set(patch.removedNodeIds ?? []);
+		const removedEdges = new Set(patch.removedEdgeIds ?? []);
+		const nodes = new Map(this.data.nodes.map((node) => [node.id, node]));
+		const edges = new Map(this.data.edges.map((edge) => [edge.id, edge]));
+
+		for (const id of removedNodes) nodes.delete(id);
+		for (const id of removedEdges) edges.delete(id);
+		for (const node of patch.addedNodes ?? []) nodes.set(node.id, node);
+		for (const edge of patch.addedEdges ?? []) edges.set(edge.id, edge);
+
+		const validEdges = [...edges.values()].filter((edge) => nodes.has(edge.source) && nodes.has(edge.target));
+		this.replaceData({ nodes: [...nodes.values()], edges: validEdges }, false);
+	}
+
+	private replaceData(data: GraphraumData<NodeAttributes, EdgeAttributes>, fitView: boolean) {
 		const compiled = compileGraph(data, this.visuals);
 		this.disposeGraphObjects();
 		this.data = {
@@ -208,7 +229,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.edgeLines = edgeLines;
 		this.scene.add(edgeLines);
 
-		this.fitView();
+		if (fitView) this.fitView();
+		else this.requestRender();
 	}
 
 	updateNodes(updates: readonly GraphraumNodeUpdate[]) {

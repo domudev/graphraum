@@ -63,6 +63,12 @@ graph.updateNodes([
   { id: "hamburg", color: "#fcfffc" },
 ]);
 
+// Merge streamed graph pages without fitting or resetting the camera:
+graph.applyDataPatch({
+	addedNodes: [{ id: "munich", position: { x: 0, y: 40 } }],
+	addedEdges: [{ id: "branch", source: "berlin", target: "munich" }],
+});
+
 // When the surface unmounts:
 graph.destroy();
 ```
