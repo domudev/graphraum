@@ -12,6 +12,11 @@ export default defineConfig({
 		starlight({
 			title: "graphraum",
 			description: "An opinionated WebGL engine for interactive graphs in 2D and 3D.",
+			logo: {
+				dark: "./src/assets/logo-dark.svg",
+				light: "./src/assets/logo-light.svg",
+				alt: "",
+			},
 			customCss: ["./src/styles/custom.css"],
 			components: {
 				Head: "./src/components/Head.astro",
