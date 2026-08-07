@@ -75,3 +75,19 @@ test("applies force settings and recenters every live step", () => {
 	expect(center[0] / request.nodeCount).toBeCloseTo(0, 5);
 	expect(center[1] / request.nodeCount).toBeCloseTo(0, 5);
 });
+
+test("adds nodes and edges without resetting existing layout state", () => {
+	const simulation = createForceSimulation({ dimensions: 2, edges: new Uint32Array([0, 1]), nodeCount: 2 });
+	simulation.step(0.35);
+	const before = Array.from(simulation.positions.slice(0, 6));
+
+	const start = simulation.addNodes(1, new Float32Array([12, 8, 0]));
+	simulation.addEdges(new Uint32Array([1, start]));
+
+	expect(start).toBe(2);
+	expect(simulation.nodeCount).toBe(3);
+	expect(Array.from(simulation.positions.slice(0, 6))).toEqual(before);
+	expect(Array.from(simulation.edges)).toEqual([0, 1, 1, 2]);
+	simulation.step(0.2);
+	expect(simulation.positions.every(Number.isFinite)).toBe(true);
+});
