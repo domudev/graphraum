@@ -59,7 +59,10 @@ export default defineConfig({
 				},
 				{
 					label: "Evidence",
-					items: [{ label: "Playground", link: "/benchmark/", badge: "Live" }],
+					items: [
+						{ label: "Explorer", link: "/explore/", badge: "Live" },
+						{ label: "Playground", link: "/benchmark/", badge: "Proof" },
+					],
 				},
 			],
 		}),

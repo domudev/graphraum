@@ -1,7 +1,8 @@
 ---
 import Default from "@astrojs/starlight/components/PageTitle.astro";
 
-const isBenchmark = Astro.locals.starlightRoute.id === "benchmark";
+const routeId = Astro.locals.starlightRoute.id;
+const hideTitle = routeId === "benchmark" || routeId === "explore";
 ---
 
-{!isBenchmark && <Default />}
+{!hideTitle && <Default />}

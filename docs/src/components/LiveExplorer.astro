@@ -1,0 +1,319 @@
+---
+const shapeOptions = [
+	{ label: "Circle", value: "circle" },
+	{ label: "Square", value: "square" },
+	{ label: "Diamond", value: "diamond" },
+	{ label: "Hexagon", value: "hexagon" },
+	{ label: "Triangle", value: "triangle" },
+	{ label: "Pill", value: "pill" },
+	{ label: "Rounded", value: "rounded" },
+] as const;
+const docsHome = `${import.meta.env.BASE_URL}`;
+const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
+---
+
+<section class="explorer-shell not-content" aria-label="graphraum explorer">
+	<aside class="explorer-sidebar">
+		<header class="explorer-brand">
+			<p class="explorer-eyebrow">graphraum</p>
+			<h1>Explorer</h1>
+			<p class="explorer-lede">Fullscreen live graph · layouts + appearance</p>
+		</header>
+
+		<form id="explorer-controls" class="explorer-controls" aria-label="Explorer controls">
+			<section>
+				<h2>Graph</h2>
+				<label>
+					<span>Layout</span>
+					<select name="layout">
+						<option value="grid" selected>Grid</option>
+						<option value="circle">Circle</option>
+						<option value="force">Force</option>
+						<option value="force-live">Force live</option>
+					</select>
+				</label>
+				<label>
+					<span>Size</span>
+					<select name="nodeCount">
+						<option value="100">100 nodes</option>
+						<option value="1000" selected>1,000 nodes</option>
+						<option value="10000">10,000 nodes</option>
+					</select>
+				</label>
+				<label>
+					<span>Dimension</span>
+					<select name="mode">
+						<option value="2d">2D</option>
+						<option value="3d">3D</option>
+					</select>
+				</label>
+			</section>
+
+			<section>
+				<h2>Nodes</h2>
+				<label>
+					<span>Concept</span>
+					<select name="conceptShape">
+						{shapeOptions.map((option) => (
+							<option value={option.value} selected={option.value === "diamond"}>{option.label}</option>
+						))}
+					</select>
+				</label>
+				<label>
+					<span>Document</span>
+					<select name="documentShape">
+						{shapeOptions.map((option) => (
+							<option value={option.value} selected={option.value === "square"}>{option.label}</option>
+						))}
+					</select>
+				</label>
+				<label>
+					<span>Person</span>
+					<select name="personShape">
+						{shapeOptions.map((option) => (
+							<option value={option.value} selected={option.value === "circle"}>{option.label}</option>
+						))}
+					</select>
+				</label>
+				<label>
+					<span>Aspect</span>
+					<select name="nodeAspect">
+						<option value="0.7">Tall 0.7</option>
+						<option value="1" selected>Square 1.0</option>
+						<option value="1.6">Wide 1.6</option>
+					</select>
+				</label>
+				<label>
+					<span>Stroke</span>
+					<select name="nodeStrokeWidth">
+						<option value="0" selected>None</option>
+						<option value="0.5">0.5</option>
+						<option value="1">1.0</option>
+						<option value="1.5">1.5</option>
+					</select>
+				</label>
+			</section>
+
+			<section>
+				<h2>Edges</h2>
+				<label>
+					<span>Path</span>
+					<select name="edgePath">
+						<option value="straight" selected>Straight</option>
+						<option value="quadratic">Quadratic</option>
+						<option value="cubic">Cubic</option>
+					</select>
+				</label>
+				<label>
+					<span>Style</span>
+					<select name="edgeStyle">
+						<option value="solid" selected>Solid</option>
+						<option value="dashed">Dashed</option>
+						<option value="dotted">Dotted</option>
+					</select>
+				</label>
+				<label>
+					<span>Marker</span>
+					<select name="edgeMarker">
+						<option value="none" selected>None</option>
+						<option value="triangle">Triangle</option>
+					</select>
+				</label>
+				<label>
+					<span>Marker end</span>
+					<select name="edgeMarkerEnd">
+						<option value="target" selected>Target</option>
+						<option value="source">Source</option>
+						<option value="both">Both</option>
+					</select>
+				</label>
+				<label>
+					<span>Width</span>
+					<select name="edgeWidth">
+						<option value="1">1</option>
+						<option value="1.5" selected>1.5</option>
+						<option value="3">3</option>
+						<option value="5">5</option>
+					</select>
+				</label>
+				<label>
+					<span>Opacity</span>
+					<select name="edgeOpacity">
+						<option value="0.4">0.4</option>
+						<option value="0.85" selected>0.85</option>
+						<option value="1">1.0</option>
+					</select>
+				</label>
+			</section>
+		</form>
+
+		<footer class="explorer-footer">
+			<p id="explorer-status" aria-live="polite">Starting…</p>
+			<nav class="explorer-links">
+				<a href={docsHome}>Docs</a>
+				<a href={proveHref}>Prove</a>
+			</nav>
+		</footer>
+	</aside>
+
+	<div class="explorer-stage">
+		<div id="explorer-graph" class="explorer-graph" aria-label="Interactive graphraum explorer"></div>
+		<p class="explorer-hint">Drag to pan · scroll to zoom · select a node</p>
+	</div>
+</section>
+
+<script>
+	import {
+		DEFAULT_FORCE_SETTINGS,
+		Graphraum,
+		type GraphraumEdgeMarker,
+		type GraphraumEdgeMarkerEnd,
+		type GraphraumEdgePath,
+		type GraphraumEdgeStyle,
+		type GraphraumMode,
+		type GraphraumNodeShape,
+	} from "@domudev/graphraum";
+	import {
+		createPlaygroundFixture,
+		createPlaygroundVisuals,
+		defaultPlaygroundAppearance,
+		type PlaygroundAppearance,
+		type PlaygroundEdgeAttributes,
+		type PlaygroundNodeAttributes,
+	} from "../lib/playground";
+
+	type LayoutName = "circle" | "force" | "force-live" | "grid";
+	type LayoutWorkerMessage =
+		| { end: number; positions: Float32Array; run: number; type: "positions" }
+		| { run: number; type: "complete" };
+
+	function requireElement<ElementType extends Element>(selector: string) {
+		const element = document.querySelector<ElementType>(selector);
+		if (!element) throw new Error(`Explorer element not found: ${selector}`);
+		return element;
+	}
+
+	function formValue(values: FormData, name: string) {
+		const value = values.get(name);
+		if (typeof value !== "string") throw new Error(`Missing explorer control: ${name}`);
+		return value;
+	}
+
+	document.documentElement.classList.add("explore-page");
+
+	const container = requireElement<HTMLElement>("#explorer-graph");
+	const form = requireElement<HTMLFormElement>("#explorer-controls");
+	const status = requireElement<HTMLElement>("#explorer-status");
+	const layoutWorker = new Worker(new URL("../lib/explore-layout-worker.ts", import.meta.url), { type: "module" });
+
+	let graph: Graphraum<PlaygroundNodeAttributes, PlaygroundEdgeAttributes> | null = null;
+	let layoutRun = 0;
+	let liveFittedRun = -1;
+	let currentLayout: LayoutName = "grid";
+	let currentMode: GraphraumMode = "2d";
+	let currentNodeCount = 1_000;
+
+	function readAppearance(): PlaygroundAppearance & { layout: LayoutName; mode: GraphraumMode } {
+		const values = new FormData(form);
+		const appearance = defaultPlaygroundAppearance();
+		appearance.nodeCount = Number(formValue(values, "nodeCount"));
+		appearance.nodeAspect = Number(formValue(values, "nodeAspect"));
+		appearance.nodeStrokeWidth = Number(formValue(values, "nodeStrokeWidth"));
+		appearance.nodeShapes = {
+			concept: formValue(values, "conceptShape") as GraphraumNodeShape,
+			document: formValue(values, "documentShape") as GraphraumNodeShape,
+			person: formValue(values, "personShape") as GraphraumNodeShape,
+		};
+		appearance.edgePath = formValue(values, "edgePath") as GraphraumEdgePath;
+		appearance.edgeStyle = formValue(values, "edgeStyle") as GraphraumEdgeStyle;
+		appearance.edgeMarker = formValue(values, "edgeMarker") as GraphraumEdgeMarker;
+		appearance.edgeMarkerEnd = formValue(values, "edgeMarkerEnd") as GraphraumEdgeMarkerEnd;
+		appearance.edgeWidth = Number(formValue(values, "edgeWidth"));
+		appearance.edgeOpacity = Number(formValue(values, "edgeOpacity"));
+		return {
+			...appearance,
+			layout: formValue(values, "layout") as LayoutName,
+			mode: formValue(values, "mode") as GraphraumMode,
+		};
+	}
+
+	function forceEdges(edges: readonly { source: string; target: string }[]) {
+		const result = new Uint32Array(edges.length * 2);
+		for (const [index, edge] of edges.entries()) {
+			result[index * 2] = Number(edge.source.slice(5));
+			result[index * 2 + 1] = Number(edge.target.slice(5));
+		}
+		return result;
+	}
+
+	function applyLayout(layout: LayoutName, edges: readonly { source: string; target: string }[], nodeCount: number, mode: GraphraumMode) {
+		if (layout === "grid" || !graph) return;
+		const run = ++layoutRun;
+		status.textContent = `Computing ${layout} layout…`;
+		const packedEdges = layout === "force" || layout === "force-live" ? forceEdges(edges) : undefined;
+		const transfer = packedEdges?.buffer ? [packedEdges.buffer] : [];
+		layoutWorker.postMessage(
+			{
+				batchSize: Math.max(1_000, Math.ceil(nodeCount / 8)),
+				dimensions: mode === "2d" ? 2 : 3,
+				edges: packedEdges,
+				layout,
+				maxFps: 30,
+				nodeCount,
+				run,
+				settings: DEFAULT_FORCE_SETTINGS,
+				type: "start",
+			},
+			transfer,
+		);
+	}
+
+	layoutWorker.addEventListener("message", ({ data }: MessageEvent<LayoutWorkerMessage>) => {
+		if (data.run !== layoutRun || !graph) return;
+		if (data.type === "positions") {
+			const start = data.end - data.positions.length / 3;
+			const nodeIds = Array.from({ length: data.positions.length / 3 }, (_, index) => `node-${start + index}`);
+			graph.applyLayout({ nodeIds, positions: data.positions });
+			if (currentLayout === "force-live" && liveFittedRun !== data.run) {
+				liveFittedRun = data.run;
+				graph.fitView();
+			}
+			status.textContent = `${currentLayout} · ${data.end.toLocaleString()} / ${currentNodeCount.toLocaleString()} nodes`;
+			if (currentLayout !== "force-live") {
+				requestAnimationFrame(() => {
+					if (data.run === layoutRun) layoutWorker.postMessage({ run: data.run, type: "next" });
+				});
+			}
+			return;
+		}
+		graph.fitView();
+		status.textContent = `${currentNodeCount.toLocaleString()} nodes · ${currentMode.toUpperCase()} · ${currentLayout}`;
+	});
+
+	function mount() {
+		const state = readAppearance();
+		layoutRun += 1;
+		liveFittedRun = -1;
+		currentLayout = state.layout;
+		currentMode = state.mode;
+		currentNodeCount = state.nodeCount;
+		graph?.destroy();
+		const next = new Graphraum(container, {
+			mode: state.mode,
+			maxPixelRatio: 1,
+			visuals: createPlaygroundVisuals(state),
+		});
+		const data = createPlaygroundFixture(state.nodeCount);
+		next.setData(data);
+		graph = next;
+		status.textContent =
+			state.layout === "grid"
+				? `${state.nodeCount.toLocaleString()} nodes · ${state.mode.toUpperCase()} · grid`
+				: `Computing ${state.layout} layout…`;
+		if (state.layout !== "grid") applyLayout(state.layout, data.edges, state.nodeCount, state.mode);
+	}
+
+	form.addEventListener("change", () => mount());
+	window.addEventListener("beforeunload", () => layoutWorker.terminate());
+	mount();
+</script>

@@ -542,6 +542,18 @@
 	color: var(--sl-color-white);
 }
 
+a.playground-tab-link {
+	align-items: center;
+	color: var(--sl-color-gray-3);
+	display: flex;
+	justify-content: center;
+	text-decoration: none;
+}
+
+a.playground-tab-link:hover {
+	color: var(--sl-color-white);
+}
+
 .playground-panel[hidden] {
 	display: none;
 }
@@ -1183,5 +1195,174 @@
 	.demo-route-grid > a + a {
 		border-left: 0;
 		border-top: 1px solid var(--graphraum-border);
+	}
+}
+
+/* Fullscreen Explorer (/explore/) — covers Starlight chrome */
+html.explore-page,
+html.explore-page body {
+	height: 100%;
+	overflow: hidden;
+}
+
+.explorer-shell {
+	--sl-color-white: #fcfffc;
+	--sl-color-gray-2: #d7e2dc;
+	--sl-color-gray-3: #9bb0a7;
+	--sl-color-gray-5: #28453c;
+	background: #040f0f;
+	color: var(--sl-color-white);
+	display: grid;
+	grid-template-columns: min(19rem, 34vw) minmax(0, 1fr);
+	inset: 0;
+	position: fixed;
+	z-index: 200;
+}
+
+.explorer-sidebar {
+	background: #081916;
+	border-right: 1px solid var(--sl-color-gray-5);
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.explorer-brand {
+	border-bottom: 1px solid var(--sl-color-gray-5);
+	padding: 1.1rem 1.15rem 1rem;
+}
+
+.explorer-brand h1 {
+	font-size: 1.45rem;
+	font-weight: 800;
+	letter-spacing: -0.035em;
+	line-height: 1.15;
+	margin: 0.15rem 0 0.35rem;
+}
+
+.explorer-eyebrow {
+	color: #73c7a5;
+	font-size: 0.68rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.explorer-lede {
+	color: var(--sl-color-gray-3);
+	font-size: 0.8rem;
+	line-height: 1.4;
+	margin: 0;
+}
+
+.explorer-controls {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 0;
+	min-height: 0;
+	overflow: auto;
+}
+
+.explorer-controls > section {
+	border-bottom: 1px solid var(--sl-color-gray-5);
+	display: grid;
+	gap: 0.65rem;
+	padding: 0.9rem 1.15rem;
+}
+
+.explorer-controls h2 {
+	color: var(--sl-color-gray-3);
+	font-size: 0.68rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.explorer-controls label {
+	display: grid;
+	gap: 0.3rem;
+}
+
+.explorer-controls label span {
+	color: var(--sl-color-gray-2);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.explorer-controls select {
+	background: #040f0f;
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 0.45rem;
+	color: var(--sl-color-white);
+	font: inherit;
+	min-height: 2.25rem;
+	padding: 0.35rem 0.55rem;
+}
+
+.explorer-footer {
+	border-top: 1px solid var(--sl-color-gray-5);
+	display: grid;
+	gap: 0.65rem;
+	padding: 0.85rem 1.15rem 1rem;
+}
+
+.explorer-footer p {
+	color: var(--sl-color-gray-3);
+	font-size: 0.72rem;
+	line-height: 1.4;
+	margin: 0;
+}
+
+.explorer-links {
+	display: flex;
+	gap: 0.75rem;
+}
+
+.explorer-links a {
+	color: #73c7a5;
+	font-size: 0.8rem;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.explorer-links a:hover {
+	text-decoration: underline;
+}
+
+.explorer-stage {
+	display: grid;
+	grid-template-rows: 1fr auto;
+	min-height: 0;
+	min-width: 0;
+}
+
+.explorer-graph {
+	height: 100%;
+	min-height: 0;
+	width: 100%;
+}
+
+.explorer-hint {
+	background: #0d211c;
+	border-top: 1px solid var(--sl-color-gray-5);
+	color: var(--sl-color-gray-3);
+	font-size: 0.72rem;
+	margin: 0;
+	padding: 0.55rem 1rem;
+}
+
+@media (max-width: 52rem) {
+	.explorer-shell {
+		grid-template-columns: 1fr;
+		grid-template-rows: min(42vh, 20rem) minmax(0, 1fr);
+	}
+
+	.explorer-sidebar {
+		border-bottom: 1px solid var(--sl-color-gray-5);
+		border-right: 0;
 	}
 }
