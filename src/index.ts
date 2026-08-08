@@ -1,3 +1,4 @@
+export { graphraumEdgePaths } from "./edge-styles";
 export type { ForceLayoutRequest, ForceSettings } from "./force-layout";
 export {
 	computeClusteredForcePositions,
@@ -22,6 +23,7 @@ export type {
 	GraphraumEdgeEncoding,
 	GraphraumEdgeMarker,
 	GraphraumEdgeMarkerEnd,
+	GraphraumEdgePath,
 	GraphraumEdgeStyle,
 	GraphraumEdgeVisual,
 	GraphraumLayoutPositions,

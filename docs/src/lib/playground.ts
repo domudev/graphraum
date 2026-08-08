@@ -2,6 +2,7 @@ import type {
 	GraphraumData,
 	GraphraumEdgeMarker,
 	GraphraumEdgeMarkerEnd,
+	GraphraumEdgePath,
 	GraphraumEdgeStyle,
 	GraphraumNodeShape,
 } from "../../../src/types";
@@ -23,6 +24,7 @@ export interface PlaygroundAppearance {
 	edgeMarker: GraphraumEdgeMarker;
 	edgeMarkerEnd: GraphraumEdgeMarkerEnd;
 	edgeOpacity: number;
+	edgePath: GraphraumEdgePath;
 	edgeStyle: GraphraumEdgeStyle;
 	edgeWidth: number;
 	nodeAspect: number;
@@ -50,6 +52,7 @@ export const defaultPlaygroundAppearance = (): PlaygroundAppearance => ({
 	edgeMarker: "none",
 	edgeMarkerEnd: "target",
 	edgeOpacity: 0.85,
+	edgePath: "straight",
 	edgeStyle: "solid",
 	edgeWidth: 1.5,
 	nodeAspect: 1,
@@ -108,6 +111,7 @@ export function createPlaygroundVisuals(appearance: PlaygroundAppearance) {
 				marker: appearance.edgeMarker,
 				markerEnd: appearance.edgeMarkerEnd,
 				opacity: appearance.edgeOpacity,
+				path: appearance.edgePath,
 				style: appearance.edgeStyle,
 				width: appearance.edgeWidth,
 			},

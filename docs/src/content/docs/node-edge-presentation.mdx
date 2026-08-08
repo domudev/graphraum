@@ -102,7 +102,7 @@ The mapper result overrides direct `color`, `shape`, `size`, `width`, `height`, 
 
 `size` is shorthand for a square node: `width` and `height` default to `size` (or `4` world units) when omitted, so most nodes only ever set `size`. Set `width` and `height` independently for non-square footprints such as the `pill`-shaped place node above. `strokeWidth` (world units, `0` by default) draws an SDF ring around the shape's outer edge; `strokeColor` falls back to `theme.nodeStroke` when the node sets a `strokeWidth` but no color. Picking and the spatial grid already account for the outer boundary, so a stroked node is exactly as clickable as its rendered outline.
 
-Edge `visual` fields work the same way: `color`, `width`, `opacity`, `style` (`solid`, `dashed`, `dotted`), `marker` (`none`, `triangle`), `markerSize`, and `markerEnd` (`target`, `source`, `both`) override direct edge snapshot fields. Coordinates never live on the edge—they come from the source and target node positions, so moving a node moves every incident edge automatically.
+Edge `visual` fields work the same way: `color`, `width`, `opacity`, `style` (`solid`, `dashed`, `dotted`), `marker` (`none`, `triangle`), `markerSize`, `markerEnd` (`target`, `source`, `both`), `path` (`straight`, `quadratic`, `cubic`), and optional `controlPoints` override direct edge snapshot fields. Omit `controlPoints` to use auto-derived handles; provide exactly one point for `quadratic` or two for `cubic`. Endpoints come from the source and target node positions, so moving a node moves every incident edge automatically. Overview LOD forces straight segments.
 
 ## Render detail only when needed
 

@@ -28,6 +28,12 @@ const edgeMarkerEnds = [
 	{ label: "Both", value: "both" },
 ];
 
+const edgePaths = [
+	{ label: "Straight", value: "straight" },
+	{ label: "Quadratic", value: "quadratic" },
+	{ label: "Cubic", value: "cubic" },
+];
+
 function NumberField(label: string, name: string, value: number, min: number, max?: number, step?: number) {
 	return Field(label, Input({ max, min, name, step, type: "number", value }));
 }
@@ -99,6 +105,7 @@ export function renderControls(form: HTMLFormElement) {
 			Slider("Edge width", "edgeWidth", graphraumTheme.edgeWidth, 0.5, 6, 0.25),
 			Slider("Edge opacity", "edgeOpacity", graphraumTheme.edgeOpacity, 0, 1, 0.05),
 			SelectField("Edge style", "edgeStyle", "solid", edgeStyles),
+			SelectField("Edge path", "edgePath", "straight", edgePaths),
 			SelectField("Edge marker", "edgeMarker", "none", edgeMarkers),
 			SelectField("Marker end", "edgeMarkerEnd", "target", edgeMarkerEnds),
 		),

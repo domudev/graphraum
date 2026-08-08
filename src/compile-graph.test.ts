@@ -302,6 +302,8 @@ describe("compileGraph", () => {
 					marker: "triangle",
 					markerSize: 1.5,
 					markerEnd: "both",
+					path: "quadratic",
+					controlPoints: [{ x: 0.5, y: 1 }],
 				},
 			],
 		});
@@ -313,8 +315,33 @@ describe("compileGraph", () => {
 				marker: "triangle",
 				markerSize: 1.5,
 				markerEnd: "both",
+				path: "quadratic",
+				controlPoints: [{ x: 0.5, y: 1 }],
 			},
 		]);
+	});
+
+	test("rejects quadratic edges with the wrong control point count", () => {
+		expect(() =>
+			compileGraph({
+				nodes: [
+					{ id: "a", position: { x: 0, y: 0 } },
+					{ id: "b", position: { x: 1, y: 0 } },
+				],
+				edges: [
+					{
+						id: "a-b",
+						source: "a",
+						target: "b",
+						path: "quadratic",
+						controlPoints: [
+							{ x: 0, y: 1 },
+							{ x: 1, y: 1 },
+						],
+					},
+				],
+			}),
+		).toThrow(/a-b.*expects 1 control point/);
 	});
 
 	test("rejects invalid edge opacity", () => {

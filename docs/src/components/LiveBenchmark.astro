@@ -100,6 +100,14 @@ const shapeOptions = [
 				</select>
 			</label>
 			<label>
+				<span>Edge path</span>
+				<select name="edgePath">
+					<option value="straight" selected>Straight</option>
+					<option value="quadratic">Quadratic</option>
+					<option value="cubic">Cubic</option>
+				</select>
+			</label>
+			<label>
 				<span>Edge marker</span>
 				<select name="edgeMarker">
 					<option value="none" selected>None</option>
@@ -236,6 +244,7 @@ const shapeOptions = [
 		Graphraum,
 		type GraphraumEdgeMarker,
 		type GraphraumEdgeMarkerEnd,
+		type GraphraumEdgePath,
 		type GraphraumEdgeStyle,
 		type GraphraumMode,
 		type GraphraumNodeShape,
@@ -357,6 +366,7 @@ const shapeOptions = [
 			person: formValue(values, "personShape") as GraphraumNodeShape,
 		};
 		appearance.edgeStyle = formValue(values, "edgeStyle") as GraphraumEdgeStyle;
+		appearance.edgePath = formValue(values, "edgePath") as GraphraumEdgePath;
 		appearance.edgeMarker = formValue(values, "edgeMarker") as GraphraumEdgeMarker;
 		appearance.edgeMarkerEnd = formValue(values, "edgeMarkerEnd") as GraphraumEdgeMarkerEnd;
 		appearance.edgeWidth = Number(formValue(values, "edgeWidth"));
