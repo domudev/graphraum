@@ -34,6 +34,7 @@ export function prepareLayoutPositions<NodeAttributes = undefined>(
 			positionChanged: true,
 			shapeChanged: false,
 			sizeChanged: false,
+			strokeChanged: false,
 		};
 	});
 }

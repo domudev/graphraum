@@ -1,3 +1,4 @@
+import { resolveNodeAxes } from "./node-axes";
 import { containsNodePoint } from "./node-shapes";
 import type { GraphraumNodeGeometry } from "./types";
 
@@ -6,6 +7,21 @@ export interface Bounds2D {
 	left: number;
 	right: number;
 	top: number;
+}
+
+function nodeAxes(node: GraphraumNodeGeometry) {
+	return resolveNodeAxes({ height: node.height, nodeId: node.id, size: node.size, width: node.width });
+}
+
+/**
+ * Coarse occupancy radius for cell bucketing and bounding-box checks: half of the node's
+ * larger axis, padded by its world-unit `strokeWidth`. This is intentionally conservative
+ * (a circle-equivalent bound around a possibly non-square shape) — exact hit testing in
+ * `pick` uses the true `width`/`height` per axis via `containsNodePoint`.
+ */
+function nodeOccupancyRadius(node: GraphraumNodeGeometry): number {
+	const { height, width } = nodeAxes(node);
+	return Math.max(width, height) + (node.strokeWidth ?? 0);
 }
 
 /** A mutable uniform grid shared by 2D picking and viewport visibility queries. */
@@ -36,7 +52,7 @@ export class SpatialGrid2D {
 		this.cells.set(key, cell);
 		this.cellKeys[index] = key;
 		this.nodes[index] = node;
-		this.maxRadius = Math.max(this.maxRadius, node.size ?? 4);
+		this.maxRadius = Math.max(this.maxRadius, nodeOccupancyRadius(node));
 	}
 
 	pick(x: number, y: number): number | null {
@@ -51,11 +67,11 @@ export class SpatialGrid2D {
 				for (const index of this.cells.get(this.key(cellX, cellY)) ?? []) {
 					const node = this.nodes[index];
 					if (!node) continue;
-					const radius = node.size ?? 4;
+					const { height, width } = nodeAxes(node);
 					const offsetX = node.position.x - x;
 					const offsetY = node.position.y - y;
 					const distance = offsetX ** 2 + offsetY ** 2;
-					if (containsNodePoint(node.shape, offsetX / radius, offsetY / radius) && distance < nearestDistance) {
+					if (containsNodePoint(node.shape, offsetX / width, offsetY / height) && distance < nearestDistance) {
 						nearestDistance = distance;
 						nearestIndex = index;
 					}
@@ -84,7 +100,7 @@ export class SpatialGrid2D {
 			for (const index of cell) {
 				const node = this.nodes[index];
 				if (!node) continue;
-				const radius = node.size ?? 4;
+				const radius = nodeOccupancyRadius(node);
 				if (
 					node.position.x + radius >= left &&
 					node.position.x - radius <= right &&
