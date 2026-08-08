@@ -1,149 +1,31 @@
 ---
-const shapeOptions = [
-	{ label: "Circle", value: "circle" },
-	{ label: "Square", value: "square" },
-	{ label: "Diamond", value: "diamond" },
-	{ label: "Hexagon", value: "hexagon" },
-	{ label: "Triangle", value: "triangle" },
-	{ label: "Pill", value: "pill" },
-	{ label: "Rounded", value: "rounded" },
-] as const;
+const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 ---
 
 <section class="benchmark-shell not-content" aria-labelledby="benchmark-title">
 	<header class="benchmark-header">
 		<div>
 			<p class="benchmark-eyebrow"><span aria-hidden="true"></span> Runs locally on this device</p>
-			<h2 id="benchmark-title">graphraum playground</h2>
+			<h2 id="benchmark-title">graphraum proof lab</h2>
 		</div>
-		<p>Explore appearance live · prove timing when you need evidence</p>
+		<p>Timed protocol · complete result · no telemetry</p>
 	</header>
 
 	<div class="playground-tabs" role="tablist" aria-label="Playground mode">
-		<button id="tab-explore" class="playground-tab" type="button" role="tab" aria-selected="true" aria-controls="panel-explore" tabindex="0">Explore</button>
-		<button id="tab-prove" class="playground-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-prove" tabindex="-1">Prove</button>
+		<a id="tab-explore" class="playground-tab playground-tab-link" href={exploreHref}>Explorer</a>
+		<button id="tab-prove" class="playground-tab" type="button" role="tab" aria-selected="true" aria-controls="panel-prove" tabindex="0">Prove</button>
 	</div>
 
 	<div class="benchmark-stage">
 		<div class="benchmark-stage-bar">
 			<span><i aria-hidden="true"></i> Live viewport</span>
-			<span id="benchmark-stage-mode">2D · explore</span>
+			<span id="benchmark-stage-mode">2D · ready</span>
 		</div>
 		<div id="benchmark-graph" class="benchmark-graph" aria-label="Interactive graphraum viewport"></div>
 		<p class="benchmark-interaction">Drag to pan · scroll to zoom · select a node</p>
 	</div>
 
-	<div id="panel-explore" class="playground-panel" role="tabpanel" aria-labelledby="tab-explore">
-		<form id="explore-controls" class="benchmark-controls playground-explore-controls" aria-label="Explore appearance">
-			<label>
-				<span>Graph size</span>
-				<select name="nodeCount">
-					<option value="100">100 nodes</option>
-					<option value="1000" selected>1,000 nodes · 3,000 edges</option>
-					<option value="10000">10,000 nodes · 30,000 edges</option>
-				</select>
-			</label>
-			<label>
-				<span>Dimension</span>
-				<select name="mode">
-					<option value="2d">2D</option>
-					<option value="3d">3D</option>
-				</select>
-			</label>
-			<label>
-				<span>Concept shape</span>
-				<select name="conceptShape">
-					{shapeOptions.map((option) => (
-						<option value={option.value} selected={option.value === "diamond"}>{option.label}</option>
-					))}
-				</select>
-			</label>
-			<label>
-				<span>Document shape</span>
-				<select name="documentShape">
-					{shapeOptions.map((option) => (
-						<option value={option.value} selected={option.value === "square"}>{option.label}</option>
-					))}
-				</select>
-			</label>
-			<label>
-				<span>Person shape</span>
-				<select name="personShape">
-					{shapeOptions.map((option) => (
-						<option value={option.value} selected={option.value === "circle"}>{option.label}</option>
-					))}
-				</select>
-			</label>
-			<label>
-				<span>Aspect</span>
-				<select name="nodeAspect">
-					<option value="0.7">Tall 0.7</option>
-					<option value="1" selected>Square 1.0</option>
-					<option value="1.6">Wide 1.6</option>
-				</select>
-			</label>
-			<label>
-				<span>Stroke width</span>
-				<select name="nodeStrokeWidth">
-					<option value="0" selected>None</option>
-					<option value="0.5">0.5</option>
-					<option value="1">1.0</option>
-					<option value="1.5">1.5</option>
-				</select>
-			</label>
-			<label>
-				<span>Edge style</span>
-				<select name="edgeStyle">
-					<option value="solid" selected>Solid</option>
-					<option value="dashed">Dashed</option>
-					<option value="dotted">Dotted</option>
-				</select>
-			</label>
-			<label>
-				<span>Edge path</span>
-				<select name="edgePath">
-					<option value="straight" selected>Straight</option>
-					<option value="quadratic">Quadratic</option>
-					<option value="cubic">Cubic</option>
-				</select>
-			</label>
-			<label>
-				<span>Edge marker</span>
-				<select name="edgeMarker">
-					<option value="none" selected>None</option>
-					<option value="triangle">Triangle</option>
-				</select>
-			</label>
-			<label>
-				<span>Marker end</span>
-				<select name="edgeMarkerEnd">
-					<option value="target" selected>Target</option>
-					<option value="source">Source</option>
-					<option value="both">Both</option>
-				</select>
-			</label>
-			<label>
-				<span>Edge width</span>
-				<select name="edgeWidth">
-					<option value="1">1</option>
-					<option value="1.5" selected>1.5</option>
-					<option value="3">3</option>
-					<option value="5">5</option>
-				</select>
-			</label>
-			<label>
-				<span>Edge opacity</span>
-				<select name="edgeOpacity">
-					<option value="0.4">0.4</option>
-					<option value="0.85" selected>0.85</option>
-					<option value="1">1.0</option>
-				</select>
-			</label>
-		</form>
-		<p id="explore-status" class="playground-explore-status" aria-live="polite">Live graph · change a control to rematerialize visuals.</p>
-	</div>
-
-	<div id="panel-prove" class="playground-panel" role="tabpanel" aria-labelledby="tab-prove" hidden>
+	<div id="panel-prove" class="playground-panel" role="tabpanel" aria-labelledby="tab-prove">
 		<div class="benchmark-controls" aria-label="Benchmark configuration">
 			<label class="benchmark-fixture">
 				<span>Graph size</span>
@@ -240,15 +122,7 @@ const shapeOptions = [
 </section>
 
 <script>
-	import {
-		Graphraum,
-		type GraphraumEdgeMarker,
-		type GraphraumEdgeMarkerEnd,
-		type GraphraumEdgePath,
-		type GraphraumEdgeStyle,
-		type GraphraumMode,
-		type GraphraumNodeShape,
-	} from "@domudev/graphraum";
+	import { Graphraum, type GraphraumMode } from "@domudev/graphraum";
 	import { createFixture, effectivePixelRatio, summarize } from "../lib/benchmark";
 	import {
 		appendHistory,
@@ -258,15 +132,8 @@ const shapeOptions = [
 		type BenchmarkHistoryEntry,
 		type BenchmarkHistoryMetric,
 	} from "../lib/benchmark-history";
-	import {
-		createPlaygroundFixture,
-		createPlaygroundVisuals,
-		defaultPlaygroundAppearance,
-		type PlaygroundAppearance,
-	} from "../lib/playground";
 
 	type MemoryPerformance = Performance & { memory?: { usedJSHeapSize: number } };
-	type PlaygroundTab = "explore" | "prove";
 
 	function requireElement<ElementType extends Element>(selector: string) {
 		const element = document.querySelector<ElementType>(selector);
@@ -307,13 +174,6 @@ const shapeOptions = [
 
 	const container = requireElement<HTMLElement>("#benchmark-graph");
 	const stageMode = requireElement<HTMLElement>("#benchmark-stage-mode");
-	const tabExplore = requireElement<HTMLButtonElement>("#tab-explore");
-	const tabProve = requireElement<HTMLButtonElement>("#tab-prove");
-	const panelExplore = requireElement<HTMLElement>("#panel-explore");
-	const panelProve = requireElement<HTMLElement>("#panel-prove");
-	const exploreForm = requireElement<HTMLFormElement>("#explore-controls");
-	const exploreStatus = requireElement<HTMLElement>("#explore-status");
-
 	const sizeSelect = requireElement<HTMLSelectElement>("#benchmark-size");
 	const modeSelect = requireElement<HTMLSelectElement>("#benchmark-mode");
 	const pixelRatioSelect = requireElement<HTMLSelectElement>("#benchmark-pixel-ratio");
@@ -344,72 +204,11 @@ const shapeOptions = [
 	const historyCount = requireElement<HTMLElement>("#benchmark-history-count");
 
 	let graph: { destroy: () => void } | null = null;
-	let activeTab: PlaygroundTab = "explore";
 	let result = "";
-	let measuring = false;
-
-	function formValue(values: FormData, name: string) {
-		const value = values.get(name);
-		if (typeof value !== "string") throw new Error(`Missing explore control: ${name}`);
-		return value;
-	}
-
-	function readExploreAppearance(): { appearance: PlaygroundAppearance; mode: GraphraumMode } {
-		const values = new FormData(exploreForm);
-		const appearance = defaultPlaygroundAppearance();
-		appearance.nodeCount = Number(formValue(values, "nodeCount"));
-		appearance.nodeAspect = Number(formValue(values, "nodeAspect"));
-		appearance.nodeStrokeWidth = Number(formValue(values, "nodeStrokeWidth"));
-		appearance.nodeShapes = {
-			concept: formValue(values, "conceptShape") as GraphraumNodeShape,
-			document: formValue(values, "documentShape") as GraphraumNodeShape,
-			person: formValue(values, "personShape") as GraphraumNodeShape,
-		};
-		appearance.edgeStyle = formValue(values, "edgeStyle") as GraphraumEdgeStyle;
-		appearance.edgePath = formValue(values, "edgePath") as GraphraumEdgePath;
-		appearance.edgeMarker = formValue(values, "edgeMarker") as GraphraumEdgeMarker;
-		appearance.edgeMarkerEnd = formValue(values, "edgeMarkerEnd") as GraphraumEdgeMarkerEnd;
-		appearance.edgeWidth = Number(formValue(values, "edgeWidth"));
-		appearance.edgeOpacity = Number(formValue(values, "edgeOpacity"));
-		return { appearance, mode: formValue(values, "mode") as GraphraumMode };
-	}
 
 	function destroyGraph() {
 		graph?.destroy();
 		graph = null;
-	}
-
-	function mountExplore() {
-		if (measuring || activeTab !== "explore") return;
-		const { appearance, mode } = readExploreAppearance();
-		destroyGraph();
-		const next = new Graphraum(container, {
-			mode,
-			maxPixelRatio: 1,
-			visuals: createPlaygroundVisuals(appearance),
-		});
-		next.setData(createPlaygroundFixture(appearance.nodeCount));
-		graph = next;
-		stageMode.textContent = `${mode.toUpperCase()} · explore`;
-		exploreStatus.textContent = `${appearance.nodeCount.toLocaleString()} nodes · ${mode.toUpperCase()} · shapes, stroke, and edge styles rematerialize on change.`;
-	}
-
-	function setActiveTab(next: PlaygroundTab) {
-		if (measuring && next === "explore") return;
-		activeTab = next;
-		const exploreActive = next === "explore";
-		tabExplore.setAttribute("aria-selected", String(exploreActive));
-		tabProve.setAttribute("aria-selected", String(!exploreActive));
-		tabExplore.tabIndex = exploreActive ? 0 : -1;
-		tabProve.tabIndex = exploreActive ? -1 : 0;
-		panelExplore.hidden = !exploreActive;
-		panelProve.hidden = exploreActive;
-		if (exploreActive) {
-			mountExplore();
-		} else {
-			destroyGraph();
-			stageMode.textContent = `${modeSelect.value.toUpperCase()} · ready`;
-		}
 	}
 
 	function loadHistory() {
@@ -490,9 +289,6 @@ const shapeOptions = [
 		}
 	}
 
-	tabExplore.addEventListener("click", () => setActiveTab("explore"));
-	tabProve.addEventListener("click", () => setActiveTab("prove"));
-	exploreForm.addEventListener("change", () => mountExplore());
 	sizeSelect.addEventListener("change", renderHistory);
 	historyMetric.addEventListener("change", renderHistory);
 	historyClear.addEventListener("click", () => {
@@ -506,7 +302,6 @@ const shapeOptions = [
 		renderHistory();
 	});
 	renderHistory();
-	mountExplore();
 
 	copyButton.addEventListener("click", async () => {
 		await navigator.clipboard.writeText(result);
@@ -515,11 +310,8 @@ const shapeOptions = [
 	});
 
 	runButton.addEventListener("click", async () => {
-		if (activeTab !== "prove") setActiveTab("prove");
-		measuring = true;
 		runButton.disabled = true;
 		copyButton.disabled = true;
-		tabExplore.disabled = true;
 		stageMode.textContent = `${modeSelect.value.toUpperCase()} · measuring`;
 		status.textContent = "Running… keep this tab visible for representative frame timing.";
 		output.textContent = "Collecting browser measurements…";
@@ -668,9 +460,7 @@ const shapeOptions = [
 			status.textContent = `Benchmark failed: ${message}`;
 			output.textContent = message;
 		} finally {
-			measuring = false;
 			runButton.disabled = false;
-			tabExplore.disabled = false;
 		}
 	});
 </script>
