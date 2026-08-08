@@ -12,7 +12,7 @@ import VersionReference from "../../components/VersionReference.astro";
 Prefer proof over snippets? Run the same contract across three domains in the [interactive demos](../demos/).
 
 <div class="presentation-contract not-content">
-  <div><strong>GPU visual</strong><span>Always cheap</span><p>Node color, shape, and size plus edge color are compiled into the existing two batched draw calls.</p></div>
+  <div><strong>GPU visual</strong><span>Always cheap</span><p>Node color, shape, and size plus edge color, width, opacity, style, and markers are compiled into the existing two batched draw calls.</p></div>
   <div><strong>Presentation</strong><span>On demand</span><p>Titles, subtitles, properties, and action descriptors stay available by ID for your focused or selected UI.</p></div>
   <div><strong>Application</strong><span>Owns behavior</span><p>Your framework renders accessible HTML and decides what an action ID does. The engine never stores callbacks.</p></div>
 </div>
@@ -52,7 +52,14 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
     },
   }),
   edge: (edge) => ({
-    visual: { color: "#226f54" },
+    visual: {
+      color: "#226f54",
+      width: 2,
+      opacity: 0.85,
+      style: "dashed",
+      marker: "triangle",
+      markerEnd: "target",
+    },
     presentation: { title: edge.attributes.relationship },
   }),
 });
@@ -90,6 +97,8 @@ graph.setData({
 ```
 
 The mapper result overrides direct `color`, `shape`, and `size` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API. Built-in `circle`, `square`, and `diamond` shapes share one instanced billboard geometry and one node draw call in both 2D and 3D.
+
+Edge `visual` fields work the same way: `color`, `width`, `opacity`, `style` (`solid`, `dashed`, `dotted`), `marker` (`none`, `triangle`), `markerSize`, and `markerEnd` (`target`, `source`, `both`) override direct edge snapshot fields. Coordinates never live on the edge—they come from the source and target node positions, so moving a node moves every incident edge automatically.
 
 ## Render detail only when needed
 

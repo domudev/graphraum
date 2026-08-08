@@ -2,6 +2,9 @@ import type { ForceSettings } from "../../src";
 import {
 	defineVisuals,
 	Graphraum,
+	type GraphraumEdgeMarker,
+	type GraphraumEdgeMarkerEnd,
+	type GraphraumEdgeStyle,
 	type GraphraumMode,
 	type GraphraumNodeShape,
 	type GraphraumOptions,
@@ -27,6 +30,11 @@ type LayoutWorkerMessage =
 
 interface LabState extends FixtureOptions {
 	antialias: boolean;
+	edgeMarker: GraphraumEdgeMarker;
+	edgeMarkerEnd: GraphraumEdgeMarkerEnd;
+	edgeStyle: GraphraumEdgeStyle;
+	edgeOpacity: number;
+	edgeWidth: number;
 	forceMaxFps: number;
 	forceSettings: ForceSettings;
 	layout: LayoutName;
@@ -91,7 +99,12 @@ function readState(): LabState {
 			mentions: formValue(values, "mentionsColor"),
 			related: formValue(values, "relatedColor"),
 		},
+		edgeMarker: formValue(values, "edgeMarker") as GraphraumEdgeMarker,
+		edgeMarkerEnd: formValue(values, "edgeMarkerEnd") as GraphraumEdgeMarkerEnd,
 		edgeMultiplier: scaleMode === "million-density" ? 0.1 : scaleMode === "million-literal" ? 0 : 3,
+		edgeOpacity: formNumber(values, "edgeOpacity"),
+		edgeStyle: formValue(values, "edgeStyle") as GraphraumEdgeStyle,
+		edgeWidth: formNumber(values, "edgeWidth"),
 		encoding: formValue(values, "encoding") as Encoding,
 		forceMaxFps: formNumber(values, "forceMaxFps"),
 		forceSettings: {
@@ -163,7 +176,16 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 			title: `${edge.attributes.kind} ${edge.id}`,
 		},
 		...(state.encoding === "mapper" && !edge.attributes.useTheme
-			? { visual: { color: state.edgeColors[edge.attributes.kind] } }
+			? {
+					visual: {
+						color: state.edgeColors[edge.attributes.kind],
+						marker: state.edgeMarker,
+						markerEnd: state.edgeMarkerEnd,
+						opacity: state.edgeOpacity,
+						style: state.edgeStyle,
+						width: state.edgeWidth,
+					},
+				}
 			: {}),
 	}),
 });
@@ -178,6 +200,7 @@ function renderDiagnostics() {
 		["Visible nodes", `${values.visibleNodes.toLocaleString()} / ${values.totalNodes.toLocaleString()}`],
 		["Edge candidates", values.visibleEdgeCandidates.toLocaleString()],
 		["Visible edges", `${values.visibleEdges.toLocaleString()} / ${values.totalEdges.toLocaleString()}`],
+		["Visible edge markers", values.visibleEdgeMarkers.toLocaleString()],
 	]);
 }
 

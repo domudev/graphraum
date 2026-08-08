@@ -75,12 +75,34 @@ interface GraphraumEdge {
   source: string;
   target: string;
   color?: string | number;
+  width?: number;
+  opacity?: number;
+  style?: "solid" | "dashed" | "dotted";
+  marker?: "none" | "triangle";
+  markerSize?: number;
+  markerEnd?: "target" | "source" | "both";
 }
 ```
 
-Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node sizes must be positive. Positions and sizes use world units.
+Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node sizes must be positive. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
 
-Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, and size, edge color, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, and size, edge color, width, opacity, style, and markers, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
+
+## Edge visuals
+
+```ts
+interface GraphraumEdgeVisual {
+  color?: string | number;
+  width?: number;
+  opacity?: number;
+  style?: "solid" | "dashed" | "dotted";
+  marker?: "none" | "triangle";
+  markerSize?: number;
+  markerEnd?: "target" | "source" | "both";
+}
+```
+
+`defineVisuals()` maps typed edge attributes to this contract; direct edge fields use the same shape without a mapper. `style` selects a dash pattern, `marker` draws a triangle at `markerEnd` (`target` by default), and `markerSize` scales the triangle relative to `width`. Edge coordinates always come from the source and target node positions—`GraphraumEdgeVisual` never carries a position. See [Node & edge presentation](../node-edge-presentation/) for the full contract.
 
 ## Data and updates
 
@@ -185,11 +207,11 @@ Missing coordinates default to zero so layout does not block the first render. M
 
 ```ts
 const graph = new Graphraum(container, {
-  theme: { ...graphraumTheme, selectedNode: "#73c7a5" },
+  theme: { ...graphraumTheme, edgeWidth: 2, selectedNode: "#73c7a5" },
 });
 ```
 
-See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
+`edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
 
 ## Diagnostics
 
@@ -209,11 +231,13 @@ interface GraphraumDiagnostics {
   pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
   totalEdges: number;
   totalNodes: number;
-  visibleNodeCandidates: number;
   visibleEdgeCandidates: number;
+  visibleEdgeMarkers: number;
+  visibleEdgeSegments: number;
   visibleEdges: number;
   visibleNodes: number;
+  visibleNodeCandidates: number;
 }
 ```
 
-Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them.
+Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them. `visibleEdgeSegments` counts rendered edge lines and `visibleEdges` is an alias for it; `visibleEdgeMarkers` counts rendered direction triangles, which the overview LOD tier drops first.

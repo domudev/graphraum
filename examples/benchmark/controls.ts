@@ -1,10 +1,27 @@
-import { DEFAULT_FORCE_SETTINGS } from "../../src";
+import { DEFAULT_FORCE_SETTINGS, graphraumTheme } from "../../src";
 import { Checkbox, Color, Field, Input, Section, Select, Slider } from "./ui";
 
 const shapes = [
 	{ label: "Circle", value: "circle" },
 	{ label: "Square", value: "square" },
 	{ label: "Diamond", value: "diamond" },
+];
+
+const edgeStyles = [
+	{ label: "Solid", value: "solid" },
+	{ label: "Dashed", value: "dashed" },
+	{ label: "Dotted", value: "dotted" },
+];
+
+const edgeMarkers = [
+	{ label: "None", value: "none" },
+	{ label: "Triangle", value: "triangle" },
+];
+
+const edgeMarkerEnds = [
+	{ label: "Target", value: "target" },
+	{ label: "Source", value: "source" },
+	{ label: "Both", value: "both" },
 ];
 
 function NumberField(label: string, name: string, value: number, min: number, max?: number, step?: number) {
@@ -72,6 +89,11 @@ export function renderControls(form: HTMLFormElement) {
 			VisualField("Person", "personShape", "circle", "personColor", "#fcfffc"),
 			Color("Mentions edge", "mentionsColor", "#2d8b6a"),
 			Color("Related edge", "relatedColor", "#226f54"),
+			Slider("Edge width", "edgeWidth", graphraumTheme.edgeWidth, 0.5, 6, 0.25),
+			Slider("Edge opacity", "edgeOpacity", graphraumTheme.edgeOpacity, 0, 1, 0.05),
+			SelectField("Edge style", "edgeStyle", "solid", edgeStyles),
+			SelectField("Edge marker", "edgeMarker", "none", edgeMarkers),
+			SelectField("Marker end", "edgeMarkerEnd", "target", edgeMarkerEnds),
 		),
 		Section(
 			"Force layout",
