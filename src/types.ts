@@ -4,7 +4,7 @@ export type GraphraumMode = "2d" | "3d";
 
 export type GraphraumNodeState = "dimmed" | "focused" | "hovered" | "selected";
 
-export type GraphraumNodeShape = "circle" | "diamond" | "square";
+export type GraphraumNodeShape = "circle" | "diamond" | "hexagon" | "pill" | "rounded" | "square" | "triangle";
 
 export interface GraphraumPosition {
 	x: number;
@@ -20,18 +20,26 @@ export interface GraphraumNodeGeometry {
 	id: string;
 	position: GraphraumPosition;
 	color?: GraphraumColor;
+	height?: number;
 	shape?: GraphraumNodeShape;
 	size?: number;
+	strokeColor?: GraphraumColor;
+	strokeWidth?: number;
+	width?: number;
 }
 
 export type GraphraumNode<NodeAttributes = undefined> = GraphraumNodeGeometry & GraphraumAttributes<NodeAttributes>;
 
 export interface GraphraumNodeUpdate {
 	color?: GraphraumColor | undefined;
+	height?: number | undefined;
 	id: string;
 	position?: GraphraumPosition;
 	shape?: GraphraumNodeShape | undefined;
 	size?: number | undefined;
+	strokeColor?: GraphraumColor | undefined;
+	strokeWidth?: number | undefined;
+	width?: number | undefined;
 }
 
 /** A transferable XYZ position batch in the same order as `nodeIds`. */
@@ -71,8 +79,12 @@ export interface GraphraumDataPatch<NodeAttributes = undefined, EdgeAttributes =
 
 export interface GraphraumNodeVisual {
 	color?: GraphraumColor;
+	height?: number;
 	shape?: GraphraumNodeShape;
 	size?: number;
+	strokeColor?: GraphraumColor;
+	strokeWidth?: number;
+	width?: number;
 }
 
 export interface GraphraumEdgeVisual {
@@ -155,6 +167,7 @@ export interface GraphraumTheme {
 	focusedNode: GraphraumColor;
 	hoveredNode: GraphraumColor;
 	node: GraphraumColor;
+	nodeStroke: GraphraumColor;
 	selectedNode: GraphraumColor;
 }
 
