@@ -27,7 +27,7 @@ The package also provides a dimension-aware force simulation for applications th
 
 The baseline renderer uses one instanced node mesh and one edge line geometry: two draw calls. It updates affected buffers instead of building a component or scene object per entity. In 2D, viewport materialization and density LOD bound the visible node and edge work; diagnostics expose candidates, visible counts, LOD decisions, draw calls, CPU frame time, and GPU timing when the browser supports timer queries.
 
-These choices do not prove that graphraum is universally faster than another library. Performance depends on fixture topology, update frequency, node size, overdraw, pixel ratio, browser, and hardware. The [live benchmark](../benchmark/) reports its protocol and lets the claim be tested on the machine that matters.
+These choices do not prove that graphraum is universally faster than another library. Performance depends on fixture topology, update frequency, node size, overdraw, pixel ratio, browser, and hardware. The [playground Prove tab](../benchmark/) reports its protocol and lets the claim be tested on the machine that matters.
 
 ### Open source deliberately, under Apache-2.0
 

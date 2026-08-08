@@ -1,10 +1,12 @@
-import { Color, InstancedBufferAttribute, PlaneGeometry, ShaderMaterial } from "three";
+import { Color, InstancedBufferAttribute, type InstancedMesh, PlaneGeometry, ShaderMaterial } from "three";
 
 import { encodeNodeShape } from "./node-shapes";
 import type { GraphraumColor, GraphraumNodeShape } from "./types";
 
+// Do not declare `attribute vec3 instanceColor` here. Three.js injects it when
+// InstancedMesh.instanceColor is set (USE_INSTANCING_COLOR). A second declaration
+// fails shader validate with "instanceColor : redefinition".
 const vertexShader = `
-attribute vec3 instanceColor;
 attribute float instanceShape;
 attribute float instanceStrokeWidth;
 attribute vec3 instanceStrokeColor;
@@ -124,6 +126,11 @@ export function createNodeGeometry(capacity: number) {
 	geometry.setAttribute("instanceStrokeWidth", new InstancedBufferAttribute(new Float32Array(capacity), 1));
 	geometry.setAttribute("instanceStrokeColor", new InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
 	return geometry;
+}
+
+/** Allocate InstancedMesh.instanceColor before first compile so Three injects the attribute. */
+export function allocateNodeInstanceColors(mesh: InstancedMesh, capacity: number) {
+	mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
 }
 
 export function createNodeMaterial(depthTest: boolean) {
