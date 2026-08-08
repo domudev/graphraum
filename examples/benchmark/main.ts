@@ -119,6 +119,7 @@ function readState(): LabState {
 		maxVisibleEdges: 100_000,
 		maxVisibleNodes: scaleMode === "million-density" ? 50_000 : scaleMode === "million-literal" ? 1_000_000 : 100_000,
 		mode: formValue(values, "mode") as GraphraumMode,
+		nodeAspect: formNumber(values, "nodeAspect"),
 		nodeColors: {
 			concept: formValue(values, "conceptColor"),
 			document: formValue(values, "documentColor"),
@@ -131,6 +132,8 @@ function readState(): LabState {
 			person: formValue(values, "personShape") as GraphraumNodeShape,
 		},
 		nodeSize: formNumber(values, "nodeSize"),
+		nodeStrokeColor: formValue(values, "nodeStrokeColor"),
+		nodeStrokeWidth: formNumber(values, "nodeStrokeWidth"),
 		scoreSize: formNumber(values, "scoreSize"),
 		scaleMode,
 	};
@@ -160,9 +163,16 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 		...(state.encoding === "mapper"
 			? {
 					visual: {
-						...(node.attributes.useTheme ? {} : { color: state.nodeColors[node.attributes.kind] }),
+						...(node.attributes.useTheme
+							? {}
+							: {
+									color: state.nodeColors[node.attributes.kind],
+									strokeColor: state.nodeStrokeColor,
+									strokeWidth: state.nodeStrokeWidth,
+								}),
+						height: state.nodeSize + node.attributes.score * state.scoreSize,
 						shape: state.nodeShapes[node.attributes.kind],
-						size: state.nodeSize + node.attributes.score * state.scoreSize,
+						width: (state.nodeSize + node.attributes.score * state.scoreSize) * state.nodeAspect,
 					},
 				}
 			: {}),

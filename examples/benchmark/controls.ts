@@ -5,6 +5,10 @@ const shapes = [
 	{ label: "Circle", value: "circle" },
 	{ label: "Square", value: "square" },
 	{ label: "Diamond", value: "diamond" },
+	{ label: "Hexagon", value: "hexagon" },
+	{ label: "Triangle", value: "triangle" },
+	{ label: "Pill", value: "pill" },
+	{ label: "Rounded", value: "rounded" },
 ];
 
 const edgeStyles = [
@@ -84,6 +88,9 @@ export function renderControls(form: HTMLFormElement) {
 			"Appearance",
 			Slider("Base size", "nodeSize", 3, 1, 12, 0.5),
 			Slider("Score scale", "scoreSize", 4, 0, 10, 0.5),
+			Slider("Aspect (width / height)", "nodeAspect", 1, 0.5, 2, 0.1),
+			Slider("Stroke width", "nodeStrokeWidth", 0, 0, 2, 0.1),
+			Color("Stroke color", "nodeStrokeColor", graphraumTheme.nodeStroke),
 			VisualField("Concept", "conceptShape", "diamond", "conceptColor", "#e4a853"),
 			VisualField("Document", "documentShape", "square", "documentColor", "#73c7a5"),
 			VisualField("Person", "personShape", "circle", "personColor", "#fcfffc"),

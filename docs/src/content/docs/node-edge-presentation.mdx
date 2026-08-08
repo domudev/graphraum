@@ -36,8 +36,10 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
   node: (node) => ({
     visual: {
       color: node.attributes.kind === "person" ? "#73c7a5" : "#469878",
-      shape: node.attributes.kind === "person" ? "circle" : "square",
-      size: node.attributes.kind === "person" ? 8 : 6,
+      shape: node.attributes.kind === "person" ? "circle" : "pill",
+      width: node.attributes.kind === "person" ? 8 : 10,
+      height: node.attributes.kind === "person" ? 8 : 6,
+      strokeWidth: node.attributes.kind === "place" ? 1 : 0,
     },
     presentation: {
       title: node.attributes.displayName,
@@ -96,7 +98,9 @@ graph.setData({
 });
 ```
 
-The mapper result overrides direct `color`, `shape`, and `size` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API. Built-in `circle`, `square`, and `diamond` shapes share one instanced billboard geometry and one node draw call in both 2D and 3D.
+The mapper result overrides direct `color`, `shape`, `size`, `width`, `height`, `strokeWidth`, and `strokeColor` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API. All seven built-in shapes—`circle`, `square`, `diamond`, `hexagon`, `triangle`, `pill`, and `rounded`—share one instanced billboard geometry and one node draw call in both 2D and 3D.
+
+`size` is shorthand for a square node: `width` and `height` default to `size` (or `4` world units) when omitted, so most nodes only ever set `size`. Set `width` and `height` independently for non-square footprints such as the `pill`-shaped place node above. `strokeWidth` (world units, `0` by default) draws an SDF ring around the shape's outer edge; `strokeColor` falls back to `theme.nodeStroke` when the node sets a `strokeWidth` but no color. Picking and the spatial grid already account for the outer boundary, so a stroked node is exactly as clickable as its rendered outline.
 
 Edge `visual` fields work the same way: `color`, `width`, `opacity`, `style` (`solid`, `dashed`, `dotted`), `marker` (`none`, `triangle`), `markerSize`, and `markerEnd` (`target`, `source`, `both`) override direct edge snapshot fields. Coordinates never live on the edge—they come from the source and target node positions, so moving a node moves every incident edge automatically.
 

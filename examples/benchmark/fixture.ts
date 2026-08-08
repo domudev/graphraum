@@ -22,10 +22,13 @@ export interface FixtureOptions {
 	edgeColors: Record<EdgeKind, string>;
 	edgeMultiplier: number;
 	encoding: Encoding;
+	nodeAspect: number;
 	nodeColors: Record<NodeKind, string>;
 	nodeCount: number;
 	nodeShapes: Record<NodeKind, GraphraumNodeShape>;
 	nodeSize: number;
+	nodeStrokeColor: string;
+	nodeStrokeWidth: number;
 	scoreSize: number;
 }
 
@@ -62,13 +65,21 @@ export function createFixture(options: FixtureOptions): GraphraumData<NodeAttrib
 		const kind = nodeKinds[index % nodeKinds.length];
 		const score = (index % 5) / 5;
 		const useTheme = index % 10 === 0;
+		const height = options.nodeSize + score * options.scoreSize;
 		return {
 			attributes: { cluster, kind, score, useTheme },
 			...(options.encoding === "snapshot"
 				? {
-						...(useTheme ? {} : { color: options.nodeColors[kind] }),
+						...(useTheme
+							? {}
+							: {
+									color: options.nodeColors[kind],
+									strokeColor: options.nodeStrokeColor,
+									strokeWidth: options.nodeStrokeWidth,
+								}),
+						height,
 						shape: options.nodeShapes[kind],
-						size: options.nodeSize + score * options.scoreSize,
+						width: height * options.nodeAspect,
 					}
 				: {}),
 			id: `node-${index}`,
