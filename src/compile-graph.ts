@@ -1,5 +1,5 @@
-import { assertNodeShape } from "./node-shapes";
 import { assertEdgeVisual } from "./edge-styles";
+import { assertNodeShape } from "./node-shapes";
 import type {
 	CompiledGraphraumPresentation,
 	GraphraumData,

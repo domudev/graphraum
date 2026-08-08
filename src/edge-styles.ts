@@ -1,30 +1,25 @@
-import type {
-	GraphraumEdgeMarker,
-	GraphraumEdgeMarkerEnd,
-	GraphraumEdgeStyle,
-	GraphraumEdgeVisual,
-} from "./types";
+import type { GraphraumEdgeMarker, GraphraumEdgeMarkerEnd, GraphraumEdgeStyle, GraphraumEdgeVisual } from "./types";
 
 export const graphraumEdgeStyles = ["solid", "dashed", "dotted"] as const satisfies readonly GraphraumEdgeStyle[];
 export const graphraumEdgeMarkers = ["none", "triangle"] as const satisfies readonly GraphraumEdgeMarker[];
-export const graphraumEdgeMarkerEnds = ["target", "source", "both"] as const satisfies readonly GraphraumEdgeMarkerEnd[];
+export const graphraumEdgeMarkerEnds = [
+	"target",
+	"source",
+	"both",
+] as const satisfies readonly GraphraumEdgeMarkerEnd[];
 
 const styleCodes: Readonly<Record<GraphraumEdgeStyle, number>> = { solid: 0, dashed: 1, dotted: 2 };
 const markerCodes: Readonly<Record<GraphraumEdgeMarker, number>> = { none: 0, triangle: 1 };
 
 export function assertEdgeStyle(edgeId: string, style: unknown): asserts style is GraphraumEdgeStyle {
 	if (typeof style !== "string" || !graphraumEdgeStyles.includes(style as GraphraumEdgeStyle)) {
-		throw new Error(
-			`Edge "${edgeId}" style must be one of: ${graphraumEdgeStyles.map((s) => `"${s}"`).join(", ")}`,
-		);
+		throw new Error(`Edge "${edgeId}" style must be one of: ${graphraumEdgeStyles.map((s) => `"${s}"`).join(", ")}`);
 	}
 }
 
 export function assertEdgeMarker(edgeId: string, marker: unknown): asserts marker is GraphraumEdgeMarker {
 	if (typeof marker !== "string" || !graphraumEdgeMarkers.includes(marker as GraphraumEdgeMarker)) {
-		throw new Error(
-			`Edge "${edgeId}" marker must be one of: ${graphraumEdgeMarkers.map((m) => `"${m}"`).join(", ")}`,
-		);
+		throw new Error(`Edge "${edgeId}" marker must be one of: ${graphraumEdgeMarkers.map((m) => `"${m}"`).join(", ")}`);
 	}
 }
 

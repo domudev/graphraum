@@ -82,8 +82,6 @@ export function packEdgeInstances(input: {
 }
 
 /** Map existing diagnostics lodLevel into the edge visual tier. */
-export function edgeTierFromDiagnosticsLod(
-	lodLevel: "density" | "detail" | "overview",
-): EdgeLodTier {
+export function edgeTierFromDiagnosticsLod(lodLevel: "density" | "detail" | "overview"): EdgeLodTier {
 	return lodLevel === "detail" ? "detail" : "overview";
 }
