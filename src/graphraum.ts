@@ -1,12 +1,8 @@
 import {
 	Box3,
-	BufferAttribute,
-	BufferGeometry,
 	Color,
 	type InstancedBufferAttribute,
 	InstancedMesh,
-	LineBasicMaterial,
-	LineSegments,
 	type Material,
 	Matrix4,
 	MeshBasicMaterial,
@@ -24,6 +20,13 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
+import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
+import {
+	createEdgeGeometry,
+	createEdgeMaterial,
+	writeEdgeMarkerInstance,
+	writeEdgeSegmentInstance,
+} from "./edge-rendering";
 import { prepareLayoutPositions } from "./layout-positions";
 import { createNodeGeometry, createNodeMaterial, setNodeShapeAt } from "./node-rendering";
 import { containsNodePoint } from "./node-shapes";
@@ -46,11 +49,11 @@ import type {
 	GraphraumTheme,
 	GraphraumVisualMapper,
 } from "./types";
-import { applyEdgeBudget, collectIncidentEdges, shouldUseDensityLod } from "./viewport-lod";
+import { applyEdgeBudget, collectIncidentEdges, resolveLodLevel, shouldUseDensityLod } from "./viewport-lod";
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
 type GraphraumGraphObjects = {
-	edgeLines: LineSegments;
+	edgeMesh: InstancedMesh;
 	nodeMesh: InstancedMesh;
 	nodePickMesh: InstancedMesh;
 };
@@ -72,6 +75,15 @@ interface GpuTimer {
 function disposeMaterial(material: Material | Material[]) {
 	for (const item of Array.isArray(material) ? material : [material]) item.dispose();
 }
+
+const EDGE_INSTANCE_ATTRIBUTES = [
+	"instanceKind",
+	"instanceEndA",
+	"instanceEndB",
+	"instanceColor",
+	"instanceWidth",
+	"instanceStyle",
+] as const;
 
 /** A small, explicit WebGL graph renderer: one instanced node mesh and one batched edge geometry. */
 export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
@@ -96,16 +108,17 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private nodeIndices = new Map<string, number>();
 	private edgeNodeIndices: Uint32Array = new Uint32Array();
 	private canonicalEdgePositions: Float32Array = new Float32Array();
-	private canonicalEdgeColors: Float32Array = new Float32Array();
 	private incidentEdgeIndices: readonly (readonly number[])[] = [];
 	private nodePresentations = new Map<string, CompiledGraphraumPresentation>();
 	private edgePresentations = new Map<string, CompiledGraphraumPresentation>();
 	private spatialGrid2d = new SpatialGrid2D();
 	private nodeMesh: InstancedMesh | null = null;
 	private nodePickMesh: InstancedMesh | null = null;
-	private edgeLines: LineSegments | null = null;
+	private edgeMesh: InstancedMesh | null = null;
 	private nodeCapacity = 0;
 	private edgeCapacity = 0;
+	private markerCapacity = 0;
+	private edgeInstanceCapacity = 0;
 	private selectedNodeIds = new Set<string>();
 	private hoveredNodeIds = new Set<string>();
 	private focusedNodeIds = new Set<string>();
@@ -116,7 +129,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private visibleNodeCount = 0;
 	private visibleNodeCandidateCount = 0;
 	private densityLodActive = false;
-	private visibleEdgeCount = 0;
+	private visibleEdgeSegmentCount = 0;
+	private visibleEdgeMarkerCount = 0;
 	private visibleEdgeCandidateCount = 0;
 	private mode: GraphraumMode;
 	private frameRequest: number | null = null;
@@ -192,7 +206,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private canAppendDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
-		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) return false;
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeMesh) return false;
 		if ((patch.removedNodeIds?.length ?? 0) > 0 || (patch.removedEdgeIds?.length ?? 0) > 0) return false;
 		const nodeIds = new Set(this.data.nodes.map((node) => node.id));
 		if ((patch.addedNodes ?? []).some((node) => nodeIds.has(node.id))) return false;
@@ -233,8 +247,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		nextEdgeIndices.set(this.edgeNodeIndices);
 		const nextEdgePositions = new Float32Array(nextEdges.length * 6);
 		nextEdgePositions.set(this.canonicalEdgePositions);
-		const nextEdgeColors = new Float32Array(nextEdges.length * 6);
-		nextEdgeColors.set(this.canonicalEdgeColors);
 		const nextIncidentEdges = this.incidentEdgeIndices.map((indices) => [...indices]);
 		for (const [index, edge] of nextEdges.entries()) {
 			const source = nextNodeIndices.get(edge.source);
@@ -262,9 +274,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 						index * 6,
 					);
 				}
-				const color = new Color(compiled.edgeVisuals[index - this.data.edges.length]?.color ?? this.theme.edge);
-				color.toArray(nextEdgeColors, index * 6);
-				color.toArray(nextEdgeColors, index * 6 + 3);
 			}
 		}
 		this.data = { nodes: nextNodes, edges: nextEdges };
@@ -272,7 +281,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.nodeIndices = nextNodeIndices;
 		this.edgeNodeIndices = nextEdgeIndices;
 		this.canonicalEdgePositions = nextEdgePositions;
-		this.canonicalEdgeColors = nextEdgeColors;
 		this.incidentEdgeIndices = nextIncidentEdges;
 		for (const node of addedNodes) {
 			const index = nextNodeIndices.get(node.id);
@@ -300,12 +308,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.nodeIndices = new Map(compiled.nodeIndices);
 		this.edgeNodeIndices = compiled.edgeNodeIndices;
 		this.canonicalEdgePositions = compiled.edgePositions;
-		this.canonicalEdgeColors = new Float32Array(data.edges.length * 6);
-		for (const [index, visual] of compiled.edgeVisuals.entries()) {
-			const color = new Color(visual.color ?? this.theme.edge);
-			color.toArray(this.canonicalEdgeColors, index * 6);
-			color.toArray(this.canonicalEdgeColors, index * 6 + 3);
-		}
 		this.incidentEdgeIndices = compiled.incidentEdgeIndices;
 		this.nodePresentations = new Map(compiled.nodePresentations);
 		this.edgePresentations = new Map(compiled.edgePresentations);
@@ -313,7 +315,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
 
 		this.nodeCapacity = Math.min(this.maxVisibleNodes, nextCapacity(data.nodes.length));
-		this.edgeCapacity = Math.min(this.maxVisibleEdges, nextCapacity(data.edges.length));
 		const nodeCapacity = this.nodeCapacity;
 		const nodeGeometry = createNodeGeometry(nodeCapacity);
 		const nodeMaterial = createNodeMaterial(this.mode === "3d");
@@ -325,19 +326,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const nodePickMesh = new InstancedMesh(new SphereGeometry(1, 8, 6), new MeshBasicMaterial(), nodeCapacity);
 		this.nodePickMesh = nodePickMesh;
 
-		const edgeGeometry = new BufferGeometry();
-		const edgePositions = new Float32Array(this.edgeCapacity * 6);
-		edgePositions.set(compiled.edgePositions);
-		const edgeColors = new Float32Array(this.edgeCapacity * 6);
-		edgeColors.set(this.canonicalEdgeColors);
-		edgeGeometry.setAttribute("position", new BufferAttribute(edgePositions, 3));
-		edgeGeometry.setAttribute("color", new BufferAttribute(edgeColors, 3));
-		const edgeLines = new LineSegments(
-			edgeGeometry,
-			new LineBasicMaterial({ color: "#ffffff", opacity: 0.55, transparent: true, vertexColors: true }),
-		);
-		this.edgeLines = edgeLines;
-		this.scene.add(edgeLines);
+		this.edgeCapacity = Math.min(this.maxVisibleEdges, nextCapacity(data.edges.length));
+		this.markerCapacity = Math.min(this.edgeCapacity * 2, nextCapacity(data.edges.length * 2));
+		this.edgeInstanceCapacity = this.edgeCapacity + this.markerCapacity;
+		const edgeGeometry = createEdgeGeometry(this.edgeInstanceCapacity);
+		const edgeMaterial = createEdgeMaterial(this.mode === "3d");
+		const edgeMesh = new InstancedMesh(edgeGeometry, edgeMaterial, this.edgeInstanceCapacity);
+		edgeMesh.frustumCulled = false;
+		this.edgeMesh = edgeMesh;
+		this.scene.add(edgeMesh);
 
 		if (fitView) this.fitView();
 		else this.requestRender();
@@ -359,23 +356,25 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private getGraphObjects(action: string): GraphraumGraphObjects {
-		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) {
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeMesh) {
 			throw new Error(`Cannot ${action} before graph data is set`);
 		}
-		return { edgeLines: this.edgeLines, nodeMesh: this.nodeMesh, nodePickMesh: this.nodePickMesh };
+		return { edgeMesh: this.edgeMesh, nodeMesh: this.nodeMesh, nodePickMesh: this.nodePickMesh };
 	}
 
 	private applyPreparedNodeUpdates(
 		prepared: readonly PreparedNodeUpdate<NodeAttributes>[],
-		{ edgeLines, nodeMesh, nodePickMesh }: GraphraumGraphObjects,
+		{ nodeMesh, nodePickMesh }: GraphraumGraphObjects,
 	) {
 		const nodes = [...this.data.nodes];
 		const matrix = new Matrix4();
-		const edgePosition = edgeLines.geometry.getAttribute("position") as BufferAttribute;
 		const nodeShape = nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
-		const renderedEdgePositions = edgePosition.array as Float32Array;
 		const viewportBounds = this.getViewportBounds2d();
 		let visibilityChanged = false;
+		// Edge segments/markers are re-packed by materializeViewport rather than patched in
+		// place, so any endpoint move that touches a rendered edge forces a full repack. See
+		// DONE_WITH_CONCERNS in the task report for the perf trade-off during layout streaming.
+		let edgeEndpointsChanged = false;
 
 		for (const update of prepared) {
 			nodes[update.index] = update.next;
@@ -408,17 +407,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				nodeShape.addUpdateRange(nodeSlot, 1);
 			}
 			if (update.positionChanged) {
-				for (const edgeIndex of this.incidentEdgeIndices[update.index] ?? []) {
+				const incidentEdges = this.incidentEdgeIndices[update.index] ?? [];
+				if (incidentEdges.length > 0) edgeEndpointsChanged = true;
+				for (const edgeIndex of incidentEdges) {
 					const sourceIndex = this.edgeNodeIndices[edgeIndex * 2];
 					const canonicalOffset = edgeIndex * 6 + (sourceIndex === update.index ? 0 : 3);
-					const values = [update.next.position.x, update.next.position.y, update.next.position.z ?? 0];
-					this.canonicalEdgePositions.set(values, canonicalOffset);
-					const edgeSlot = this.visibleEdgeSlots.get(edgeIndex);
-					if (edgeSlot !== undefined) {
-						const renderedOffset = edgeSlot * 6 + (sourceIndex === update.index ? 0 : 3);
-						renderedEdgePositions.set(values, renderedOffset);
-						edgePosition.addUpdateRange(renderedOffset, 3);
-					}
+					this.canonicalEdgePositions.set(
+						[update.next.position.x, update.next.position.y, update.next.position.z ?? 0],
+						canonicalOffset,
+					);
 				}
 			}
 		}
@@ -427,7 +424,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 
 		this.data = { ...this.data, nodes };
-		if (visibilityChanged) {
+		if (visibilityChanged || edgeEndpointsChanged) {
 			this.materializeViewport();
 			this.requestRender();
 			return;
@@ -440,7 +437,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			nodeMesh.instanceColor.needsUpdate = true;
 		}
 		if (prepared.some((update) => update.shapeChanged)) nodeShape.needsUpdate = true;
-		if (prepared.some((update) => update.positionChanged)) edgePosition.needsUpdate = true;
 		this.requestRender();
 	}
 
@@ -479,6 +475,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.nodeMesh.material.depthWrite = mode === "3d";
 			this.nodeMesh.material.needsUpdate = true;
 			this.nodeMesh.renderOrder = mode === "2d" ? 1 : 0;
+		}
+		if (this.edgeMesh && !Array.isArray(this.edgeMesh.material)) {
+			this.edgeMesh.material.depthTest = mode === "3d";
+			this.edgeMesh.material.depthWrite = mode === "3d";
+			this.edgeMesh.material.needsUpdate = true;
 		}
 		this.fitView();
 	}
@@ -554,18 +555,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			gpuDrawCalls: this.renderer.info.render.calls,
 			gpuGeometries: this.renderer.info.memory.geometries,
 			gpuTextures: this.renderer.info.memory.textures,
-			lodLevel: this.densityLodActive
-				? "density"
-				: this.visibleEdgeCandidateCount > this.visibleEdgeCount
-					? "overview"
-					: "detail",
+			lodLevel: resolveLodLevel(this.densityLodActive, this.visibleEdgeCandidateCount, this.visibleEdgeSegmentCount),
 			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
 			totalEdges: this.data.edges.length,
 			totalNodes: this.data.nodes.length,
 			visibleEdgeCandidates: this.visibleEdgeCandidateCount,
-			visibleEdgeMarkers: 0,
-			visibleEdgeSegments: this.visibleEdgeCount,
-			visibleEdges: this.visibleEdgeCount,
+			visibleEdgeMarkers: this.visibleEdgeMarkerCount,
+			visibleEdgeSegments: this.visibleEdgeSegmentCount,
+			visibleEdges: this.visibleEdgeSegmentCount,
 			visibleNodes: this.visibleNodeCount,
 			visibleNodeCandidates: this.visibleNodeCandidateCount,
 		};
@@ -809,7 +806,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private materializeViewport() {
-		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeLines) return;
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeMesh) return;
 		const bounds = this.getViewportBounds2d();
 		const visibleNodeCandidates = bounds
 			? this.spatialGrid2d.queryBounds(bounds, this.viewportOverscan)
@@ -862,28 +859,40 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		nodeShape.addUpdateRange(0, materializedNodes.length);
 		nodeShape.needsUpdate = true;
 
-		const edgePosition = this.edgeLines.geometry.getAttribute("position") as BufferAttribute;
-		const renderedEdgePositions = edgePosition.array as Float32Array;
-		const edgeColor = this.edgeLines.geometry.getAttribute("color") as BufferAttribute;
-		const renderedEdgeColors = edgeColor.array as Float32Array;
-		edgePosition.clearUpdateRanges();
-		edgeColor.clearUpdateRanges();
+		const lodLevel = resolveLodLevel(this.densityLodActive, edgeCandidates.length, visibleEdgeIndices.length);
+		const packed = packEdgeInstances({
+			edgeIndices: visibleEdgeIndices,
+			edgeVisuals: this.data.edges,
+			endpointPositions: this.canonicalEdgePositions,
+			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
+			tier: edgeTierFromDiagnosticsLod(lodLevel),
+		});
+		const edgeGeometry = this.edgeMesh.geometry;
 		this.visibleEdgeSlots = new Map();
-		for (const [slot, edgeIndex] of visibleEdgeIndices.entries()) {
-			this.visibleEdgeSlots.set(edgeIndex, slot);
-			renderedEdgePositions.set(this.canonicalEdgePositions.subarray(edgeIndex * 6, edgeIndex * 6 + 6), slot * 6);
-			renderedEdgeColors.set(this.canonicalEdgeColors.subarray(edgeIndex * 6, edgeIndex * 6 + 6), slot * 6);
+		let edgeSlot = 0;
+		for (const segment of packed.segments) {
+			writeEdgeSegmentInstance(edgeGeometry, edgeSlot, segment);
+			this.visibleEdgeSlots.set(segment.edgeIndex, edgeSlot);
+			edgeSlot += 1;
 		}
-		this.edgeLines.geometry.setDrawRange(0, visibleEdgeIndices.length * 2);
-		edgePosition.addUpdateRange(0, visibleEdgeIndices.length * 6);
-		edgePosition.needsUpdate = true;
-		edgeColor.addUpdateRange(0, visibleEdgeIndices.length * 6);
-		edgeColor.needsUpdate = true;
+		const segmentCount = edgeSlot;
+		for (const marker of packed.markers) {
+			writeEdgeMarkerInstance(edgeGeometry, edgeSlot, marker);
+			edgeSlot += 1;
+		}
+		this.edgeMesh.count = edgeSlot;
+		for (const name of EDGE_INSTANCE_ATTRIBUTES) {
+			const attribute = edgeGeometry.getAttribute(name) as InstancedBufferAttribute;
+			attribute.clearUpdateRanges();
+			attribute.addUpdateRange(0, edgeSlot * attribute.itemSize);
+			attribute.needsUpdate = true;
+		}
 
 		this.visibleNodeCandidateCount = visibleNodeCandidates.length;
 		this.visibleNodeCount = materializedNodes.length;
 		this.visibleEdgeCandidateCount = edgeCandidates.length;
-		this.visibleEdgeCount = visibleEdgeIndices.length;
+		this.visibleEdgeSegmentCount = segmentCount;
+		this.visibleEdgeMarkerCount = packed.markers.length;
 	}
 
 	private materializeNodes(indices: readonly number[], bounds: Bounds2D | null): readonly MaterializedNode[] {
@@ -940,11 +949,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			disposeMaterial(this.nodePickMesh.material);
 			this.nodePickMesh = null;
 		}
-		if (this.edgeLines) {
-			this.scene.remove(this.edgeLines);
-			this.edgeLines.geometry.dispose();
-			disposeMaterial(this.edgeLines.material);
-			this.edgeLines = null;
+		if (this.edgeMesh) {
+			this.scene.remove(this.edgeMesh);
+			this.edgeMesh.geometry.dispose();
+			disposeMaterial(this.edgeMesh.material);
+			this.edgeMesh = null;
 		}
 	}
 }

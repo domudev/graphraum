@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { packEdgeInstances } from "./edge-materialize";
+import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
 
 const endpoints = {
 	// edge 0: a(0,0,0) -> b(10,0,0)
@@ -32,5 +32,13 @@ describe("packEdgeInstances", () => {
 		expect(packed.segments).toHaveLength(1);
 		expect(packed.markers).toHaveLength(2);
 		expect(packed.markers.map((m) => m.end)).toEqual(["source", "target"]);
+	});
+});
+
+describe("edgeTierFromDiagnosticsLod", () => {
+	it("maps only the detail LOD level to the detail edge tier", () => {
+		expect(edgeTierFromDiagnosticsLod("detail")).toBe("detail");
+		expect(edgeTierFromDiagnosticsLod("overview")).toBe("overview");
+		expect(edgeTierFromDiagnosticsLod("density")).toBe("overview");
 	});
 });

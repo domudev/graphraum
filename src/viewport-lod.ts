@@ -1,3 +1,15 @@
+export type GraphraumLodLevel = "density" | "detail" | "overview";
+
+/** Single source of truth for the density/overview/detail tier reported in diagnostics and used to drive edge LOD packing. */
+export function resolveLodLevel(
+	densityLodActive: boolean,
+	edgeCandidateCount: number,
+	visibleEdgeSegmentCount: number,
+): GraphraumLodLevel {
+	if (densityLodActive) return "density";
+	return edgeCandidateCount > visibleEdgeSegmentCount ? "overview" : "detail";
+}
+
 /** Collects unique edges touching visible nodes without scanning the complete edge list. */
 export function collectIncidentEdges(
 	visibleNodeIndices: readonly number[],
