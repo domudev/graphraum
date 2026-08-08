@@ -326,9 +326,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const nodePickMesh = new InstancedMesh(new SphereGeometry(1, 8, 6), new MeshBasicMaterial(), nodeCapacity);
 		this.nodePickMesh = nodePickMesh;
 
-		this.edgeCapacity = Math.min(this.maxVisibleEdges, nextCapacity(data.edges.length));
-		this.markerCapacity = Math.min(this.edgeCapacity * 2, nextCapacity(data.edges.length * 2));
-		this.edgeInstanceCapacity = this.edgeCapacity + this.markerCapacity;
+		const capacities = edgeInstanceCapacities(data.edges.length, this.maxVisibleEdges);
+		this.edgeCapacity = capacities.edgeCapacity;
+		this.markerCapacity = capacities.markerCapacity;
+		this.edgeInstanceCapacity = capacities.edgeInstanceCapacity;
 		const edgeGeometry = createEdgeGeometry(this.edgeInstanceCapacity);
 		const edgeMaterial = createEdgeMaterial(this.mode === "3d");
 		const edgeMesh = new InstancedMesh(edgeGeometry, edgeMaterial, this.edgeInstanceCapacity);
@@ -962,4 +963,16 @@ function nextCapacity(length: number): number {
 	let capacity = 1;
 	while (capacity < length) capacity *= 2;
 	return capacity;
+}
+
+/**
+ * Marker capacity is always exactly 2x edge capacity (worst case: every edge has a marker at
+ * both ends) — never derived from `nextCapacity(edgeCount * 2)` independently, which can
+ * undershoot for small edge counts (e.g. edgeCount=0 gives nextCapacity(0)=1, not 0) and let a
+ * later append with `markerEnd: "both"` overrun the instanced buffer.
+ */
+export function edgeInstanceCapacities(edgeCount: number, maxVisibleEdges: number) {
+	const edgeCapacity = Math.min(maxVisibleEdges, nextCapacity(edgeCount));
+	const markerCapacity = edgeCapacity * 2;
+	return { edgeCapacity, markerCapacity, edgeInstanceCapacity: edgeCapacity + markerCapacity };
 }
