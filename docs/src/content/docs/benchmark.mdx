@@ -1,6 +1,6 @@
 ---
-title: Live benchmark
-description: Run graphraum against deterministic 1k, 10k, and 100k fixtures in this browser.
+title: Playground
+description: Explore graphraum node and edge visuals live, then run the timed proof protocol in this browser.
 template: splash
 tableOfContents: false
 ---
@@ -8,9 +8,9 @@ tableOfContents: false
 import LiveBenchmark from "../../components/LiveBenchmark.astro";
 
 <div class="proof-intro">
-  <p class="proof-kicker">Executable evidence</p>
-  <h1>Make the renderer prove it.</h1>
-  <p class="proof-lede">Generate a deterministic graph locally, exercise graphraum on this browser, and inspect every measurement. No uploaded traces. No favorable-machine screenshot.</p>
+  <p class="proof-kicker">Executable playground</p>
+  <h1>Try the visuals. Then prove the cadence.</h1>
+  <p class="proof-lede">Explore shapes, strokes, aspect, and edge styles on a live graph in this browser. Switch to Prove when you need the deterministic timing protocol. No uploaded traces. No favorable-machine screenshot.</p>
 </div>
 
 <div class="reference-run not-content" aria-label="Reference result from a 100,000 node benchmark">
@@ -36,11 +36,15 @@ import LiveBenchmark from "../../components/LiveBenchmark.astro";
   </div>
 </div>
 
-<p class="reference-context">Chrome 150 on macOS, DPR 2 capped to 1, captured 21 July 2026. Treat it as a reference, not a universal score—run the same protocol below on your device.</p>
+<p class="reference-context">Chrome 150 on macOS, DPR 2 capped to 1, captured 21 July 2026. Treat it as a reference, not a universal score—run the same Prove protocol below on your device.</p>
 
 <LiveBenchmark />
 
-## Read the result
+## Explore
+
+Use the Explore tab to rematerialize a typed fixture with the GPU shape catalog, stroke, free aspect, edge width/opacity, dash styles, and markers. Pan, zoom, and select while you change controls. This tab is for visual verification, not a published score.
+
+## Prove
 
 - **Phases:** fixture generation, renderer construction, synchronous `setData`, and the first visible frame are reported separately.
 - **First meaningful frame:** the complete fixture-through-first-frame path for compatibility with earlier results.
@@ -57,4 +61,4 @@ import LiveBenchmark from "../../components/LiveBenchmark.astro";
 
 ## Interpret honestly
 
-This is a rendering microbenchmark. It does not measure network loading, force-layout convergence, label rendering, application state, accessibility overlays, or a production Graph Explorer. The 100k fixture intentionally allocates a large in-memory graph and may expose long tasks while full-snapshot updates remain synchronous. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated fresh-page runs on the same browser and effective pixel ratio.
+Prove is a rendering microbenchmark. It does not measure network loading, force-layout convergence, label rendering, application state, accessibility overlays, or a production Graph Explorer. The 100k fixture intentionally allocates a large in-memory graph and may expose long tasks while full-snapshot updates remain synchronous. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated fresh-page runs on the same browser and effective pixel ratio.

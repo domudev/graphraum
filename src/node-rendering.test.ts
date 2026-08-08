@@ -1,14 +1,41 @@
-import { Color, type InstancedBufferAttribute } from "three";
+import { Color, InstancedBufferAttribute, InstancedMesh } from "three";
 import { describe, expect, test } from "vitest";
 
-import { createNodeGeometry, createNodeMaterial, setNodeShapeAt, setNodeStrokeAt } from "./node-rendering";
+import {
+	allocateNodeInstanceColors,
+	createNodeGeometry,
+	createNodeMaterial,
+	setNodeShapeAt,
+	setNodeStrokeAt,
+} from "./node-rendering";
 
 describe("node rendering buffers", () => {
+	test("does not redeclare Three.js instanceColor from setColorAt", () => {
+		const material = createNodeMaterial(false);
+		// Three injects `attribute vec3 instanceColor` when InstancedMesh.instanceColor exists.
+		// Redeclaring it in the ShaderMaterial source fails VALIDATE_STATUS with "redefinition".
+		expect(material.vertexShader).not.toContain("attribute vec3 instanceColor;");
+		expect(material.vertexShader).toContain("nodeColor = instanceColor;");
+		material.dispose();
+	});
+
+	test("allocates InstancedMesh.instanceColor so Three enables USE_INSTANCING_COLOR", () => {
+		const geometry = createNodeGeometry(2);
+		const material = createNodeMaterial(false);
+		const mesh = new InstancedMesh(geometry, material, 2);
+		expect(mesh.instanceColor).toBeNull();
+		allocateNodeInstanceColors(mesh, 2);
+		expect(mesh.instanceColor).toBeInstanceOf(InstancedBufferAttribute);
+		expect(mesh.instanceColor?.count).toBe(2);
+		expect(mesh.instanceColor?.itemSize).toBe(3);
+		geometry.dispose();
+		material.dispose();
+	});
+
 	test("configures node depth for the active dimension", () => {
 		const overlay = createNodeMaterial(false);
 		const spatial = createNodeMaterial(true);
 
-		expect(overlay.vertexShader).toContain("attribute vec3 instanceColor;");
 		expect(overlay.depthTest).toBe(false);
 		expect(overlay.depthWrite).toBe(false);
 		expect(spatial.depthTest).toBe(true);

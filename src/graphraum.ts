@@ -29,7 +29,13 @@ import {
 } from "./edge-rendering";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
-import { createNodeGeometry, createNodeMaterial, setNodeShapeAt, setNodeStrokeAt } from "./node-rendering";
+import {
+	allocateNodeInstanceColors,
+	createNodeGeometry,
+	createNodeMaterial,
+	setNodeShapeAt,
+	setNodeStrokeAt,
+} from "./node-rendering";
 import { containsNodePoint } from "./node-shapes";
 import { resolveNodeStroke } from "./node-stroke";
 import { type PreparedNodeUpdate, prepareNodeUpdates } from "./node-updates";
@@ -323,6 +329,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const nodeGeometry = createNodeGeometry(nodeCapacity);
 		const nodeMaterial = createNodeMaterial(this.mode === "3d");
 		const nodeMesh = new InstancedMesh(nodeGeometry, nodeMaterial, nodeCapacity);
+		allocateNodeInstanceColors(nodeMesh, nodeCapacity);
 		nodeMesh.renderOrder = this.mode === "2d" ? 1 : 0;
 		this.nodeMesh = nodeMesh;
 		this.scene.add(nodeMesh);

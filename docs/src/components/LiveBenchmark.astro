@@ -1,117 +1,245 @@
+---
+const shapeOptions = [
+	{ label: "Circle", value: "circle" },
+	{ label: "Square", value: "square" },
+	{ label: "Diamond", value: "diamond" },
+	{ label: "Hexagon", value: "hexagon" },
+	{ label: "Triangle", value: "triangle" },
+	{ label: "Pill", value: "pill" },
+	{ label: "Rounded", value: "rounded" },
+] as const;
+---
+
 <section class="benchmark-shell not-content" aria-labelledby="benchmark-title">
 	<header class="benchmark-header">
 		<div>
 			<p class="benchmark-eyebrow"><span aria-hidden="true"></span> Runs locally on this device</p>
-			<h2 id="benchmark-title">graphraum proof lab</h2>
+			<h2 id="benchmark-title">graphraum playground</h2>
 		</div>
-		<p>Deterministic fixture · complete result · no telemetry</p>
+		<p>Explore appearance live · prove timing when you need evidence</p>
 	</header>
 
-	<div class="benchmark-controls" aria-label="Benchmark configuration">
-		<label class="benchmark-fixture">
-			<span>Graph size</span>
-			<select id="benchmark-size">
-				<option value="1000">1,000 nodes · 3,000 edges</option>
-				<option value="10000">10,000 nodes · 30,000 edges</option>
-				<option value="100000">100,000 nodes · 300,000 edges</option>
-			</select>
-		</label>
-		<label>
-			<span>Dimension</span>
-			<select id="benchmark-mode">
-				<option value="2d">2D</option>
-				<option value="3d">3D</option>
-			</select>
-		</label>
-		<label>
-			<span>Pixel ratio</span>
-			<select id="benchmark-pixel-ratio">
-				<option value="1">1× controlled</option>
-				<option value="2">Up to 2× native</option>
-			</select>
-		</label>
-		<button id="benchmark-run" type="button"><span>Run benchmark</span><span aria-hidden="true">→</span></button>
+	<div class="playground-tabs" role="tablist" aria-label="Playground mode">
+		<button id="tab-explore" class="playground-tab" type="button" role="tab" aria-selected="true" aria-controls="panel-explore" tabindex="0">Explore</button>
+		<button id="tab-prove" class="playground-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-prove" tabindex="-1">Prove</button>
 	</div>
 
 	<div class="benchmark-stage">
 		<div class="benchmark-stage-bar">
 			<span><i aria-hidden="true"></i> Live viewport</span>
-			<span id="benchmark-stage-mode">2D · ready</span>
+			<span id="benchmark-stage-mode">2D · explore</span>
 		</div>
-		<div id="benchmark-graph" class="benchmark-graph" aria-label="Interactive benchmark graph"></div>
+		<div id="benchmark-graph" class="benchmark-graph" aria-label="Interactive graphraum viewport"></div>
 		<p class="benchmark-interaction">Drag to pan · scroll to zoom · select a node</p>
 	</div>
 
-	<div class="benchmark-metrics" aria-label="Benchmark headline measurements">
-		<div><span>First meaningful frame</span><strong id="metric-fmf">—</strong><small>fixture to visible graph</small></div>
-		<div><span>Rendered frame p95</span><strong id="metric-frame">—</strong><small>scheduled render cadence</small></div>
-		<div><span>1% node update</span><strong id="metric-incremental">—</strong><small>positions + incident edges</small></div>
-		<div><span>Full snapshot +1%</span><strong id="metric-snapshot">—</strong><small>complete graph replacement</small></div>
-		<div><span>Visible materialization</span><strong id="metric-visible">—</strong><small id="metric-lod">LOD and edge budget</small></div>
-		<div><span>GPU draw calls</span><strong id="metric-draw-calls">—</strong><small id="metric-picking">per rendered frame</small></div>
+	<div id="panel-explore" class="playground-panel" role="tabpanel" aria-labelledby="tab-explore">
+		<form id="explore-controls" class="benchmark-controls playground-explore-controls" aria-label="Explore appearance">
+			<label>
+				<span>Graph size</span>
+				<select name="nodeCount">
+					<option value="100">100 nodes</option>
+					<option value="1000" selected>1,000 nodes · 3,000 edges</option>
+					<option value="10000">10,000 nodes · 30,000 edges</option>
+				</select>
+			</label>
+			<label>
+				<span>Dimension</span>
+				<select name="mode">
+					<option value="2d">2D</option>
+					<option value="3d">3D</option>
+				</select>
+			</label>
+			<label>
+				<span>Concept shape</span>
+				<select name="conceptShape">
+					{shapeOptions.map((option) => (
+						<option value={option.value} selected={option.value === "diamond"}>{option.label}</option>
+					))}
+				</select>
+			</label>
+			<label>
+				<span>Document shape</span>
+				<select name="documentShape">
+					{shapeOptions.map((option) => (
+						<option value={option.value} selected={option.value === "square"}>{option.label}</option>
+					))}
+				</select>
+			</label>
+			<label>
+				<span>Person shape</span>
+				<select name="personShape">
+					{shapeOptions.map((option) => (
+						<option value={option.value} selected={option.value === "circle"}>{option.label}</option>
+					))}
+				</select>
+			</label>
+			<label>
+				<span>Aspect</span>
+				<select name="nodeAspect">
+					<option value="0.7">Tall 0.7</option>
+					<option value="1" selected>Square 1.0</option>
+					<option value="1.6">Wide 1.6</option>
+				</select>
+			</label>
+			<label>
+				<span>Stroke width</span>
+				<select name="nodeStrokeWidth">
+					<option value="0" selected>None</option>
+					<option value="0.5">0.5</option>
+					<option value="1">1.0</option>
+					<option value="1.5">1.5</option>
+				</select>
+			</label>
+			<label>
+				<span>Edge style</span>
+				<select name="edgeStyle">
+					<option value="solid" selected>Solid</option>
+					<option value="dashed">Dashed</option>
+					<option value="dotted">Dotted</option>
+				</select>
+			</label>
+			<label>
+				<span>Edge marker</span>
+				<select name="edgeMarker">
+					<option value="none" selected>None</option>
+					<option value="triangle">Triangle</option>
+				</select>
+			</label>
+			<label>
+				<span>Marker end</span>
+				<select name="edgeMarkerEnd">
+					<option value="target" selected>Target</option>
+					<option value="source">Source</option>
+					<option value="both">Both</option>
+				</select>
+			</label>
+			<label>
+				<span>Edge width</span>
+				<select name="edgeWidth">
+					<option value="1">1</option>
+					<option value="1.5" selected>1.5</option>
+					<option value="3">3</option>
+					<option value="5">5</option>
+				</select>
+			</label>
+			<label>
+				<span>Edge opacity</span>
+				<select name="edgeOpacity">
+					<option value="0.4">0.4</option>
+					<option value="0.85" selected>0.85</option>
+					<option value="1">1.0</option>
+				</select>
+			</label>
+		</form>
+		<p id="explore-status" class="playground-explore-status" aria-live="polite">Live graph · change a control to rematerialize visuals.</p>
 	</div>
-	<section class="benchmark-statistics" aria-labelledby="benchmark-statistics-title">
-		<header>
-			<p class="benchmark-eyebrow">Sample distributions</p>
-			<h3 id="benchmark-statistics-title">Statistical analysis</h3>
-			<p id="statistics-protocol">Run the benchmark to populate distribution statistics.</p>
-		</header>
-		<div class="benchmark-statistics-grid">
-			<div><span>Frame mean</span><strong id="statistics-frame-mean">—</strong></div>
-			<div><span>Frame median</span><strong id="statistics-frame-p50">—</strong></div>
-			<div><span>Frame p99</span><strong id="statistics-frame-p99">—</strong></div>
-			<div><span>Frame σ</span><strong id="statistics-frame-deviation">—</strong></div>
-			<div><span>Frame CV</span><strong id="statistics-frame-variation">—</strong></div>
-			<div><span>Selection p99</span><strong id="statistics-selection-p99">—</strong></div>
-		</div>
-	</section>
 
-	<section class="benchmark-history" aria-labelledby="benchmark-history-title">
-		<header>
+	<div id="panel-prove" class="playground-panel" role="tabpanel" aria-labelledby="tab-prove" hidden>
+		<div class="benchmark-controls" aria-label="Benchmark configuration">
+			<label class="benchmark-fixture">
+				<span>Graph size</span>
+				<select id="benchmark-size">
+					<option value="1000">1,000 nodes · 3,000 edges</option>
+					<option value="10000">10,000 nodes · 30,000 edges</option>
+					<option value="100000">100,000 nodes · 300,000 edges</option>
+				</select>
+			</label>
+			<label>
+				<span>Dimension</span>
+				<select id="benchmark-mode">
+					<option value="2d">2D</option>
+					<option value="3d">3D</option>
+				</select>
+			</label>
+			<label>
+				<span>Pixel ratio</span>
+				<select id="benchmark-pixel-ratio">
+					<option value="1">1× controlled</option>
+					<option value="2">Up to 2× native</option>
+				</select>
+			</label>
+			<button id="benchmark-run" type="button"><span>Run benchmark</span><span aria-hidden="true">→</span></button>
+		</div>
+
+		<div class="benchmark-metrics" aria-label="Benchmark headline measurements">
+			<div><span>First meaningful frame</span><strong id="metric-fmf">—</strong><small>fixture to visible graph</small></div>
+			<div><span>Rendered frame p95</span><strong id="metric-frame">—</strong><small>scheduled render cadence</small></div>
+			<div><span>1% node update</span><strong id="metric-incremental">—</strong><small>positions + incident edges</small></div>
+			<div><span>Full snapshot +1%</span><strong id="metric-snapshot">—</strong><small>complete graph replacement</small></div>
+			<div><span>Visible materialization</span><strong id="metric-visible">—</strong><small id="metric-lod">LOD and edge budget</small></div>
+			<div><span>GPU draw calls</span><strong id="metric-draw-calls">—</strong><small id="metric-picking">per rendered frame</small></div>
+		</div>
+		<section class="benchmark-statistics" aria-labelledby="benchmark-statistics-title">
+			<header>
+				<p class="benchmark-eyebrow">Sample distributions</p>
+				<h3 id="benchmark-statistics-title">Statistical analysis</h3>
+				<p id="statistics-protocol">Run the benchmark to populate distribution statistics.</p>
+			</header>
+			<div class="benchmark-statistics-grid">
+				<div><span>Frame mean</span><strong id="statistics-frame-mean">—</strong></div>
+				<div><span>Frame median</span><strong id="statistics-frame-p50">—</strong></div>
+				<div><span>Frame p99</span><strong id="statistics-frame-p99">—</strong></div>
+				<div><span>Frame σ</span><strong id="statistics-frame-deviation">—</strong></div>
+				<div><span>Frame CV</span><strong id="statistics-frame-variation">—</strong></div>
+				<div><span>Selection p99</span><strong id="statistics-selection-p99">—</strong></div>
+			</div>
+		</section>
+
+		<section class="benchmark-history" aria-labelledby="benchmark-history-title">
+			<header>
+				<div>
+					<p class="benchmark-eyebrow">Browser-local evidence</p>
+					<h3 id="benchmark-history-title">Run history</h3>
+					<p id="benchmark-history-count">Runs are saved in this browser after they complete.</p>
+				</div>
+				<div class="benchmark-history-actions">
+					<label>
+						<span>Metric</span>
+						<select id="benchmark-history-metric">
+							<option value="frameP95Milliseconds">Rendered frame p95</option>
+							<option value="firstMeaningfulFrameMilliseconds">First meaningful frame</option>
+							<option value="selectionP95Milliseconds">Selection p95</option>
+							<option value="incrementalUpdateMilliseconds">1% node update</option>
+							<option value="fullSnapshotUpdateMilliseconds">Full snapshot +1%</option>
+						</select>
+					</label>
+					<button id="benchmark-history-clear" class="benchmark-secondary" type="button">Clear local history</button>
+				</div>
+			</header>
+			<div class="benchmark-chart-wrap">
+				<svg id="benchmark-history-chart" viewBox="0 0 800 260" role="img" aria-label="Saved benchmark runs plotted over time"></svg>
+				<p id="benchmark-history-empty">Complete a run to start the comparison.</p>
+			</div>
+			<footer class="benchmark-history-meta">
+				<div id="benchmark-history-legend" class="benchmark-history-legend" aria-label="Chart series"></div>
+				<p class="benchmark-history-note">History stays in this browser. The selected graph size filters the chart so unlike fixtures are never compared as peers.</p>
+			</footer>
+		</section>
+
+		<div class="benchmark-report">
 			<div>
-				<p class="benchmark-eyebrow">Browser-local evidence</p>
-				<h3 id="benchmark-history-title">Run history</h3>
-				<p id="benchmark-history-count">Runs are saved in this browser after they complete.</p>
+				<p id="benchmark-status" class="benchmark-status" aria-live="polite">Ready. Nothing has been measured yet.</p>
+				<p class="benchmark-note">Keep this tab visible and avoid DevTools throttling for a representative run.</p>
 			</div>
-			<div class="benchmark-history-actions">
-				<label>
-					<span>Metric</span>
-					<select id="benchmark-history-metric">
-						<option value="frameP95Milliseconds">Rendered frame p95</option>
-						<option value="firstMeaningfulFrameMilliseconds">First meaningful frame</option>
-						<option value="selectionP95Milliseconds">Selection p95</option>
-						<option value="incrementalUpdateMilliseconds">1% node update</option>
-						<option value="fullSnapshotUpdateMilliseconds">Full snapshot +1%</option>
-					</select>
-				</label>
-				<button id="benchmark-history-clear" class="benchmark-secondary" type="button">Clear local history</button>
-			</div>
-		</header>
-		<div class="benchmark-chart-wrap">
-			<svg id="benchmark-history-chart" viewBox="0 0 800 260" role="img" aria-label="Saved benchmark runs plotted over time"></svg>
-			<p id="benchmark-history-empty">Complete a run to start the comparison.</p>
+			<button id="benchmark-copy" class="benchmark-secondary" type="button" disabled>Copy JSON</button>
 		</div>
-		<footer class="benchmark-history-meta">
-			<div id="benchmark-history-legend" class="benchmark-history-legend" aria-label="Chart series"></div>
-			<p class="benchmark-history-note">History stays in this browser. The selected graph size filters the chart so unlike fixtures are never compared as peers.</p>
-		</footer>
-	</section>
-
-	<div class="benchmark-report">
-		<div>
-			<p id="benchmark-status" class="benchmark-status" aria-live="polite">Ready. Nothing has been measured yet.</p>
-			<p class="benchmark-note">Keep this tab visible and avoid DevTools throttling for a representative run.</p>
-		</div>
-		<button id="benchmark-copy" class="benchmark-secondary" type="button" disabled>Copy JSON</button>
+		<details class="benchmark-details">
+			<summary>Complete benchmark JSON</summary>
+			<pre id="benchmark-output" class="benchmark-output" tabindex="0">Run the benchmark to produce a result.</pre>
+		</details>
 	</div>
-	<details class="benchmark-details">
-		<summary>Complete benchmark JSON</summary>
-		<pre id="benchmark-output" class="benchmark-output" tabindex="0">Run the benchmark to produce a result.</pre>
-	</details>
 </section>
 
 <script>
-	import { Graphraum, type GraphraumMode } from "@domudev/graphraum";
+	import {
+		Graphraum,
+		type GraphraumEdgeMarker,
+		type GraphraumEdgeMarkerEnd,
+		type GraphraumEdgeStyle,
+		type GraphraumMode,
+		type GraphraumNodeShape,
+	} from "@domudev/graphraum";
 	import { createFixture, effectivePixelRatio, summarize } from "../lib/benchmark";
 	import {
 		appendHistory,
@@ -121,12 +249,19 @@
 		type BenchmarkHistoryEntry,
 		type BenchmarkHistoryMetric,
 	} from "../lib/benchmark-history";
+	import {
+		createPlaygroundFixture,
+		createPlaygroundVisuals,
+		defaultPlaygroundAppearance,
+		type PlaygroundAppearance,
+	} from "../lib/playground";
 
 	type MemoryPerformance = Performance & { memory?: { usedJSHeapSize: number } };
+	type PlaygroundTab = "explore" | "prove";
 
 	function requireElement<ElementType extends Element>(selector: string) {
 		const element = document.querySelector<ElementType>(selector);
-		if (!element) throw new Error(`Benchmark element not found: ${selector}`);
+		if (!element) throw new Error(`Playground element not found: ${selector}`);
 		return element;
 	}
 
@@ -162,6 +297,14 @@
 	}
 
 	const container = requireElement<HTMLElement>("#benchmark-graph");
+	const stageMode = requireElement<HTMLElement>("#benchmark-stage-mode");
+	const tabExplore = requireElement<HTMLButtonElement>("#tab-explore");
+	const tabProve = requireElement<HTMLButtonElement>("#tab-prove");
+	const panelExplore = requireElement<HTMLElement>("#panel-explore");
+	const panelProve = requireElement<HTMLElement>("#panel-prove");
+	const exploreForm = requireElement<HTMLFormElement>("#explore-controls");
+	const exploreStatus = requireElement<HTMLElement>("#explore-status");
+
 	const sizeSelect = requireElement<HTMLSelectElement>("#benchmark-size");
 	const modeSelect = requireElement<HTMLSelectElement>("#benchmark-mode");
 	const pixelRatioSelect = requireElement<HTMLSelectElement>("#benchmark-pixel-ratio");
@@ -169,7 +312,6 @@
 	const copyButton = requireElement<HTMLButtonElement>("#benchmark-copy");
 	const output = requireElement<HTMLElement>("#benchmark-output");
 	const status = requireElement<HTMLElement>("#benchmark-status");
-	const stageMode = requireElement<HTMLElement>("#benchmark-stage-mode");
 	const metricFmf = requireElement<HTMLElement>("#metric-fmf");
 	const metricFrame = requireElement<HTMLElement>("#metric-frame");
 	const metricIncremental = requireElement<HTMLElement>("#metric-incremental");
@@ -191,8 +333,74 @@
 	const historyEmpty = requireElement<HTMLElement>("#benchmark-history-empty");
 	const historyLegend = requireElement<HTMLElement>("#benchmark-history-legend");
 	const historyCount = requireElement<HTMLElement>("#benchmark-history-count");
-	let graph: Graphraum | null = null;
+
+	let graph: { destroy: () => void } | null = null;
+	let activeTab: PlaygroundTab = "explore";
 	let result = "";
+	let measuring = false;
+
+	function formValue(values: FormData, name: string) {
+		const value = values.get(name);
+		if (typeof value !== "string") throw new Error(`Missing explore control: ${name}`);
+		return value;
+	}
+
+	function readExploreAppearance(): { appearance: PlaygroundAppearance; mode: GraphraumMode } {
+		const values = new FormData(exploreForm);
+		const appearance = defaultPlaygroundAppearance();
+		appearance.nodeCount = Number(formValue(values, "nodeCount"));
+		appearance.nodeAspect = Number(formValue(values, "nodeAspect"));
+		appearance.nodeStrokeWidth = Number(formValue(values, "nodeStrokeWidth"));
+		appearance.nodeShapes = {
+			concept: formValue(values, "conceptShape") as GraphraumNodeShape,
+			document: formValue(values, "documentShape") as GraphraumNodeShape,
+			person: formValue(values, "personShape") as GraphraumNodeShape,
+		};
+		appearance.edgeStyle = formValue(values, "edgeStyle") as GraphraumEdgeStyle;
+		appearance.edgeMarker = formValue(values, "edgeMarker") as GraphraumEdgeMarker;
+		appearance.edgeMarkerEnd = formValue(values, "edgeMarkerEnd") as GraphraumEdgeMarkerEnd;
+		appearance.edgeWidth = Number(formValue(values, "edgeWidth"));
+		appearance.edgeOpacity = Number(formValue(values, "edgeOpacity"));
+		return { appearance, mode: formValue(values, "mode") as GraphraumMode };
+	}
+
+	function destroyGraph() {
+		graph?.destroy();
+		graph = null;
+	}
+
+	function mountExplore() {
+		if (measuring || activeTab !== "explore") return;
+		const { appearance, mode } = readExploreAppearance();
+		destroyGraph();
+		const next = new Graphraum(container, {
+			mode,
+			maxPixelRatio: 1,
+			visuals: createPlaygroundVisuals(appearance),
+		});
+		next.setData(createPlaygroundFixture(appearance.nodeCount));
+		graph = next;
+		stageMode.textContent = `${mode.toUpperCase()} · explore`;
+		exploreStatus.textContent = `${appearance.nodeCount.toLocaleString()} nodes · ${mode.toUpperCase()} · shapes, stroke, and edge styles rematerialize on change.`;
+	}
+
+	function setActiveTab(next: PlaygroundTab) {
+		if (measuring && next === "explore") return;
+		activeTab = next;
+		const exploreActive = next === "explore";
+		tabExplore.setAttribute("aria-selected", String(exploreActive));
+		tabProve.setAttribute("aria-selected", String(!exploreActive));
+		tabExplore.tabIndex = exploreActive ? 0 : -1;
+		tabProve.tabIndex = exploreActive ? -1 : 0;
+		panelExplore.hidden = !exploreActive;
+		panelProve.hidden = exploreActive;
+		if (exploreActive) {
+			mountExplore();
+		} else {
+			destroyGraph();
+			stageMode.textContent = `${modeSelect.value.toUpperCase()} · ready`;
+		}
+	}
 
 	function loadHistory() {
 		try {
@@ -212,90 +420,69 @@
 	}
 
 	function renderHistory() {
-		const entries = loadHistory().filter(
-			(entry) => entry.nodeCount === Number(sizeSelect.value),
-		);
-		const selectedMetric = historyMetric.value as BenchmarkHistoryMetric;
+		const history = loadHistory().filter((entry) => entry.nodeCount === Number(sizeSelect.value));
+		const metric = historyMetric.value as BenchmarkHistoryMetric;
+		historyCount.textContent =
+			history.length === 0
+				? "No saved runs for this fixture size yet."
+				: `${history.length} saved run${history.length === 1 ? "" : "s"} for this fixture size.`;
+		historyEmpty.hidden = history.length > 0;
 		historyChart.replaceChildren();
 		historyLegend.replaceChildren();
-		historyEmpty.hidden = entries.length > 0;
-		historyChart.toggleAttribute("hidden", entries.length === 0);
-		historyCount.textContent = entries.length
-			? `${entries.length} saved ${entries.length === 1 ? "run" : "runs"} for this fixture.`
-			: "Runs are saved in this browser after they complete.";
-		if (entries.length === 0) return;
+		if (history.length === 0) return;
 
 		const width = 800;
 		const height = 260;
-		const padding = { top: 20, right: 24, bottom: 34, left: 58 };
-		const plotWidth = width - padding.left - padding.right;
-		const plotHeight = height - padding.top - padding.bottom;
-		const maximum = Math.max(...entries.map((entry) => metricValue(entry, selectedMetric)), 1) * 1.1;
+		const pad = { top: 24, right: 24, bottom: 36, left: 56 };
+		const plotWidth = width - pad.left - pad.right;
+		const plotHeight = height - pad.top - pad.bottom;
+		const values = history.map((entry) => metricValue(entry, metric));
+		const maxValue = Math.max(...values, 1);
+		const modes = [...new Set(history.map((entry) => entry.mode))];
 
-		for (let index = 0; index <= 4; index += 1) {
-			const y = padding.top + (plotHeight * index) / 4;
+		for (const tick of [0, 0.25, 0.5, 0.75, 1]) {
+			const y = pad.top + plotHeight * (1 - tick);
 			const line = svgElement("line");
-			line.setAttribute("x1", String(padding.left));
-			line.setAttribute("x2", String(width - padding.right));
+			line.setAttribute("class", "benchmark-chart-grid");
+			line.setAttribute("x1", String(pad.left));
+			line.setAttribute("x2", String(width - pad.right));
 			line.setAttribute("y1", String(y));
 			line.setAttribute("y2", String(y));
-			line.setAttribute("class", "benchmark-chart-grid");
 			historyChart.append(line);
 			const label = svgElement("text");
-			label.setAttribute("x", String(padding.left - 10));
-			label.setAttribute("y", String(y + 4));
 			label.setAttribute("class", "benchmark-chart-label");
-			label.textContent = formatMilliseconds(maximum * (1 - index / 4));
+			label.setAttribute("x", String(pad.left - 8));
+			label.setAttribute("y", String(y + 4));
+			label.textContent = formatMilliseconds(maxValue * tick);
 			historyChart.append(label);
 		}
 
-		const series = new Map<string, { color: string; points: string[] }>();
-		entries.forEach((entry, index) => {
-			const key = `${entry.approach} · ${entry.mode.toUpperCase()}`;
-			const current = series.get(key) ?? { color: seriesColors[series.size % seriesColors.length], points: [] };
-			const x = entries.length === 1 ? padding.left + plotWidth / 2 : padding.left + (plotWidth * index) / (entries.length - 1);
-			const value = metricValue(entry, selectedMetric);
-			const y = padding.top + plotHeight * (1 - value / maximum);
-			current.points.push(`${x},${y}`);
-			series.set(key, current);
-
-			const dot = svgElement("circle");
-			dot.setAttribute("cx", String(x));
-			dot.setAttribute("cy", String(y));
-			dot.setAttribute("r", "5");
-			dot.setAttribute("fill", current.color);
-			const title = svgElement("title");
-			title.textContent = `${key}: ${formatMilliseconds(value)} · ${new Date(entry.timestamp).toLocaleString()}`;
-			dot.append(title);
-			historyChart.append(dot);
-		});
-
-		for (const [name, seriesValue] of series) {
-			if (seriesValue.points.length > 1) {
-				const line = svgElement("polyline");
-				line.setAttribute("points", seriesValue.points.join(" "));
-				line.setAttribute("fill", "none");
-				line.setAttribute("stroke", seriesValue.color);
-				line.setAttribute("stroke-width", "3");
-				line.setAttribute("stroke-linejoin", "round");
-				historyChart.prepend(line);
-			}
-			const legendItem = document.createElement("span");
-			const swatch = document.createElement("i");
-			swatch.style.background = seriesValue.color;
-			legendItem.append(swatch, name);
-			historyLegend.append(legendItem);
+		for (const [modeIndex, mode] of modes.entries()) {
+			const color = seriesColors[modeIndex % seriesColors.length] ?? "#73c7a5";
+			const points = history
+				.map((entry, index) => {
+					if (entry.mode !== mode) return null;
+					const x = pad.left + (history.length === 1 ? plotWidth / 2 : (index / (history.length - 1)) * plotWidth);
+					const y = pad.top + plotHeight * (1 - metricValue(entry, metric) / maxValue);
+					return `${x},${y}`;
+				})
+				.filter((point): point is string => point !== null);
+			if (points.length === 0) continue;
+			const path = svgElement("polyline");
+			path.setAttribute("fill", "none");
+			path.setAttribute("stroke", color);
+			path.setAttribute("stroke-width", "2");
+			path.setAttribute("points", points.join(" "));
+			historyChart.append(path);
+			const legend = document.createElement("span");
+			legend.innerHTML = `<i style="background:${color}"></i>${mode.toUpperCase()}`;
+			historyLegend.append(legend);
 		}
 	}
 
-	container.addEventListener("click", (event) => {
-		const selected = graph?.pick(event.clientX, event.clientY);
-		graph?.setSelection(selected ? [selected] : []);
-	});
-
-	modeSelect.addEventListener("change", () => {
-		stageMode.textContent = `${modeSelect.value.toUpperCase()} · ready`;
-	});
+	tabExplore.addEventListener("click", () => setActiveTab("explore"));
+	tabProve.addEventListener("click", () => setActiveTab("prove"));
+	exploreForm.addEventListener("change", () => mountExplore());
 	sizeSelect.addEventListener("change", renderHistory);
 	historyMetric.addEventListener("change", renderHistory);
 	historyClear.addEventListener("click", () => {
@@ -309,6 +496,7 @@
 		renderHistory();
 	});
 	renderHistory();
+	mountExplore();
 
 	copyButton.addEventListener("click", async () => {
 		await navigator.clipboard.writeText(result);
@@ -317,12 +505,15 @@
 	});
 
 	runButton.addEventListener("click", async () => {
+		if (activeTab !== "prove") setActiveTab("prove");
+		measuring = true;
 		runButton.disabled = true;
 		copyButton.disabled = true;
+		tabExplore.disabled = true;
 		stageMode.textContent = `${modeSelect.value.toUpperCase()} · measuring`;
 		status.textContent = "Running… keep this tab visible for representative frame timing.";
 		output.textContent = "Collecting browser measurements…";
-		graph?.destroy();
+		destroyGraph();
 
 		try {
 			const nodeCount = Number(sizeSelect.value);
@@ -345,10 +536,11 @@
 			const fixtureGenerationMilliseconds = performance.now() - fixtureStartedAt;
 			await nextFrame();
 			const constructionStartedAt = performance.now();
-			graph = new Graphraum(container, { mode, maxPixelRatio });
+			const measureGraph = new Graphraum(container, { mode, maxPixelRatio });
+			graph = measureGraph;
 			const rendererConstructionMilliseconds = performance.now() - constructionStartedAt;
 			const setDataStartedAt = performance.now();
-			graph.setData(data);
+			measureGraph.setData(data);
 			const setDataMilliseconds = performance.now() - setDataStartedAt;
 			status.textContent = "Measuring first frame…";
 			const firstFrameStartedAt = performance.now();
@@ -357,20 +549,20 @@
 			const firstMeaningfulFrameMilliseconds = performance.now() - mountedAt;
 			const displayCadence = summarize(await measureFrames(() => {}, 30));
 			status.textContent = `Warming up with ${warmupFrameCount} rendered frames…`;
-			await measureFrames(() => graph?.render(), warmupFrameCount);
+			await measureFrames(() => measureGraph.render(), warmupFrameCount);
 			status.textContent = `Measuring ${frameSampleCount} rendered frames…`;
-			const frameTimes = summarize(await measureFrames(() => graph?.render(), frameSampleCount));
+			const frameTimes = summarize(await measureFrames(() => measureGraph.render(), frameSampleCount));
 			const selectionFeedback: number[] = [];
 			status.textContent = `Measuring ${selectionSampleCount} selection changes…`;
 			for (let index = 0; index < selectionSampleCount; index += 1) {
 				const startedAt = performance.now();
-				graph.setSelection([`node-${index % 2}`]);
+				measureGraph.setSelection([`node-${index % 2}`]);
 				await nextFrame();
 				selectionFeedback.push(performance.now() - startedAt);
 			}
 			const incrementalUpdateStartedAt = performance.now();
 			const incrementalNodeCount = Math.max(10, Math.floor(nodeCount * 0.01));
-			graph.updateNodes(
+			measureGraph.updateNodes(
 				data.nodes.slice(0, incrementalNodeCount).map((node) => ({
 					id: node.id,
 					position: { ...node.position, x: node.position.x + 0.5 },
@@ -380,13 +572,13 @@
 			const incrementalNodeUpdateMilliseconds = performance.now() - incrementalUpdateStartedAt;
 			const updateStartedAt = performance.now();
 			status.textContent = "Measuring a 1% full-snapshot update…";
-			graph.setData(createFixture(nodeCount + Math.max(10, Math.floor(nodeCount * 0.01))));
+			measureGraph.setData(createFixture(nodeCount + Math.max(10, Math.floor(nodeCount * 0.01))));
 			await nextFrame();
 			const updateMilliseconds = performance.now() - updateStartedAt;
 			await nextFrame();
 			observer?.disconnect();
 			const heapAfter = (performance as MemoryPerformance).memory?.usedJSHeapSize;
-			const diagnostics = graph.getDiagnostics();
+			const diagnostics = measureGraph.getDiagnostics();
 
 			const selectionSummary = summarize(selectionFeedback);
 			const payload = {
@@ -466,7 +658,9 @@
 			status.textContent = `Benchmark failed: ${message}`;
 			output.textContent = message;
 		} finally {
+			measuring = false;
 			runButton.disabled = false;
+			tabExplore.disabled = false;
 		}
 	});
 </script>
