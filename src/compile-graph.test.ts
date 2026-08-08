@@ -98,7 +98,7 @@ describe("compileGraph", () => {
 			compileGraph(
 				{ edges: [], nodes: [{ id: "customer-42", position: { x: 0, y: 0 } }] },
 				defineVisuals({
-					node: () => ({ visual: { shape: "hexagon" as "circle" } }),
+					node: () => ({ visual: { shape: "octagon" as "circle" } }),
 				}),
 			),
 		).toThrow('Node "customer-42" shape must be one of: "circle", "square", "diamond"');

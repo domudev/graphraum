@@ -31,7 +31,7 @@ describe("prepareNodeUpdates", () => {
 
 	test("rejects an invalid batch before renderer mutation", () => {
 		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", size: 0 }])).toThrow("positive finite size");
-		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", shape: "hexagon" as "circle" }])).toThrow(
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", shape: "octagon" as "circle" }])).toThrow(
 			'Node "a" shape must be one of',
 		);
 		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "missing", size: 2 }])).toThrow(
