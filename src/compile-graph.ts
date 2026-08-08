@@ -78,10 +78,23 @@ function compilePresentation(
 	});
 }
 
-function compileNodeVisual(id: string, visual: GraphraumNodeVisual): Readonly<GraphraumNodeVisual> {
-	if (visual.size !== undefined && (!Number.isFinite(visual.size) || visual.size <= 0)) {
-		throw new Error(`Node "${id}" visual must have a positive finite size`);
+function assertPositiveFiniteVisual(id: string, field: string, value: number | undefined): void {
+	if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+		throw new Error(`Node "${id}" visual must have a positive finite ${field}`);
 	}
+}
+
+function assertNonNegativeFiniteVisual(id: string, field: string, value: number | undefined): void {
+	if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+		throw new Error(`Node "${id}" visual must have a finite non-negative ${field}`);
+	}
+}
+
+function compileNodeVisual(id: string, visual: GraphraumNodeVisual): Readonly<GraphraumNodeVisual> {
+	assertPositiveFiniteVisual(id, "size", visual.size);
+	assertPositiveFiniteVisual(id, "width", visual.width);
+	assertPositiveFiniteVisual(id, "height", visual.height);
+	assertNonNegativeFiniteVisual(id, "strokeWidth", visual.strokeWidth);
 	if (visual.shape !== undefined) assertNodeShape(id, visual.shape);
 	return Object.freeze({ ...visual });
 }
@@ -109,11 +122,16 @@ export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefi
 		const encoding = visuals?.node?.(node);
 		const visual = compileNodeVisual(
 			node.id,
-			encoding?.visual ?? { color: node.color, shape: node.shape, size: node.size },
+			encoding?.visual ?? {
+				color: node.color,
+				height: node.height,
+				shape: node.shape,
+				size: node.size,
+				strokeColor: node.strokeColor,
+				strokeWidth: node.strokeWidth,
+				width: node.width,
+			},
 		);
-		if (visual.size !== undefined && (!Number.isFinite(visual.size) || visual.size <= 0)) {
-			throw new Error(`Node "${node.id}" must have a positive finite size`);
-		}
 		nodeVisuals.push(visual);
 		if (encoding?.presentation) {
 			nodePresentations.set(node.id, compilePresentation("Node", node.id, encoding.presentation));
