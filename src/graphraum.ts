@@ -563,6 +563,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			totalEdges: this.data.edges.length,
 			totalNodes: this.data.nodes.length,
 			visibleEdgeCandidates: this.visibleEdgeCandidateCount,
+			visibleEdgeMarkers: 0,
+			visibleEdgeSegments: this.visibleEdgeCount,
 			visibleEdges: this.visibleEdgeCount,
 			visibleNodes: this.visibleNodeCount,
 			visibleNodeCandidates: this.visibleNodeCandidateCount,

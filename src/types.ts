@@ -40,8 +40,18 @@ export interface GraphraumLayoutPositions {
 	positions: Float32Array;
 }
 
+export type GraphraumEdgeStyle = "solid" | "dashed" | "dotted";
+export type GraphraumEdgeMarker = "none" | "triangle";
+export type GraphraumEdgeMarkerEnd = "target" | "source" | "both";
+
 export type GraphraumEdge<EdgeAttributes = undefined> = {
 	color?: GraphraumColor;
+	width?: number;
+	opacity?: number;
+	style?: GraphraumEdgeStyle;
+	marker?: GraphraumEdgeMarker;
+	markerSize?: number;
+	markerEnd?: GraphraumEdgeMarkerEnd;
 	id: string;
 	source: string;
 	target: string;
@@ -67,6 +77,12 @@ export interface GraphraumNodeVisual {
 
 export interface GraphraumEdgeVisual {
 	color?: GraphraumColor;
+	width?: number;
+	opacity?: number;
+	style?: GraphraumEdgeStyle;
+	marker?: GraphraumEdgeMarker;
+	markerSize?: number;
+	markerEnd?: GraphraumEdgeMarkerEnd;
 }
 
 export type GraphraumPropertyValue = boolean | null | number | string;
@@ -134,6 +150,8 @@ export interface GraphraumTheme {
 	background: GraphraumColor;
 	dimmedNode: GraphraumColor;
 	edge: GraphraumColor;
+	edgeOpacity: number;
+	edgeWidth: number;
 	focusedNode: GraphraumColor;
 	hoveredNode: GraphraumColor;
 	node: GraphraumColor;
@@ -164,6 +182,8 @@ export interface GraphraumDiagnostics {
 	totalEdges: number;
 	totalNodes: number;
 	visibleEdgeCandidates: number;
+	visibleEdgeMarkers: number;
+	visibleEdgeSegments: number;
 	visibleEdges: number;
 	visibleNodes: number;
 	visibleNodeCandidates: number;
