@@ -1,3 +1,4 @@
+import { resolveNodeAxes } from "./node-axes";
 import { assertNodeShape } from "./node-shapes";
 import type { GraphraumNode, GraphraumNodeGeometry, GraphraumNodeUpdate } from "./types";
 
@@ -7,10 +8,13 @@ export interface PreparedNodeUpdate<NodeAttributes = undefined> {
 	next: GraphraumNode<NodeAttributes>;
 	positionChanged: boolean;
 	shapeChanged: boolean;
+	/** True when `size`, `width`, or `height` changed — the matrix scale must be rewritten. */
 	sizeChanged: boolean;
+	/** True when `strokeWidth` or `strokeColor` changed — the stroke attributes must be rewritten. */
+	strokeChanged: boolean;
 }
 
-function assertFinitePosition(node: GraphraumNodeGeometry) {
+function assertValidNode(node: GraphraumNodeGeometry) {
 	for (const [axis, value] of [
 		["x", node.position.x],
 		["y", node.position.y],
@@ -18,8 +22,9 @@ function assertFinitePosition(node: GraphraumNodeGeometry) {
 	] as const) {
 		if (!Number.isFinite(value)) throw new Error(`Node "${node.id}" has a non-finite ${axis} position`);
 	}
-	if (node.size !== undefined && (!Number.isFinite(node.size) || node.size <= 0)) {
-		throw new Error(`Node "${node.id}" must have a positive finite size`);
+	resolveNodeAxes({ height: node.height, nodeId: node.id, size: node.size, width: node.width });
+	if (node.strokeWidth !== undefined && (!Number.isFinite(node.strokeWidth) || node.strokeWidth < 0)) {
+		throw new Error(`Node "${node.id}" must have a finite non-negative strokeWidth`);
 	}
 	if (node.shape !== undefined) assertNodeShape(node.id, node.shape);
 }
@@ -44,15 +49,20 @@ export function prepareNodeUpdates<NodeAttributes = undefined>(
 			...(update.position ? { position: { ...update.position } } : {}),
 			...(Object.hasOwn(update, "shape") ? { shape: update.shape } : {}),
 			...(Object.hasOwn(update, "size") ? { size: update.size } : {}),
+			...(Object.hasOwn(update, "width") ? { width: update.width } : {}),
+			...(Object.hasOwn(update, "height") ? { height: update.height } : {}),
+			...(Object.hasOwn(update, "strokeWidth") ? { strokeWidth: update.strokeWidth } : {}),
+			...(Object.hasOwn(update, "strokeColor") ? { strokeColor: update.strokeColor } : {}),
 		};
-		assertFinitePosition(next);
+		assertValidNode(next);
 		return {
 			colorChanged: Object.hasOwn(update, "color"),
 			index,
 			next,
 			positionChanged: update.position !== undefined,
 			shapeChanged: Object.hasOwn(update, "shape"),
-			sizeChanged: Object.hasOwn(update, "size"),
+			sizeChanged: Object.hasOwn(update, "size") || Object.hasOwn(update, "width") || Object.hasOwn(update, "height"),
+			strokeChanged: Object.hasOwn(update, "strokeWidth") || Object.hasOwn(update, "strokeColor"),
 		};
 	});
 }

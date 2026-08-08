@@ -98,7 +98,7 @@ describe("compileGraph", () => {
 			compileGraph(
 				{ edges: [], nodes: [{ id: "customer-42", position: { x: 0, y: 0 } }] },
 				defineVisuals({
-					node: () => ({ visual: { shape: "hexagon" as "circle" } }),
+					node: () => ({ visual: { shape: "octagon" as "circle" } }),
 				}),
 			),
 		).toThrow('Node "customer-42" shape must be one of: "circle", "square", "diamond"');
@@ -175,6 +175,93 @@ describe("compileGraph", () => {
 
 		expect(graph.nodeVisuals).toEqual([{ color: "#73c7a5", size: 7 }]);
 		expect(graph.edgeVisuals).toEqual([{ color: "#469878" }]);
+	});
+
+	test("compiles a full node visual with axes and stroke from mapper and snapshot fields", () => {
+		const mapped = compileGraph(
+			{
+				edges: [],
+				nodes: [{ id: "a", position: { x: 0, y: 0 } }],
+			},
+			defineVisuals({
+				node: () => ({
+					visual: {
+						color: "#73c7a5",
+						height: 4,
+						shape: "hexagon",
+						size: 5,
+						strokeColor: "#fcfffc",
+						strokeWidth: 1.5,
+						width: 6,
+					},
+				}),
+			}),
+		);
+		expect(mapped.nodeVisuals).toEqual([
+			{
+				color: "#73c7a5",
+				height: 4,
+				shape: "hexagon",
+				size: 5,
+				strokeColor: "#fcfffc",
+				strokeWidth: 1.5,
+				width: 6,
+			},
+		]);
+		expect(Object.isFrozen(mapped.nodeVisuals[0])).toBe(true);
+
+		const snapshot = compileGraph({
+			edges: [],
+			nodes: [
+				{
+					color: "#73c7a5",
+					height: 4,
+					id: "a",
+					position: { x: 0, y: 0 },
+					shape: "hexagon",
+					size: 5,
+					strokeColor: "#fcfffc",
+					strokeWidth: 1.5,
+					width: 6,
+				},
+			],
+		});
+		expect(snapshot.nodeVisuals).toEqual(mapped.nodeVisuals);
+	});
+
+	test("rejects a non-positive or non-finite node width", () => {
+		expect(() =>
+			compileGraph({
+				edges: [],
+				nodes: [{ id: "a", position: { x: 0, y: 0 }, width: 0 }],
+			}),
+		).toThrow('Node "a" visual must have a positive finite width');
+	});
+
+	test("rejects a non-positive or non-finite node height", () => {
+		expect(() =>
+			compileGraph({
+				edges: [],
+				nodes: [{ height: Number.NaN, id: "a", position: { x: 0, y: 0 } }],
+			}),
+		).toThrow('Node "a" visual must have a positive finite height');
+	});
+
+	test("rejects a negative node strokeWidth", () => {
+		expect(() =>
+			compileGraph({
+				edges: [],
+				nodes: [{ id: "a", position: { x: 0, y: 0 }, strokeWidth: -1 }],
+			}),
+		).toThrow('Node "a" visual must have a finite non-negative strokeWidth');
+	});
+
+	test("accepts a zero node strokeWidth", () => {
+		const graph = compileGraph({
+			edges: [],
+			nodes: [{ id: "a", position: { x: 0, y: 0 }, strokeWidth: 0 }],
+		});
+		expect(graph.nodeVisuals).toEqual([{ strokeWidth: 0 }]);
 	});
 
 	test("rejects duplicate node identities before rendering", () => {

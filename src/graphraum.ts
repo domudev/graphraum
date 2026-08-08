@@ -28,8 +28,10 @@ import {
 	writeEdgeSegmentInstance,
 } from "./edge-rendering";
 import { prepareLayoutPositions } from "./layout-positions";
-import { createNodeGeometry, createNodeMaterial, setNodeShapeAt } from "./node-rendering";
+import { resolveNodeAxes } from "./node-axes";
+import { createNodeGeometry, createNodeMaterial, setNodeShapeAt, setNodeStrokeAt } from "./node-rendering";
 import { containsNodePoint } from "./node-shapes";
+import { resolveNodeStroke } from "./node-stroke";
 import { type PreparedNodeUpdate, prepareNodeUpdates } from "./node-updates";
 import { GraphraumOverlay } from "./overlay";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
@@ -59,8 +61,9 @@ type GraphraumGraphObjects = {
 };
 
 interface MaterializedNode {
+	height: number;
 	index: number;
-	size: number;
+	width: number;
 	x: number;
 	y: number;
 	z: number;
@@ -94,6 +97,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private readonly pointer = new Vector2();
 	private readonly pickCenter = new Vector3();
 	private readonly pickRight = new Vector3();
+	private readonly pickUp = new Vector3();
 	private readonly theme: GraphraumTheme;
 	private readonly resizeObserver: ResizeObserver;
 	private readonly maxVisibleEdges: number;
@@ -370,6 +374,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const nodes = [...this.data.nodes];
 		const matrix = new Matrix4();
 		const nodeShape = nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
+		const nodeStrokeWidth = nodeMesh.geometry.getAttribute("instanceStrokeWidth") as InstancedBufferAttribute;
+		const nodeStrokeColor = nodeMesh.geometry.getAttribute("instanceStrokeColor") as InstancedBufferAttribute;
 		const viewportBounds = this.getViewportBounds2d();
 		let visibilityChanged = false;
 		// Edge segments/markers are re-packed by materializeViewport rather than patched in
@@ -387,13 +393,19 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			const nodeSlot = this.visibleNodeSlots.get(update.index);
 			if (update.positionChanged || update.sizeChanged) {
 				if (nodeSlot !== undefined) {
-					const size = update.next.size ?? 4;
-					matrix.makeScale(size, size, size);
+					const { height, width } = resolveNodeAxes({
+						height: update.next.height,
+						nodeId: update.next.id,
+						size: update.next.size,
+						width: update.next.width,
+					});
+					const maxAxis = Math.max(width, height);
+					matrix.makeScale(width, height, maxAxis);
 					matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
 					nodeMesh.setMatrixAt(nodeSlot, matrix);
 					nodeMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
-					const pickSize = size * Math.SQRT2;
-					matrix.makeScale(pickSize, pickSize, pickSize);
+					const pickScale = maxAxis * Math.SQRT2;
+					matrix.makeScale(pickScale, pickScale, pickScale);
 					matrix.setPosition(update.next.position.x, update.next.position.y, update.next.position.z ?? 0);
 					nodePickMesh.setMatrixAt(nodeSlot, matrix);
 					nodePickMesh.instanceMatrix.addUpdateRange(nodeSlot * 16, 16);
@@ -406,6 +418,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			if (update.shapeChanged && nodeSlot !== undefined) {
 				setNodeShapeAt(nodeShape, nodeSlot, update.next.shape);
 				nodeShape.addUpdateRange(nodeSlot, 1);
+			}
+			if (update.strokeChanged && nodeSlot !== undefined) {
+				setNodeStrokeAt(nodeStrokeWidth, nodeStrokeColor, nodeSlot, resolveNodeStroke(update.next, this.theme));
+				nodeStrokeWidth.addUpdateRange(nodeSlot, 1);
+				nodeStrokeColor.addUpdateRange(nodeSlot * 3, 3);
 			}
 			if (update.positionChanged) {
 				const incidentEdges = this.incidentEdgeIndices[update.index] ?? [];
@@ -438,6 +455,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			nodeMesh.instanceColor.needsUpdate = true;
 		}
 		if (prepared.some((update) => update.shapeChanged)) nodeShape.needsUpdate = true;
+		if (prepared.some((update) => update.strokeChanged)) {
+			nodeStrokeWidth.needsUpdate = true;
+			nodeStrokeColor.needsUpdate = true;
+		}
 		this.requestRender();
 	}
 
@@ -590,19 +611,32 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			if (nodeIndex === undefined) continue;
 			const node = this.data.nodes[nodeIndex];
 			if (!node) continue;
-			const radius = node.size ?? 4;
+			const { height, width } = resolveNodeAxes({
+				height: node.height,
+				nodeId: node.id,
+				size: node.size,
+				width: node.width,
+			});
 			this.pickCenter.set(node.position.x, node.position.y, node.position.z ?? 0).project(this.camera);
-			this.pickRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(radius);
+			this.pickRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(width);
 			this.pickRight.set(
 				this.pickRight.x + node.position.x,
 				this.pickRight.y + node.position.y,
 				this.pickRight.z + (node.position.z ?? 0),
 			);
 			this.pickRight.project(this.camera);
-			const radiusNdc = Math.abs(this.pickRight.x - this.pickCenter.x);
-			if (radiusNdc === 0) continue;
-			const offsetX = (this.pointer.x - this.pickCenter.x) / radiusNdc;
-			const offsetY = (this.pointer.y - this.pickCenter.y) / (radiusNdc * (bounds.width / bounds.height));
+			this.pickUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(height);
+			this.pickUp.set(
+				this.pickUp.x + node.position.x,
+				this.pickUp.y + node.position.y,
+				this.pickUp.z + (node.position.z ?? 0),
+			);
+			this.pickUp.project(this.camera);
+			const radiusNdcX = Math.abs(this.pickRight.x - this.pickCenter.x);
+			const radiusNdcY = Math.abs(this.pickUp.y - this.pickCenter.y);
+			if (radiusNdcX === 0 || radiusNdcY === 0) continue;
+			const offsetX = (this.pointer.x - this.pickCenter.x) / radiusNdcX;
+			const offsetY = (this.pointer.y - this.pickCenter.y) / radiusNdcY;
 			if (containsNodePoint(node.shape, offsetX, offsetY)) return this.nodeIds[nodeIndex] ?? null;
 		}
 		return null;
@@ -618,7 +652,13 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const minimum = new Vector3();
 		const maximum = new Vector3();
 		for (const node of this.data.nodes) {
-			const radius = node.size ?? 4;
+			const { height, width } = resolveNodeAxes({
+				height: node.height,
+				nodeId: node.id,
+				size: node.size,
+				width: node.width,
+			});
+			const radius = Math.max(width, height);
 			const z = node.position.z ?? 0;
 			bounds.expandByPoint(minimum.set(node.position.x - radius, node.position.y - radius, z - radius));
 			bounds.expandByPoint(maximum.set(node.position.x + radius, node.position.y + radius, z + radius));
@@ -797,12 +837,17 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		bounds: Bounds2D | null,
 	) {
 		if (!bounds) return true;
-		const radius = node.size ?? 4;
+		const { height, width } = resolveNodeAxes({
+			height: node.height,
+			nodeId: node.id,
+			size: node.size,
+			width: node.width,
+		});
 		return (
-			node.position.x + radius >= bounds.left - this.viewportOverscan &&
-			node.position.x - radius <= bounds.right + this.viewportOverscan &&
-			node.position.y + radius >= bounds.bottom - this.viewportOverscan &&
-			node.position.y - radius <= bounds.top + this.viewportOverscan
+			node.position.x + width >= bounds.left - this.viewportOverscan &&
+			node.position.x - width <= bounds.right + this.viewportOverscan &&
+			node.position.y + height >= bounds.bottom - this.viewportOverscan &&
+			node.position.y - height <= bounds.top + this.viewportOverscan
 		);
 	}
 
@@ -830,22 +875,28 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.nodePickMesh.instanceMatrix.clearUpdateRanges();
 		this.nodeMesh.instanceColor?.clearUpdateRanges();
 		const nodeShape = this.nodeMesh.geometry.getAttribute("instanceShape") as InstancedBufferAttribute;
+		const nodeStrokeWidth = this.nodeMesh.geometry.getAttribute("instanceStrokeWidth") as InstancedBufferAttribute;
+		const nodeStrokeColor = this.nodeMesh.geometry.getAttribute("instanceStrokeColor") as InstancedBufferAttribute;
 		nodeShape.clearUpdateRanges();
+		nodeStrokeWidth.clearUpdateRanges();
+		nodeStrokeColor.clearUpdateRanges();
 		for (const [slot, materialized] of materializedNodes.entries()) {
 			const nodeIndex = materialized.index;
 			const node = this.data.nodes[nodeIndex];
 			if (!node) continue;
 			this.visibleNodeSlots.set(nodeIndex, slot);
-			const size = materialized.size;
-			matrix.makeScale(size, size, size);
+			const { height, width } = materialized;
+			const maxAxis = Math.max(width, height);
+			matrix.makeScale(width, height, maxAxis);
 			matrix.setPosition(materialized.x, materialized.y, materialized.z);
 			this.nodeMesh.setMatrixAt(slot, matrix);
-			const pickSize = size * Math.SQRT2;
-			matrix.makeScale(pickSize, pickSize, pickSize);
+			const pickScale = maxAxis * Math.SQRT2;
+			matrix.makeScale(pickScale, pickScale, pickScale);
 			matrix.setPosition(materialized.x, materialized.y, materialized.z);
 			this.nodePickMesh.setMatrixAt(slot, matrix);
 			this.nodeMesh.setColorAt(slot, this.getNodeColor(node));
 			setNodeShapeAt(nodeShape, slot, node.shape);
+			setNodeStrokeAt(nodeStrokeWidth, nodeStrokeColor, slot, resolveNodeStroke(node, this.theme));
 		}
 		this.nodeMesh.count = materializedNodes.length;
 		this.nodePickMesh.count = materializedNodes.length;
@@ -859,6 +910,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 		nodeShape.addUpdateRange(0, materializedNodes.length);
 		nodeShape.needsUpdate = true;
+		nodeStrokeWidth.addUpdateRange(0, materializedNodes.length);
+		nodeStrokeWidth.needsUpdate = true;
+		nodeStrokeColor.addUpdateRange(0, materializedNodes.length * 3);
+		nodeStrokeColor.needsUpdate = true;
 
 		const lodLevel = resolveLodLevel(this.densityLodActive, edgeCandidates.length, visibleEdgeIndices.length);
 		const packed = packEdgeInstances({
@@ -900,9 +955,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (!this.densityLodActive || !bounds) {
 			return indices.slice(0, this.maxVisibleNodes).flatMap((index) => {
 				const node = this.data.nodes[index];
-				return node
-					? [{ index, size: node.size ?? 4, x: node.position.x, y: node.position.y, z: node.position.z ?? 0 }]
-					: [];
+				if (!node) return [];
+				const { height, width } = resolveNodeAxes({
+					height: node.height,
+					nodeId: node.id,
+					size: node.size,
+					width: node.width,
+				});
+				return [{ height, index, width, x: node.position.x, y: node.position.y, z: node.position.z ?? 0 }];
 			});
 		}
 		const aspect = Math.max(this.container.clientWidth, 1) / Math.max(this.container.clientHeight, 1);
@@ -910,10 +970,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const rows = Math.max(1, Math.floor(this.maxVisibleNodes / columns));
 		const cellWidth = Math.max((bounds.right - bounds.left) / columns, Number.EPSILON);
 		const cellHeight = Math.max((bounds.top - bounds.bottom) / rows, Number.EPSILON);
+		// Clusters collapse many nodes into one representative blob, so the aggregated footprint
+		// is a uniform width/height square sized by the largest member's max(width, height).
 		const clusters = new Map<string, MaterializedNode & { count: number }>();
 		for (const index of indices) {
 			const node = this.data.nodes[index];
 			if (!node) continue;
+			const axes = resolveNodeAxes({ height: node.height, nodeId: node.id, size: node.size, width: node.width });
+			const axisSize = Math.max(axes.width, axes.height);
 			const x = Math.min(columns - 1, Math.max(0, Math.floor((node.position.x - bounds.left) / cellWidth)));
 			const y = Math.min(rows - 1, Math.max(0, Math.floor((node.position.y - bounds.bottom) / cellHeight)));
 			const key = `${x}:${y}`;
@@ -921,8 +985,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			if (!cluster) {
 				clusters.set(key, {
 					count: 1,
+					height: axisSize,
 					index,
-					size: node.size ?? 4,
+					width: axisSize,
 					x: node.position.x,
 					y: node.position.y,
 					z: node.position.z ?? 0,
@@ -933,7 +998,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			cluster.x += (node.position.x - cluster.x) / cluster.count;
 			cluster.y += (node.position.y - cluster.y) / cluster.count;
 			cluster.z += ((node.position.z ?? 0) - cluster.z) / cluster.count;
-			cluster.size = Math.min(Math.max(cluster.size, node.size ?? 4) + 0.25, 16);
+			const grownAxis = Math.min(Math.max(cluster.width, axisSize) + 0.25, 16);
+			cluster.width = grownAxis;
+			cluster.height = grownAxis;
 		}
 		return [...clusters.values()].slice(0, this.maxVisibleNodes);
 	}

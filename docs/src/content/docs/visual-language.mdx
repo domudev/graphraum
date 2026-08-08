@@ -75,7 +75,9 @@ The WebGL surface is not the accessibility tree. Applications should mirror focu
 
 Arbitrary HTML per node is not the dense rendering path: it would trade away batching, viewport materialization, and the 100k-node target. The [`defineVisuals()` translation layer](../node-edge-presentation/) maps typed domain attributes to node and edge visuals once at ingestion, then compiles them into GPU buffers. Titles, properties, and host-owned action descriptors remain available by entity ID.
 
-`circle`, `square`, and `diamond` are rendered as signed-distance fields on one instanced billboard geometry. Mixing them does not add meshes, materials, or draw calls, and the same shapes face the camera in 2D and 3D. Picking applies the same shape boundary in world space for 2D and projected screen space for 3D.
+`circle`, `square`, `diamond`, `hexagon`, `triangle`, `pill`, and `rounded` are rendered as signed-distance fields on one instanced billboard geometry. Mixing them does not add meshes, materials, or draw calls, and the same shapes face the camera in 2D and 3D. Picking applies the same shape boundary—including any stroke—in world space for 2D and projected screen space for 3D.
+
+Every shape accepts an independent `width` and `height` (square by default) plus an optional `strokeWidth` and `strokeColor` for an SDF ring around the outer edge. `strokeColor` falls back to `theme.nodeStroke`, the third canonical Porcelain swatch, so a stroked node stays on-palette without an explicit color.
 
 Edge width, dash styles, and direction markers render as one instanced GPU edge batch, packing segment and marker instances into the same edge draw call rather than one object per edge. The overview LOD tier drops markers and forces solid, theme-width segments first to keep frame time flat at scale; detail and density tiers render the full per-edge style. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
 

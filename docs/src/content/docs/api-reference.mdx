@@ -66,9 +66,22 @@ interface GraphraumNode {
   id: string;
   position: { x: number; y: number; z?: number };
   color?: string | number;
-  shape?: "circle" | "square" | "diamond";
-  size?: number;
+  shape?: GraphraumNodeShape;
+  size?: number;               // shorthand; width/height default to size (then 4)
+  width?: number;
+  height?: number;
+  strokeWidth?: number;         // world units; 0 by default (no stroke)
+  strokeColor?: string | number; // defaults to theme.nodeStroke when strokeWidth > 0
 }
+
+type GraphraumNodeShape =
+  | "circle"
+  | "square"
+  | "diamond"
+  | "hexagon"
+  | "triangle"
+  | "pill"
+  | "rounded";
 
 interface GraphraumEdge {
   id: string;
@@ -84,9 +97,9 @@ interface GraphraumEdge {
 }
 ```
 
-Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node sizes must be positive. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
+Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node `size`, `width`, and `height` must be positive when present. `strokeWidth` must be finite and non-negative. An unknown `shape` fails with the node ID in the error. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
 
-Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, and size, edge color, width, opacity, style, and markers, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, size (or independent width/height), stroke, edge color, width, opacity, style, and markers, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
 
 ## Edge visuals
 
@@ -211,7 +224,7 @@ const graph = new Graphraum(container, {
 });
 ```
 
-`edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
+`edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. `nodeStroke` is the fallback stroke color for a node that sets `strokeWidth` but no `strokeColor`. See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
 
 ## Diagnostics
 

@@ -24,14 +24,68 @@ describe("prepareNodeUpdates", () => {
 				positionChanged: true,
 				shapeChanged: true,
 				sizeChanged: false,
+				strokeChanged: false,
 			},
 		]);
 		expect(nodes[0]).toEqual({ id: "a", position: { x: 1, y: 2 }, color: "red", size: 4 });
 	});
 
+	test("merges width, height, strokeWidth, and strokeColor and marks the matching flags", () => {
+		const prepared = prepareNodeUpdates(nodes, indices, [
+			{ id: "b", width: 6, height: 3, strokeWidth: 1, strokeColor: "#fcfffc" },
+		]);
+		expect(prepared).toEqual([
+			{
+				colorChanged: false,
+				index: 1,
+				next: {
+					id: "b",
+					position: { x: 3, y: 4 },
+					width: 6,
+					height: 3,
+					strokeWidth: 1,
+					strokeColor: "#fcfffc",
+				},
+				positionChanged: false,
+				shapeChanged: false,
+				sizeChanged: true,
+				strokeChanged: true,
+			},
+		]);
+	});
+
+	test("marks sizeChanged when only width or only height changes", () => {
+		expect(prepareNodeUpdates(nodes, indices, [{ id: "a", width: 6 }])[0]).toMatchObject({
+			sizeChanged: true,
+			strokeChanged: false,
+		});
+		expect(prepareNodeUpdates(nodes, indices, [{ id: "a", height: 6 }])[0]).toMatchObject({
+			sizeChanged: true,
+			strokeChanged: false,
+		});
+	});
+
+	test("marks strokeChanged when only strokeColor changes", () => {
+		expect(prepareNodeUpdates(nodes, indices, [{ id: "a", strokeColor: "#000000" }])[0]).toMatchObject({
+			sizeChanged: false,
+			strokeChanged: true,
+		});
+	});
+
 	test("rejects an invalid batch before renderer mutation", () => {
-		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", size: 0 }])).toThrow("positive finite size");
-		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", shape: "hexagon" as "circle" }])).toThrow(
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", size: 0 }])).toThrow(
+			'Node "a" width must be a positive finite number',
+		);
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", width: -1 }])).toThrow(
+			'Node "a" width must be a positive finite number',
+		);
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", height: 0 }])).toThrow(
+			'Node "a" height must be a positive finite number',
+		);
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", strokeWidth: -1 }])).toThrow(
+			'Node "a" must have a finite non-negative strokeWidth',
+		);
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", shape: "octagon" as "circle" }])).toThrow(
 			'Node "a" shape must be one of',
 		);
 		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "missing", size: 2 }])).toThrow(

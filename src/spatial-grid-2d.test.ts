@@ -47,4 +47,24 @@ describe("SpatialGrid2D", () => {
 
 		expect(grid.queryBounds({ bottom: -1e12, left: -1e12, right: 1e12, top: 1e12 })).toEqual([0, 1]);
 	});
+
+	test("normalizes picking by independent width and height, not a single radius", () => {
+		const grid = new SpatialGrid2D(20);
+		grid.set(0, { id: "wide", position: { x: 0, y: 0 }, shape: "square", width: 10, height: 2 });
+
+		// Within the wide axis but outside the narrow one.
+		expect(grid.pick(8, 0)).toBe(0);
+		expect(grid.pick(0, 4)).toBeNull();
+		// Within the narrow axis but outside the wide one.
+		expect(grid.pick(0, 1)).toBe(0);
+		expect(grid.pick(12, 0)).toBeNull();
+	});
+
+	test("widens occupancy by strokeWidth for cell bucketing and bounding-box queries", () => {
+		const grid = new SpatialGrid2D(10);
+		grid.set(0, { id: "stroked", position: { x: 20, y: 5 }, size: 5, strokeWidth: 4 });
+
+		// size 5 alone would not reach a query bound ending at 14; the stroke padding closes the gap.
+		expect(grid.queryBounds({ bottom: 0, left: 0, right: 14, top: 10 })).toEqual([0]);
+	});
 });
