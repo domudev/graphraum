@@ -1,8 +1,4 @@
-import {
-	computeForcePositions,
-	createForceSimulation,
-	type ForceSettings,
-} from "../../../src/force-layout";
+import { computeForcePositions, createForceSimulation, type ForceSettings } from "../../../src/force-layout";
 
 type LayoutName = "circle" | "force" | "force-live" | "grid";
 
