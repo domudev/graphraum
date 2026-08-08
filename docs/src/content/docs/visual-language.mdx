@@ -77,6 +77,6 @@ Arbitrary HTML per node is not the dense rendering path: it would trade away bat
 
 `circle`, `square`, and `diamond` are rendered as signed-distance fields on one instanced billboard geometry. Mixing them does not add meshes, materials, or draw calls, and the same shapes face the camera in 2D and 3D. Picking applies the same shape boundary in world space for 2D and projected screen space for 3D.
 
-Reliable edge width, dashes, and direction markers require GPU edge quads rather than one object per edge. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
+Edge width, dash styles, and direction markers render as one instanced GPU edge batch, packing segment and marker instances into the same edge draw call rather than one object per edge. The overview LOD tier drops markers and forces solid, theme-width segments first to keep frame time flat at scale; detail and density tiers render the full per-edge style. A future HTML adapter may project a strictly bounded focused or selected subset for rich product controls while the core remains framework-neutral.
 
 Follow the design and benchmark acceptance criteria in [the node and edge visual translation issue](https://github.com/domudev/graphraum/issues/30).
