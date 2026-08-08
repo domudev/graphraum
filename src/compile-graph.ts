@@ -1,4 +1,5 @@
 import { assertNodeShape } from "./node-shapes";
+import { assertEdgeVisual } from "./edge-styles";
 import type {
 	CompiledGraphraumPresentation,
 	GraphraumData,
@@ -85,6 +86,11 @@ function compileNodeVisual(id: string, visual: GraphraumNodeVisual): Readonly<Gr
 	return Object.freeze({ ...visual });
 }
 
+function compileEdgeVisual(id: string, visual: GraphraumEdgeVisual): Readonly<GraphraumEdgeVisual> {
+	assertEdgeVisual(id, visual);
+	return Object.freeze({ ...visual });
+}
+
 /** Validates graph identity and compiles lookup-heavy objects into GPU-oriented position buffers. */
 export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefined>(
 	data: GraphraumData<NodeAttributes, EdgeAttributes>,
@@ -127,7 +133,19 @@ export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefi
 		if (edgeIds.has(edge.id)) throw new Error(`Duplicate edge id: "${edge.id}"`);
 		edgeIds.add(edge.id);
 		const encoding = visuals?.edge?.(edge);
-		edgeVisuals.push(Object.freeze({ ...(encoding?.visual ?? { color: edge.color }) }));
+		const visual = compileEdgeVisual(
+			edge.id,
+			encoding?.visual ?? {
+				color: edge.color,
+				width: edge.width,
+				opacity: edge.opacity,
+				style: edge.style,
+				marker: edge.marker,
+				markerSize: edge.markerSize,
+				markerEnd: edge.markerEnd,
+			},
+		);
+		edgeVisuals.push(visual);
 		if (encoding?.presentation) {
 			edgePresentations.set(edge.id, compilePresentation("Edge", edge.id, encoding.presentation));
 		}

@@ -197,4 +197,78 @@ describe("compileGraph", () => {
 			}),
 		).toThrow('Edge "broken" references missing target "missing"');
 	});
+
+	test("compiles full edge visuals from mapper and snapshot fields", () => {
+		const graph = compileGraph({
+			nodes: [
+				{ id: "a", position: { x: 0, y: 0 } },
+				{ id: "b", position: { x: 1, y: 0 } },
+			],
+			edges: [
+				{
+					id: "a-b",
+					source: "a",
+					target: "b",
+					width: 2,
+					opacity: 0.8,
+					style: "dashed",
+					marker: "triangle",
+					markerSize: 1.5,
+					markerEnd: "both",
+				},
+			],
+		});
+		expect(graph.edgeVisuals).toEqual([
+			{
+				width: 2,
+				opacity: 0.8,
+				style: "dashed",
+				marker: "triangle",
+				markerSize: 1.5,
+				markerEnd: "both",
+			},
+		]);
+	});
+
+	test("rejects invalid edge opacity", () => {
+		expect(() =>
+			compileGraph({
+				nodes: [
+					{ id: "a", position: { x: 0, y: 0 } },
+					{ id: "b", position: { x: 1, y: 0 } },
+				],
+				edges: [{ id: "a-b", source: "a", target: "b", opacity: 2 }],
+			}),
+		).toThrow(/a-b.*opacity/);
+	});
+
+	test("prefers mapper edge visual over snapshot fields", () => {
+		const graph = compileGraph(
+			{
+				nodes: [
+					{ id: "a", position: { x: 0, y: 0 } },
+					{ id: "b", position: { x: 1, y: 0 } },
+				],
+				edges: [
+					{
+						id: "a-b",
+						source: "a",
+						target: "b",
+						width: 1,
+						opacity: 0.5,
+						style: "solid",
+					},
+				],
+			},
+			defineVisuals({
+				edge: () => ({
+					visual: { width: 3, opacity: 0.9, style: "dotted", marker: "triangle", markerEnd: "source" },
+				}),
+			}),
+		);
+
+		expect(graph.edgeVisuals).toEqual([
+			{ width: 3, opacity: 0.9, style: "dotted", marker: "triangle", markerEnd: "source" },
+		]);
+	});
 });
