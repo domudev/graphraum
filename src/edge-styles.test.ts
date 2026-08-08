@@ -3,11 +3,13 @@ import { describe, expect, test } from "vitest";
 import {
 	assertEdgeMarker,
 	assertEdgeMarkerEnd,
+	assertEdgePath,
 	assertEdgeStyle,
 	assertEdgeVisual,
 	encodeEdgeMarker,
 	encodeEdgeStyle,
 	graphraumEdgeMarkers,
+	graphraumEdgePaths,
 	graphraumEdgeStyles,
 	markerInstanceCount,
 } from "./edge-styles";
@@ -16,6 +18,7 @@ describe("edge-styles", () => {
 	test("lists supported styles and markers", () => {
 		expect(graphraumEdgeStyles).toEqual(["solid", "dashed", "dotted"]);
 		expect(graphraumEdgeMarkers).toEqual(["none", "triangle"]);
+		expect(graphraumEdgePaths).toEqual(["straight", "quadratic", "cubic"]);
 	});
 
 	test("encodes the public style and marker unions into stable shader values", () => {
@@ -39,5 +42,22 @@ describe("edge-styles", () => {
 		expect(() => assertEdgeStyle("e1", "wave")).toThrow(/e1.*style/);
 		expect(() => assertEdgeMarker("e1", "arrow")).toThrow(/e1.*marker/);
 		expect(() => assertEdgeMarkerEnd("e1", "middle")).toThrow(/e1.*markerEnd/);
+		expect(() => assertEdgePath("e1", "step")).toThrow(/e1.*path/);
+		expect(() => assertEdgeVisual("e1", { path: "quadratic", controlPoints: [] })).not.toThrow();
+		expect(() =>
+			assertEdgeVisual("e1", {
+				path: "quadratic",
+				controlPoints: [
+					{ x: 1, y: 2 },
+					{ x: 3, y: 4 },
+				],
+			}),
+		).toThrow(/e1.*expects 1 control point/);
+		expect(() => assertEdgeVisual("e1", { path: "cubic", controlPoints: [{ x: 1, y: 2 }] })).toThrow(
+			/e1.*expects 2 control points/,
+		);
+		expect(() => assertEdgeVisual("e1", { path: "quadratic", controlPoints: [{ x: Number.NaN, y: 0 }] })).toThrow(
+			/e1.*controlPoints\[0\]/,
+		);
 	});
 });

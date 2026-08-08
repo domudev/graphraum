@@ -4,6 +4,7 @@ import {
 	Graphraum,
 	type GraphraumEdgeMarker,
 	type GraphraumEdgeMarkerEnd,
+	type GraphraumEdgePath,
 	type GraphraumEdgeStyle,
 	type GraphraumMode,
 	type GraphraumNodeShape,
@@ -32,6 +33,7 @@ interface LabState extends FixtureOptions {
 	antialias: boolean;
 	edgeMarker: GraphraumEdgeMarker;
 	edgeMarkerEnd: GraphraumEdgeMarkerEnd;
+	edgePath: GraphraumEdgePath;
 	edgeStyle: GraphraumEdgeStyle;
 	edgeOpacity: number;
 	edgeWidth: number;
@@ -103,6 +105,7 @@ function readState(): LabState {
 		edgeMarkerEnd: formValue(values, "edgeMarkerEnd") as GraphraumEdgeMarkerEnd,
 		edgeMultiplier: scaleMode === "million-density" ? 0.1 : scaleMode === "million-literal" ? 0 : 3,
 		edgeOpacity: formNumber(values, "edgeOpacity"),
+		edgePath: formValue(values, "edgePath") as GraphraumEdgePath,
 		edgeStyle: formValue(values, "edgeStyle") as GraphraumEdgeStyle,
 		edgeWidth: formNumber(values, "edgeWidth"),
 		encoding: formValue(values, "encoding") as Encoding,
@@ -192,6 +195,7 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 						marker: state.edgeMarker,
 						markerEnd: state.edgeMarkerEnd,
 						opacity: state.edgeOpacity,
+						path: state.edgePath,
 						style: state.edgeStyle,
 						width: state.edgeWidth,
 					},

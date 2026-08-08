@@ -25,6 +25,7 @@ describe("playground helpers", () => {
 		appearance.nodeShapes.concept = "hexagon";
 		appearance.nodeStrokeWidth = 1.5;
 		appearance.edgeStyle = "dashed";
+		appearance.edgePath = "quadratic";
 		appearance.edgeMarker = "triangle";
 		appearance.edgeMarkerEnd = "both";
 		const visuals = createPlaygroundVisuals(appearance);
@@ -38,6 +39,7 @@ describe("playground helpers", () => {
 		});
 		expect(visuals.edge?.(edge)?.visual).toMatchObject({
 			style: "dashed",
+			path: "quadratic",
 			marker: "triangle",
 			markerEnd: "both",
 		});

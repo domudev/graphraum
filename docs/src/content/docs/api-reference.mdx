@@ -94,12 +94,14 @@ interface GraphraumEdge {
   marker?: "none" | "triangle";
   markerSize?: number;
   markerEnd?: "target" | "source" | "both";
+  path?: "straight" | "quadratic" | "cubic";
+  controlPoints?: readonly { x: number; y: number; z?: number }[];
 }
 ```
 
 Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node `size`, `width`, and `height` must be positive when present. `strokeWidth` must be finite and non-negative. An unknown `shape` fails with the node ID in the error. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
 
-Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, size (or independent width/height), stroke, edge color, width, opacity, style, and markers, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, size (or independent width/height), stroke, edge color, width, opacity, style, markers, and path, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
 
 ## Edge visuals
 
@@ -112,10 +114,12 @@ interface GraphraumEdgeVisual {
   marker?: "none" | "triangle";
   markerSize?: number;
   markerEnd?: "target" | "source" | "both";
+  path?: "straight" | "quadratic" | "cubic";
+  controlPoints?: readonly { x: number; y: number; z?: number }[];
 }
 ```
 
-`defineVisuals()` maps typed edge attributes to this contract; direct edge fields use the same shape without a mapper. `style` selects a dash pattern, `marker` draws a triangle at `markerEnd` (`target` by default), and `markerSize` scales the triangle relative to `width`. Edge coordinates always come from the source and target node positions—`GraphraumEdgeVisual` never carries a position. See [Node & edge presentation](../node-edge-presentation/) for the full contract.
+`defineVisuals()` maps typed edge attributes to this contract; direct edge fields use the same shape without a mapper. `style` selects a dash pattern, `marker` draws a triangle at `markerEnd` (`target` by default), and `markerSize` scales the triangle relative to `width`. `path` selects a polyline sampling of a straight, quadratic, or cubic curve; omit `controlPoints` for auto handles, or supply 1 (quadratic) / 2 (cubic) world-space points. Overview LOD collapses curves to a single straight segment. Endpoints always come from the source and target node positions. See [Node & edge presentation](../node-edge-presentation/) for the full contract.
 
 ## Data and updates
 

@@ -161,6 +161,8 @@ export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefi
 				marker: edge.marker,
 				markerSize: edge.markerSize,
 				markerEnd: edge.markerEnd,
+				path: edge.path,
+				controlPoints: edge.controlPoints,
 			},
 		);
 		edgeVisuals.push(visual);

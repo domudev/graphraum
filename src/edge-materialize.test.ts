@@ -10,28 +10,71 @@ describe("packEdgeInstances", () => {
 	it("packs one segment and omits markers in overview", () => {
 		const packed = packEdgeInstances({
 			edgeIndices: [0],
-			edgeVisuals: [{ marker: "triangle", markerEnd: "both", style: "dashed", width: 3, opacity: 0.9 }],
+			edgeVisuals: [{ marker: "triangle", markerEnd: "both", style: "dashed", width: 3, opacity: 0.9, path: "cubic" }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
 			tier: "overview",
 		});
 		expect(packed.segments).toHaveLength(1);
 		expect(packed.markers).toHaveLength(0);
+		expect(packed.truncated).toBe(false);
 		expect(packed.segments[0]?.style).toBe("solid");
 		expect(packed.segments[0]?.width).toBe(1.5);
 	});
 
-	it("packs triangle markers at both ends in detail", () => {
-		const packed = packEdgeInstances({
+	it("expands quadratic and cubic paths in detail", () => {
+		const quadratic = packEdgeInstances({
 			edgeIndices: [0],
-			edgeVisuals: [{ marker: "triangle", markerEnd: "both", width: 2 }],
+			edgeVisuals: [{ path: "quadratic", controlPoints: [{ x: 5, y: 4, z: 0 }] }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
 			tier: "detail",
 		});
-		expect(packed.segments).toHaveLength(1);
+		expect(quadratic.segments).toHaveLength(8);
+
+		const cubic = packEdgeInstances({
+			edgeIndices: [0],
+			edgeVisuals: [{ path: "cubic" }],
+			endpointPositions: endpoints.positions,
+			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			tier: "detail",
+		});
+		expect(cubic.segments).toHaveLength(12);
+	});
+
+	it("packs triangle markers using end-segment tangents in detail", () => {
+		const packed = packEdgeInstances({
+			edgeIndices: [0],
+			edgeVisuals: [
+				{
+					marker: "triangle",
+					markerEnd: "both",
+					width: 2,
+					path: "quadratic",
+					controlPoints: [{ x: 5, y: 5, z: 0 }],
+				},
+			],
+			endpointPositions: endpoints.positions,
+			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			tier: "detail",
+		});
 		expect(packed.markers).toHaveLength(2);
 		expect(packed.markers.map((m) => m.end)).toEqual(["source", "target"]);
+		const target = packed.markers.find((marker) => marker.end === "target");
+		expect(target?.dx).not.toBe(0);
+	});
+
+	it("stops packing when the segment budget is exceeded", () => {
+		const packed = packEdgeInstances({
+			edgeIndices: [0],
+			edgeVisuals: [{ path: "cubic" }],
+			endpointPositions: endpoints.positions,
+			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			tier: "detail",
+			maxSegments: 4,
+		});
+		expect(packed.truncated).toBe(true);
+		expect(packed.segments).toHaveLength(0);
 	});
 });
 

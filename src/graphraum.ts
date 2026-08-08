@@ -21,6 +21,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
 import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
+import { DETAIL_MAX_SEGMENTS } from "./edge-paths";
 import {
 	createEdgeGeometry,
 	createEdgeMaterial,
@@ -140,8 +141,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private visibleNodeCandidateCount = 0;
 	private densityLodActive = false;
 	private visibleEdgeSegmentCount = 0;
+	private visibleEdgeCount = 0;
 	private visibleEdgeMarkerCount = 0;
 	private visibleEdgeCandidateCount = 0;
+	private edgeSegmentCapacity = 0;
 	private mode: GraphraumMode;
 	private frameRequest: number | null = null;
 	private cpuFrameMilliseconds = 0;
@@ -339,6 +342,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 		const capacities = edgeInstanceCapacities(data.edges.length, this.maxVisibleEdges);
 		this.edgeCapacity = capacities.edgeCapacity;
+		this.edgeSegmentCapacity = capacities.segmentCapacity;
 		this.markerCapacity = capacities.markerCapacity;
 		this.edgeInstanceCapacity = capacities.edgeInstanceCapacity;
 		const edgeGeometry = createEdgeGeometry(this.edgeInstanceCapacity);
@@ -584,14 +588,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			gpuDrawCalls: this.renderer.info.render.calls,
 			gpuGeometries: this.renderer.info.memory.geometries,
 			gpuTextures: this.renderer.info.memory.textures,
-			lodLevel: resolveLodLevel(this.densityLodActive, this.visibleEdgeCandidateCount, this.visibleEdgeSegmentCount),
+			lodLevel: resolveLodLevel(this.densityLodActive, this.visibleEdgeCandidateCount, this.visibleEdgeCount),
 			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
 			totalEdges: this.data.edges.length,
 			totalNodes: this.data.nodes.length,
 			visibleEdgeCandidates: this.visibleEdgeCandidateCount,
 			visibleEdgeMarkers: this.visibleEdgeMarkerCount,
 			visibleEdgeSegments: this.visibleEdgeSegmentCount,
-			visibleEdges: this.visibleEdgeSegmentCount,
+			visibleEdges: this.visibleEdgeCount,
 			visibleNodes: this.visibleNodeCount,
 			visibleNodeCandidates: this.visibleNodeCandidateCount,
 		};
@@ -929,13 +933,18 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			endpointPositions: this.canonicalEdgePositions,
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
 			tier: edgeTierFromDiagnosticsLod(lodLevel),
+			maxSegments: this.edgeSegmentCapacity,
 		});
 		const edgeGeometry = this.edgeMesh.geometry;
 		this.visibleEdgeSlots = new Map();
 		let edgeSlot = 0;
+		const distinctEdges = new Set<number>();
 		for (const segment of packed.segments) {
 			writeEdgeSegmentInstance(edgeGeometry, edgeSlot, segment);
-			this.visibleEdgeSlots.set(segment.edgeIndex, edgeSlot);
+			if (!this.visibleEdgeSlots.has(segment.edgeIndex)) {
+				this.visibleEdgeSlots.set(segment.edgeIndex, edgeSlot);
+			}
+			distinctEdges.add(segment.edgeIndex);
 			edgeSlot += 1;
 		}
 		const segmentCount = edgeSlot;
@@ -955,6 +964,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.visibleNodeCount = materializedNodes.length;
 		this.visibleEdgeCandidateCount = edgeCandidates.length;
 		this.visibleEdgeSegmentCount = segmentCount;
+		this.visibleEdgeCount = distinctEdges.size;
 		this.visibleEdgeMarkerCount = packed.markers.length;
 	}
 
@@ -1040,13 +1050,19 @@ function nextCapacity(length: number): number {
 }
 
 /**
- * Marker capacity is always exactly 2x edge capacity (worst case: every edge has a marker at
- * both ends) — never derived from `nextCapacity(edgeCount * 2)` independently, which can
- * undershoot for small edge counts (e.g. edgeCount=0 gives nextCapacity(0)=1, not 0) and let a
- * later append with `markerEnd: "both"` overrun the instanced buffer.
+ * Segment capacity is edgeCapacity × DETAIL_MAX_SEGMENTS (cubic worst case).
+ * Marker capacity is always exactly 2× edge capacity (both ends) — never derived from
+ * `nextCapacity(edgeCount * 2)` independently, which can undershoot for small edge counts
+ * and let a later append with `markerEnd: "both"` overrun the instanced buffer.
  */
 export function edgeInstanceCapacities(edgeCount: number, maxVisibleEdges: number) {
 	const edgeCapacity = Math.min(maxVisibleEdges, nextCapacity(edgeCount));
+	const segmentCapacity = edgeCapacity * DETAIL_MAX_SEGMENTS;
 	const markerCapacity = edgeCapacity * 2;
-	return { edgeCapacity, markerCapacity, edgeInstanceCapacity: edgeCapacity + markerCapacity };
+	return {
+		edgeCapacity,
+		segmentCapacity,
+		markerCapacity,
+		edgeInstanceCapacity: segmentCapacity + markerCapacity,
+	};
 }

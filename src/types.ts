@@ -51,6 +51,7 @@ export interface GraphraumLayoutPositions {
 export type GraphraumEdgeStyle = "solid" | "dashed" | "dotted";
 export type GraphraumEdgeMarker = "none" | "triangle";
 export type GraphraumEdgeMarkerEnd = "target" | "source" | "both";
+export type GraphraumEdgePath = "straight" | "quadratic" | "cubic";
 
 export type GraphraumEdge<EdgeAttributes = undefined> = {
 	color?: GraphraumColor;
@@ -60,6 +61,8 @@ export type GraphraumEdge<EdgeAttributes = undefined> = {
 	marker?: GraphraumEdgeMarker;
 	markerSize?: number;
 	markerEnd?: GraphraumEdgeMarkerEnd;
+	path?: GraphraumEdgePath;
+	controlPoints?: readonly GraphraumPosition[];
 	id: string;
 	source: string;
 	target: string;
@@ -95,6 +98,8 @@ export interface GraphraumEdgeVisual {
 	marker?: GraphraumEdgeMarker;
 	markerSize?: number;
 	markerEnd?: GraphraumEdgeMarkerEnd;
+	path?: GraphraumEdgePath;
+	controlPoints?: readonly GraphraumPosition[];
 }
 
 export type GraphraumPropertyValue = boolean | null | number | string;
