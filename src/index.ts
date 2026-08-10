@@ -41,6 +41,7 @@ export type {
 	GraphraumOptions,
 	GraphraumOverlayNode,
 	GraphraumOverlayOptions,
+	GraphraumPickHit,
 	GraphraumPosition,
 	GraphraumPresentation,
 	GraphraumPresentationAction,

@@ -11,5 +11,6 @@ export const graphraumTheme = Object.freeze({
 	hoveredNode: "#e4a853",
 	node: "#226f54",
 	nodeStroke: "#fcfffc",
+	selectedEdge: "#fcfffc",
 	selectedNode: "#fcfffc",
 } satisfies GraphraumTheme);
