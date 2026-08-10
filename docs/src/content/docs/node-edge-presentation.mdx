@@ -134,10 +134,19 @@ Do not put arbitrary HTML, component instances, closures, or mutable domain obje
 
 ## Add styled labels and a focused toolbar
 
-`createOverlay()` projects a bounded set of host-created HTML elements over the canvas. It is the same dense-canvas plus sparse-DOM split used by graph editors: WebGL remains responsible for the graph, while your application owns rich text, CSS, buttons, and action handling.
+`createOverlay()` projects a bounded set of host-created HTML elements over the canvas. It is the same dense-canvas plus sparse-DOM split used by graph editors: WebGL remains responsible for the graph, while your application owns rich text, CSS, buttons, and action handling. The two-draw-call GPU path is unchanged—labels stay in the DOM overlay.
+
+### Auto-budgeted labels
+
+Prefer `autoLabels: true` when the host should not guess `setLabels()` every frame. On each view change, graphraum:
+
+1. Builds candidates from `getLabelCandidates()` — `visible` from screen projection, `importance` from incident edge degree (selected nodes get a large boost so they stay labeled).
+2. Keeps only visible candidates, sorts by importance descending (stable by id on ties), and takes at most `maxLabels` (50 by default).
+3. Syncs the DOM label set to that budgeted id list.
 
 ```ts
 const overlay = graph.createOverlay({
+  autoLabels: true,
   maxLabels: 50,
   renderLabel: ({ id, presentation }) => {
     const label = document.createElement("span");
@@ -159,12 +168,21 @@ const overlay = graph.createOverlay({
   },
 });
 
-overlay.setLabels(["person:ada", "place:london"]);
 overlay.setToolbar("person:ada");
 ```
 
-`setLabels()` limits labels to `maxLabels` (50 by default). Off-screen and missing nodes are safely hidden or ignored. The overlay tracks camera movement automatically; call `destroy()` with the graph lifecycle.
+Off-screen nodes stay out of the budgeted set. You can still call `setLabels()` while `autoLabels` is on; the next view change overwrites that list from the budget policy. Export `selectBudgetedLabelIds` if you need the same policy outside the overlay.
+
+### Manual labels
+
+With `autoLabels` left false (the default), the host chooses ids:
+
+```ts
+overlay.setLabels(["person:ada", "place:london"]);
+```
+
+`setLabels()` still throws when the list exceeds `maxLabels`. Off-screen and missing nodes are safely hidden or ignored. The overlay tracks camera movement automatically; call `destroy()` with the graph lifecycle.
 
 ## Density policy
 
-Color, shape, and size can remain visible across the graph. Titles should be budgeted by zoom and importance in a future label layer. Full properties and actions belong to a bounded focused or selected subset in host HTML. This preserves both accessibility and the dense rendering path.
+Color, shape, and size can remain visible across the graph. Titles use the budgeted overlay policy above (`autoLabels` or a host-owned `setLabels()` list). Full properties and actions belong to a bounded focused or selected subset in host HTML. This preserves both accessibility and the dense rendering path.

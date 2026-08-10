@@ -48,6 +48,7 @@ import type {
 	GraphraumData,
 	GraphraumDataPatch,
 	GraphraumDiagnostics,
+	GraphraumLabelCandidate,
 	GraphraumLayoutPositions,
 	GraphraumMode,
 	GraphraumNodeState,
@@ -59,6 +60,9 @@ import type {
 	GraphraumVisualMapper,
 } from "./types";
 import { applyEdgeBudget, collectIncidentEdges, resolveLodLevel, shouldUseDensityLod } from "./viewport-lod";
+
+/** Importance boost so selected nodes stay labeled when autoLabels budgets the overlay. */
+const SELECTED_LABEL_IMPORTANCE_BOOST = 1000;
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
 type GraphraumGraphObjects = {
@@ -544,6 +548,21 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			x: ((projected.x + 1) * width) / 2,
 			y: ((1 - projected.y) * height) / 2,
 		};
+	}
+
+	/**
+	 * Candidates for a budgeted DOM label layer. Importance is incident edge degree, with a boost
+	 * for selected nodes so selection stays labeled. Visibility comes from screen projection.
+	 */
+	getLabelCandidates(): GraphraumLabelCandidate[] {
+		return this.data.nodes.map((node, index) => {
+			const degree = this.incidentEdgeIndices[index]?.length ?? 0;
+			return {
+				id: node.id,
+				importance: degree + (this.selectedNodeIds.has(node.id) ? SELECTED_LABEL_IMPORTANCE_BOOST : 0),
+				visible: this.getNodeScreenPosition(node.id)?.visible ?? false,
+			};
+		});
 	}
 
 	/** Converts client coordinates to graph world coordinates on the z=0 plane. */

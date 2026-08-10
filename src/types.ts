@@ -139,7 +139,15 @@ export interface GraphraumOverlayNode {
 	presentation: CompiledGraphraumPresentation | null;
 }
 
+export interface GraphraumLabelCandidate {
+	id: string;
+	importance: number;
+	visible: boolean;
+}
+
 export interface GraphraumOverlayOptions {
+	/** When true, the overlay refreshes labels from `getLabelCandidates()` on every view change within `maxLabels`. Manual `setLabels()` still works until the next view change. Default false. */
+	autoLabels?: boolean;
 	overlayClassName?: string;
 	maxLabels?: number;
 	labelClassName?: string;
