@@ -1,4 +1,5 @@
 import type { Graphraum } from "./graphraum";
+import { selectBudgetedLabelIds } from "./label-budget";
 import type { CompiledGraphraumPresentation, GraphraumOverlayNode, GraphraumOverlayOptions } from "./types";
 
 type OverlayEntry = {
@@ -20,6 +21,8 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	private toolbarNodeId: string | null = null;
 	private readonly stopObserving: () => void;
 	private readonly previousContainerPosition: string | null;
+	private readonly autoLabels: boolean;
+	private readonly maxLabels: number;
 
 	constructor(
 		private readonly graph: Graphraum<NodeAttributes, EdgeAttributes>,
@@ -30,6 +33,8 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		if (!Number.isSafeInteger(maxLabels) || maxLabels < 0) {
 			throw new Error("Overlay maxLabels must be a non-negative integer.");
 		}
+		this.maxLabels = maxLabels;
+		this.autoLabels = options.autoLabels === true;
 		this.root.className = `graphraum-overlay ${options.overlayClassName ?? ""}`.trim();
 		this.root.style.cssText = "inset:0;pointer-events:none;position:absolute;";
 		this.previousContainerPosition =
@@ -39,17 +44,15 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		this.stopObserving = graph.onViewChange(() => this.update());
 	}
 
+	/**
+	 * Replaces the labeled node set. When `autoLabels` is enabled, the next view change overwrites
+	 * this list from the viewport budget policy.
+	 */
 	setLabels(nodeIds: Iterable<string>) {
 		const nodeIdList = [...new Set(nodeIds)];
-		const maxLabels = this.options.maxLabels ?? 50;
-		if (nodeIdList.length > maxLabels) throw new Error(`Overlay supports at most ${maxLabels} labels.`);
-		for (const entry of this.labels.values()) entry.element.remove();
-		this.labels.clear();
-		for (const nodeId of nodeIdList) {
-			const entry = this.createEntry(nodeId, this.options.renderLabel, "Label", "none");
-			if (entry) this.labels.set(nodeId, entry);
-		}
-		this.update();
+		if (nodeIdList.length > this.maxLabels) throw new Error(`Overlay supports at most ${this.maxLabels} labels.`);
+		this.syncLabels(nodeIdList);
+		this.updatePositions();
 	}
 
 	setToolbar(nodeId: string | null) {
@@ -57,7 +60,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		this.toolbar = null;
 		this.toolbarNodeId = nodeId;
 		if (nodeId !== null) this.toolbar = this.createEntry(nodeId, this.options.renderToolbar, "Toolbar", "auto");
-		this.update();
+		this.updatePositions();
 	}
 
 	destroy() {
@@ -67,6 +70,39 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 			this.container.style.position = this.previousContainerPosition;
 		this.labels.clear();
 		this.toolbar = null;
+	}
+
+	private update() {
+		if (this.autoLabels) {
+			this.syncLabels(
+				selectBudgetedLabelIds({
+					candidates: this.graph.getLabelCandidates(),
+					maxLabels: this.maxLabels,
+				}),
+			);
+		}
+		this.updatePositions();
+	}
+
+	private syncLabels(nodeIds: readonly string[]) {
+		const nextIds = new Set(nodeIds);
+		for (const [nodeId, entry] of this.labels) {
+			if (nextIds.has(nodeId)) continue;
+			entry.element.remove();
+			this.labels.delete(nodeId);
+		}
+		for (const nodeId of nodeIds) {
+			if (this.labels.has(nodeId)) continue;
+			const entry = this.createEntry(nodeId, this.options.renderLabel, "Label", "none");
+			if (entry) this.labels.set(nodeId, entry);
+		}
+	}
+
+	private updatePositions() {
+		for (const [nodeId, entry] of this.labels)
+			this.updateEntry(nodeId, entry, this.options.renderLabel, "label", "none");
+		if (this.toolbar && this.toolbarNodeId)
+			this.updateEntry(this.toolbarNodeId, this.toolbar, this.options.renderToolbar, "toolbar", "auto");
 	}
 
 	private createEntry(
@@ -93,13 +129,6 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		element.style.pointerEvents = pointerEvents;
 		this.root.append(element);
 		return { element, presentation };
-	}
-
-	private update() {
-		for (const [nodeId, entry] of this.labels)
-			this.updateEntry(nodeId, entry, this.options.renderLabel, "label", "none");
-		if (this.toolbar && this.toolbarNodeId)
-			this.updateEntry(this.toolbarNodeId, this.toolbar, this.options.renderToolbar, "toolbar", "auto");
 	}
 
 	private updateEntry(
