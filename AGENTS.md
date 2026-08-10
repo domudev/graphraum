@@ -61,13 +61,17 @@ Prefer simple data flow, explicit arguments, immutable public inputs, early guar
 
 Custom docs surfaces use flat cards with one outer border and edge-to-edge section dividers. Internal sections have no margins, gaps, independent rounding, or shadows; card chrome uses solid fills. Controls and buttons occupy complete card sections. Mark structural components as `not-content` so Starlight prose rhythm cannot create gaps inside them.
 
+## Task tracking
+
+**GitHub Issues are the only task system for this repository.** Every planned change, bug, follow-up, and agent-assigned slice must be a GitHub issue (or an existing one that already covers it). Do not create or update tasks in Linear, Notion, Jira, or any other tracker for graphraum work. Cross-links from other systems to a GitHub issue are fine; the issue itself is the source of truth.
+
 ## GitHub workflow
 
-1. Check for an existing issue; create one with enough context when missing.
+1. Check for an existing GitHub issue; create one with enough context when missing.
 2. Branch from current `main` using `feat/`, `fix/`, `docs/`, or `chore/`.
 3. Keep commits and pull requests focused.
-4. Open a PR with **What / Why or Fix / Verification** and link the issue.
-5. Wait for CI and record follow-up work as issues instead of expanding scope silently.
+4. Open a PR with **What / Why or Fix / Verification** and link the GitHub issue.
+5. Wait for CI and record follow-up work as GitHub issues instead of expanding scope silently.
 
 ## Conventional Commits and releases
 
