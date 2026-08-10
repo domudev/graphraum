@@ -22,6 +22,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { compileGraph } from "./compile-graph";
 import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
 import { DETAIL_MAX_SEGMENTS } from "./edge-paths";
+import { type PickableEdgeSegment, pickClosestEdgeIndex } from "./edge-picking";
 import {
 	createEdgeGeometry,
 	createEdgeMaterial,
@@ -55,6 +56,7 @@ import type {
 	GraphraumNodeUpdate,
 	GraphraumOptions,
 	GraphraumOverlayOptions,
+	GraphraumPickHit,
 	GraphraumScreenPosition,
 	GraphraumTheme,
 	GraphraumVisualMapper,
@@ -135,12 +137,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private markerCapacity = 0;
 	private edgeInstanceCapacity = 0;
 	private selectedNodeIds = new Set<string>();
+	private selectedEdgeIds = new Set<string>();
 	private hoveredNodeIds = new Set<string>();
 	private focusedNodeIds = new Set<string>();
 	private dimmedNodeIds = new Set<string>();
 	private visibleNodeSlots = new Map<number, number>();
 	private visibleEdgeSlots = new Map<number, number>();
 	private visibleNodeIndices: readonly number[] = [];
+	private pickableEdgeSegments: PickableEdgeSegment[] = [];
+	private visibleEdgeSegmentEdgeIndices: number[] = [];
 	private visibleNodeCount = 0;
 	private visibleNodeCandidateCount = 0;
 	private densityLodActive = false;
@@ -481,6 +486,13 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.setNodeState("selected", nodeIds);
 	}
 
+	/** Highlights edges without changing node selection or source graph data. */
+	setEdgeSelection(edgeIds: Iterable<string>) {
+		this.selectedEdgeIds = new Set(edgeIds);
+		this.materializeViewport();
+		this.requestRender();
+	}
+
 	/** Applies an application-owned visual state without changing source graph data. */
 	setNodeState(state: GraphraumNodeState, nodeIds: Iterable<string>) {
 		const nextSelection = new Set(nodeIds);
@@ -609,6 +621,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			gpuTextures: this.renderer.info.memory.textures,
 			lodLevel: resolveLodLevel(this.densityLodActive, this.visibleEdgeCandidateCount, this.visibleEdgeCount),
 			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
+			selectedEdges: this.selectedEdgeIds.size,
+			selectedNodes: this.selectedNodeIds.size,
 			totalEdges: this.data.edges.length,
 			totalNodes: this.data.nodes.length,
 			visibleEdgeCandidates: this.visibleEdgeCandidateCount,
@@ -620,56 +634,22 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		};
 	}
 
+	/** Picks a node under the pointer. Prefer `pickHit` when edges must be selectable too. */
 	pick(clientX: number, clientY: number): string | null {
-		if (!this.nodeMesh || !this.nodePickMesh) return null;
-		const bounds = this.renderer.domElement.getBoundingClientRect();
-		this.pointer.set(
-			((clientX - bounds.left) / bounds.width) * 2 - 1,
-			-((clientY - bounds.top) / bounds.height) * 2 + 1,
-		);
-		if (this.camera instanceof OrthographicCamera) {
-			const world = new Vector3(this.pointer.x, this.pointer.y, 0).unproject(this.camera);
-			const index = this.spatialGrid2d.pick(world.x, world.y);
-			return index === null ? null : (this.nodeIds[index] ?? null);
-		}
-		this.raycaster.setFromCamera(this.pointer, this.camera);
-		const checkedInstances = new Set<number>();
-		for (const hit of this.raycaster.intersectObject(this.nodePickMesh, false)) {
-			if (hit.instanceId === undefined || checkedInstances.has(hit.instanceId)) continue;
-			checkedInstances.add(hit.instanceId);
-			const nodeIndex = this.visibleNodeIndices[hit.instanceId];
-			if (nodeIndex === undefined) continue;
-			const node = this.data.nodes[nodeIndex];
-			if (!node) continue;
-			const { height, width } = resolveNodeAxes({
-				height: node.height,
-				nodeId: node.id,
-				size: node.size,
-				width: node.width,
-			});
-			this.pickCenter.set(node.position.x, node.position.y, node.position.z ?? 0).project(this.camera);
-			this.pickRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(width);
-			this.pickRight.set(
-				this.pickRight.x + node.position.x,
-				this.pickRight.y + node.position.y,
-				this.pickRight.z + (node.position.z ?? 0),
-			);
-			this.pickRight.project(this.camera);
-			this.pickUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(height);
-			this.pickUp.set(
-				this.pickUp.x + node.position.x,
-				this.pickUp.y + node.position.y,
-				this.pickUp.z + (node.position.z ?? 0),
-			);
-			this.pickUp.project(this.camera);
-			const radiusNdcX = Math.abs(this.pickRight.x - this.pickCenter.x);
-			const radiusNdcY = Math.abs(this.pickUp.y - this.pickCenter.y);
-			if (radiusNdcX === 0 || radiusNdcY === 0) continue;
-			const offsetX = (this.pointer.x - this.pickCenter.x) / radiusNdcX;
-			const offsetY = (this.pointer.y - this.pickCenter.y) / radiusNdcY;
-			if (containsNodePoint(node.shape, offsetX, offsetY)) return this.nodeIds[nodeIndex] ?? null;
-		}
-		return null;
+		const hit = this.pickHit(clientX, clientY);
+		return hit?.kind === "node" ? hit.id : null;
+	}
+
+	/**
+	 * Picks the top-most graph element under the pointer. Nodes win over edges when both hit.
+	 * 2D uses the spatial grid for nodes and world-space segment distance for edges; 3D uses
+	 * the node pick mesh then the edge instance mesh.
+	 */
+	pickHit(clientX: number, clientY: number): GraphraumPickHit | null {
+		const nodeId = this.pickNode(clientX, clientY);
+		if (nodeId) return { kind: "node", id: nodeId };
+		const edgeId = this.pickEdge(clientX, clientY);
+		return edgeId ? { kind: "edge", id: edgeId } : null;
 	}
 
 	fitView() {
@@ -802,6 +782,95 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 		controls.addEventListener("change", this.handleViewChange);
 		return controls;
+	}
+
+	private pickNode(clientX: number, clientY: number): string | null {
+		if (!this.nodeMesh || !this.nodePickMesh) return null;
+		const bounds = this.renderer.domElement.getBoundingClientRect();
+		if (bounds.width === 0 || bounds.height === 0) return null;
+		this.pointer.set(
+			((clientX - bounds.left) / bounds.width) * 2 - 1,
+			-((clientY - bounds.top) / bounds.height) * 2 + 1,
+		);
+		if (this.camera instanceof OrthographicCamera) {
+			const world = new Vector3(this.pointer.x, this.pointer.y, 0).unproject(this.camera);
+			const index = this.spatialGrid2d.pick(world.x, world.y);
+			return index === null ? null : (this.nodeIds[index] ?? null);
+		}
+		this.raycaster.setFromCamera(this.pointer, this.camera);
+		const checkedInstances = new Set<number>();
+		for (const hit of this.raycaster.intersectObject(this.nodePickMesh, false)) {
+			if (hit.instanceId === undefined || checkedInstances.has(hit.instanceId)) continue;
+			checkedInstances.add(hit.instanceId);
+			const nodeIndex = this.visibleNodeIndices[hit.instanceId];
+			if (nodeIndex === undefined) continue;
+			const node = this.data.nodes[nodeIndex];
+			if (!node) continue;
+			const { height, width } = resolveNodeAxes({
+				height: node.height,
+				nodeId: node.id,
+				size: node.size,
+				width: node.width,
+			});
+			this.pickCenter.set(node.position.x, node.position.y, node.position.z ?? 0).project(this.camera);
+			this.pickRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(width);
+			this.pickRight.set(
+				this.pickRight.x + node.position.x,
+				this.pickRight.y + node.position.y,
+				this.pickRight.z + (node.position.z ?? 0),
+			);
+			this.pickRight.project(this.camera);
+			this.pickUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion).multiplyScalar(height);
+			this.pickUp.set(
+				this.pickUp.x + node.position.x,
+				this.pickUp.y + node.position.y,
+				this.pickUp.z + (node.position.z ?? 0),
+			);
+			this.pickUp.project(this.camera);
+			const radiusNdcX = Math.abs(this.pickRight.x - this.pickCenter.x);
+			const radiusNdcY = Math.abs(this.pickUp.y - this.pickCenter.y);
+			if (radiusNdcX === 0 || radiusNdcY === 0) continue;
+			const offsetX = (this.pointer.x - this.pickCenter.x) / radiusNdcX;
+			const offsetY = (this.pointer.y - this.pickCenter.y) / radiusNdcY;
+			if (containsNodePoint(node.shape, offsetX, offsetY)) return this.nodeIds[nodeIndex] ?? null;
+		}
+		return null;
+	}
+
+	private pickEdge(clientX: number, clientY: number): string | null {
+		if (!this.edgeMesh || this.pickableEdgeSegments.length === 0) return null;
+		const bounds = this.renderer.domElement.getBoundingClientRect();
+		if (bounds.width === 0 || bounds.height === 0) return null;
+		this.pointer.set(
+			((clientX - bounds.left) / bounds.width) * 2 - 1,
+			-((clientY - bounds.top) / bounds.height) * 2 + 1,
+		);
+		if (this.camera instanceof OrthographicCamera) {
+			const world = new Vector3(this.pointer.x, this.pointer.y, 0).unproject(this.camera);
+			const edgeIndex = pickClosestEdgeIndex({ x: world.x, y: world.y }, this.pickableEdgeSegments);
+			return edgeIndex === null ? null : (this.data.edges[edgeIndex]?.id ?? null);
+		}
+		this.raycaster.setFromCamera(this.pointer, this.camera);
+		for (const hit of this.raycaster.intersectObject(this.edgeMesh, false)) {
+			if (hit.instanceId === undefined) continue;
+			if (hit.instanceId >= this.visibleEdgeSegmentCount) continue;
+			const edgeIndex = this.visibleEdgeSegmentEdgeIndices[hit.instanceId];
+			if (edgeIndex === undefined) continue;
+			return this.data.edges[edgeIndex]?.id ?? null;
+		}
+		return null;
+	}
+
+	private worldUnitsPerPixel(): number {
+		const width = Math.max(this.renderer.domElement.clientWidth, 1);
+		if (this.camera instanceof OrthographicCamera) {
+			return (this.camera.right - this.camera.left) / (width * this.camera.zoom);
+		}
+		const bounds = this.renderer.domElement.getBoundingClientRect();
+		const left = this.screenToWorld(bounds.left, bounds.top);
+		const right = this.screenToWorld(bounds.left + 1, bounds.top);
+		if (!left || !right) return 1;
+		return Math.hypot(right.x - left.x, right.y - left.y) || 1;
 	}
 
 	private applySelectionColors(nodeIds: Iterable<string>) {
@@ -946,9 +1015,13 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		nodeStrokeColor.needsUpdate = true;
 
 		const lodLevel = resolveLodLevel(this.densityLodActive, edgeCandidates.length, visibleEdgeIndices.length);
+		const worldPerPixel = this.worldUnitsPerPixel();
+		const edgeVisuals = this.data.edges.map((edge) =>
+			this.selectedEdgeIds.has(edge.id) ? { ...edge, color: this.theme.selectedEdge } : edge,
+		);
 		const packed = packEdgeInstances({
 			edgeIndices: visibleEdgeIndices,
-			edgeVisuals: this.data.edges,
+			edgeVisuals,
 			endpointPositions: this.canonicalEdgePositions,
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
 			tier: edgeTierFromDiagnosticsLod(lodLevel),
@@ -956,14 +1029,26 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		});
 		const edgeGeometry = this.edgeMesh.geometry;
 		this.visibleEdgeSlots = new Map();
+		this.pickableEdgeSegments = [];
+		this.visibleEdgeSegmentEdgeIndices = [];
 		let edgeSlot = 0;
 		const distinctEdges = new Set<number>();
+		const minHitSlop = Math.max(4 * worldPerPixel, this.theme.edgeWidth * worldPerPixel);
 		for (const segment of packed.segments) {
 			writeEdgeSegmentInstance(edgeGeometry, edgeSlot, segment);
 			if (!this.visibleEdgeSlots.has(segment.edgeIndex)) {
 				this.visibleEdgeSlots.set(segment.edgeIndex, edgeSlot);
 			}
 			distinctEdges.add(segment.edgeIndex);
+			this.visibleEdgeSegmentEdgeIndices.push(segment.edgeIndex);
+			this.pickableEdgeSegments.push({
+				edgeIndex: segment.edgeIndex,
+				hitSlop: Math.max(minHitSlop, (segment.width * worldPerPixel) / 2 + 2 * worldPerPixel),
+				x1: segment.x1,
+				y1: segment.y1,
+				x2: segment.x2,
+				y2: segment.y2,
+			});
 			edgeSlot += 1;
 		}
 		const segmentCount = edgeSlot;
@@ -1042,6 +1127,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private disposeGraphObjects() {
+		this.pickableEdgeSegments = [];
+		this.visibleEdgeSegmentEdgeIndices = [];
 		if (this.nodeMesh) {
 			this.scene.remove(this.nodeMesh);
 			this.nodeMesh.geometry.dispose();

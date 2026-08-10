@@ -181,8 +181,12 @@ export interface GraphraumTheme {
 	hoveredNode: GraphraumColor;
 	node: GraphraumColor;
 	nodeStroke: GraphraumColor;
+	selectedEdge: GraphraumColor;
 	selectedNode: GraphraumColor;
 }
+
+/** Discriminated pick result. Nodes win over edges when both intersect the pointer. */
+export type GraphraumPickHit = { kind: "edge"; id: string } | { kind: "node"; id: string };
 
 export interface GraphraumOptions<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	antialias?: boolean;
@@ -205,6 +209,8 @@ export interface GraphraumDiagnostics {
 	gpuTextures: number;
 	lodLevel: "density" | "detail" | "overview";
 	pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+	selectedEdges: number;
+	selectedNodes: number;
 	totalEdges: number;
 	totalNodes: number;
 	visibleEdgeCandidates: number;

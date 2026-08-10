@@ -110,14 +110,28 @@ Use graphraum's picking result to fetch immutable, serializable presentation dat
 
 ```ts
 container.addEventListener("click", (event) => {
-  const nodeId = graph.pick(event.clientX, event.clientY);
-  const presentation = nodeId ? graph.getNodePresentation(nodeId) : null;
-
-  detailsPanel.render(presentation);
+  const hit = graph.pickHit(event.clientX, event.clientY);
+  if (hit?.kind === "node") {
+    graph.setSelection([hit.id]);
+    graph.setEdgeSelection([]);
+    detailsPanel.render(graph.getNodePresentation(hit.id));
+    return;
+  }
+  if (hit?.kind === "edge") {
+    graph.setEdgeSelection([hit.id]);
+    graph.setSelection([]);
+    detailsPanel.render(graph.getEdgePresentation(hit.id));
+    return;
+  }
+  graph.setSelection([]);
+  graph.setEdgeSelection([]);
+  detailsPanel.render(null);
 });
 ```
 
-`getNodePresentation(id)` and `getEdgePresentation(id)` return `null` when no presentation was compiled. Returned properties and actions are detached from the mapper input and frozen.
+`pick(clientX, clientY)` still returns a node id only (or `null`) for hosts that do not need edge hits. Prefer `pickHit` when edges must be selectable. Selected edges use `theme.selectedEdge` (Porcelain by default) without changing node selection.
+
+`getNodePresentation(id)` and `getEdgePresentation(id)` return `null` when no presentation was compiled. Returned properties and actions are detached from the mapper input and frozen. Diagnostics expose `selectedNodes` and `selectedEdges` counts.
 
 ## Dispatch actions in the host
 

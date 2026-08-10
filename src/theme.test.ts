@@ -13,6 +13,7 @@ describe("graphraumTheme", () => {
 			hoveredNode: "#e4a853",
 			node: "#226f54",
 			nodeStroke: "#fcfffc",
+			selectedEdge: "#fcfffc",
 			selectedNode: "#fcfffc",
 		});
 	});
