@@ -18,9 +18,18 @@ export type {
 export { orderFocusNodeIds, selectBudgetedLabelIds, selectFocusLabelIds } from "./label-budget";
 export { graphraumNodeShapes } from "./node-shapes";
 export { GraphraumOverlay } from "./overlay";
-export { graphraumTheme } from "./theme";
+export {
+	graphraumTheme,
+	graphraumThemeDark,
+	graphraumThemeLight,
+	graphraumThemes,
+	isTransparentGraphraumBackground,
+	normalizeGraphraumBackground,
+	resolveGraphraumTheme,
+} from "./theme";
 export type {
 	CompiledGraphraumPresentation,
+	GraphraumBackground,
 	GraphraumColor,
 	GraphraumData,
 	GraphraumDataPatch,
@@ -45,6 +54,7 @@ export type {
 	GraphraumOptions,
 	GraphraumOverlayNode,
 	GraphraumOverlayOptions,
+	GraphraumPatternBackground,
 	GraphraumPickHit,
 	GraphraumPosition,
 	GraphraumPresentation,
@@ -53,6 +63,7 @@ export type {
 	GraphraumPropertyValue,
 	GraphraumScreenPosition,
 	GraphraumTheme,
+	GraphraumThemeName,
 	GraphraumVisualMapper,
 } from "./types";
 export { defineVisuals } from "./visuals";

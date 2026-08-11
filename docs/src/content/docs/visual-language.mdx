@@ -12,23 +12,18 @@ graphraum ships with an opinionated visual baseline so a first render is legible
 ## Canonical palette
 
 <div class="palette-grid not-content">
-  <div class="palette-swatch palette-ink"><strong>Ink Black</strong><code>#040F0F</code><span>canvas</span></div>
+  <div class="palette-swatch palette-ink"><strong>Ink Black</strong><code>#040F0F</code><span>dark canvas / light selection</span></div>
   <div class="palette-swatch palette-turf"><strong>Turf Green</strong><code>#226F54</code><span>nodes and edges</span></div>
-  <div class="palette-swatch palette-porcelain"><strong>Porcelain</strong><code>#FCFFFC</code><span>selection</span></div>
+  <div class="palette-swatch palette-porcelain"><strong>Porcelain</strong><code>#FCFFFC</code><span>light canvas / dark selection</span></div>
 </div>
 
-The exported `graphraumTheme` is the source of truth for these defaults:
+Two immutable presets ship as `graphraumThemes.dark` and `graphraumThemes.light`. `graphraumTheme` remains the dark alias.
 
 ```ts
-import { graphraumTheme } from "@domudev/graphraum";
+import { graphraumTheme, graphraumThemes } from "@domudev/graphraum";
 
-console.log(graphraumTheme);
-// {
-//   background: "#040f0f",
-//   edge: "#226f54",
-//   node: "#226f54",
-//   selectedNode: "#fcfffc",
-// }
+console.log(graphraumTheme.background); // "#040f0f"
+console.log(graphraumThemes.light.background); // "#fcfffc"
 ```
 
 ## Node states
@@ -44,16 +39,23 @@ Selection is a color change inside the existing instanced node mesh. It delibera
 
 ## Override without forking
 
-Override only the tokens your product owns. The remaining values continue to follow the canonical theme.
+Pass a named preset, or override only the tokens your product owns. Switch at runtime with `setTheme` / `setBackground`.
 
 ```ts
 const graph = new Graphraum(container, {
-  theme: {
-    node: "#6d5bd0",
-    selectedNode: "#fcfffc",
-  },
+  theme: "light", // or { node: "#6d5bd0", selectedNode: "#fcfffc" }
+});
+
+graph.setTheme("dark");
+graph.setBackground("transparent"); // host CSS color / gradient / pattern shows through
+graph.setBackground({
+  type: "pattern",
+  source: patternCanvas, // HTMLCanvasElement | HTMLImageElement | ImageBitmap | …
+  repeat: [4, 4],
 });
 ```
+
+Use `"transparent"` / `null` when the product owns atmosphere (CSS grid, noise, brand gradient) behind the WebGL canvas. Use a pattern background (`type: "pattern"` with a `source`) when the pattern must live inside the WebGL scene.
 
 Per-node colors remain available for semantic categories:
 

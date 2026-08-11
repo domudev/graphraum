@@ -1,5 +1,6 @@
 import {
 	Box3,
+	CanvasTexture,
 	Color,
 	type InstancedBufferAttribute,
 	InstancedMesh,
@@ -11,8 +12,11 @@ import {
 	PerspectiveCamera,
 	Plane,
 	Raycaster,
+	RepeatWrapping,
 	Scene,
 	SphereGeometry,
+	SRGBColorSpace,
+	Texture,
 	Vector2,
 	Vector3,
 	WebGLRenderer,
@@ -43,9 +47,10 @@ import { resolveNodeStroke } from "./node-stroke";
 import { type PreparedNodeUpdate, prepareNodeUpdates } from "./node-updates";
 import { GraphraumOverlay } from "./overlay";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
-import { graphraumTheme } from "./theme";
+import { normalizeGraphraumBackground, resolveGraphraumTheme } from "./theme";
 import type {
 	CompiledGraphraumPresentation,
+	GraphraumBackground,
 	GraphraumData,
 	GraphraumDataPatch,
 	GraphraumDiagnostics,
@@ -59,6 +64,7 @@ import type {
 	GraphraumPickHit,
 	GraphraumScreenPosition,
 	GraphraumTheme,
+	GraphraumThemeName,
 	GraphraumVisualMapper,
 } from "./types";
 import { applyEdgeBudget, collectIncidentEdges, resolveLodLevel, shouldUseDensityLod } from "./viewport-lod";
@@ -111,7 +117,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private readonly pickCenter = new Vector3();
 	private readonly pickRight = new Vector3();
 	private readonly pickUp = new Vector3();
-	private readonly theme: GraphraumTheme;
+	private theme: GraphraumTheme;
+	private backgroundTexture: Texture | null = null;
 	private readonly resizeObserver: ResizeObserver;
 	private readonly maxVisibleEdges: number;
 	private readonly maxVisibleNodes: number;
@@ -180,9 +187,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (!Number.isFinite(this.viewportOverscan) || this.viewportOverscan < 0) {
 			throw new Error("Viewport overscan must be a non-negative finite number.");
 		}
-		this.theme = { ...graphraumTheme, ...options.theme };
-		this.scene.background = new Color(this.theme.background);
-		this.renderer = new WebGLRenderer({ antialias: options.antialias ?? false });
+		this.theme = resolveGraphraumTheme(options.theme);
+		this.renderer = new WebGLRenderer({ antialias: options.antialias ?? false, alpha: true });
+		this.applyBackground();
 		const context = this.renderer.getContext();
 		if (typeof WebGL2RenderingContext !== "undefined" && context instanceof WebGL2RenderingContext) {
 			const extension = context.getExtension("EXT_disjoint_timer_query_webgl2");
@@ -754,6 +761,17 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.requestRender();
 	}
 
+	setTheme(theme: Partial<GraphraumTheme> | GraphraumThemeName) {
+		this.theme = typeof theme === "string" ? resolveGraphraumTheme(theme) : resolveGraphraumTheme(theme, this.theme);
+		this.applyBackground();
+		if (this.nodeMesh) this.materializeViewport();
+		this.requestRender();
+	}
+
+	setBackground(background: GraphraumBackground) {
+		this.setTheme({ background });
+	}
+
 	resize() {
 		const width = Math.max(this.container.clientWidth, 1);
 		const height = Math.max(this.container.clientHeight, 1);
@@ -776,6 +794,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (this.gpuTimer) {
 			for (const query of this.gpuTimer.pending) this.gpuTimer.context.deleteQuery(query);
 		}
+		this.disposeBackgroundTexture();
 		this.disposeGraphObjects();
 		this.renderer.dispose();
 		this.renderer.domElement.remove();
@@ -1002,6 +1021,48 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			node.position.y + height >= bounds.bottom - this.viewportOverscan &&
 			node.position.y - height <= bounds.top + this.viewportOverscan
 		);
+	}
+
+	private disposeBackgroundTexture() {
+		if (!this.backgroundTexture) return;
+		this.backgroundTexture.dispose();
+		this.backgroundTexture = null;
+	}
+
+	private createBackgroundTexture(source: CanvasImageSource, repeat: readonly [number, number] | undefined): Texture {
+		const texture =
+			source instanceof HTMLCanvasElement ||
+			(typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas)
+				? new CanvasTexture(source)
+				: new Texture(source as HTMLImageElement | ImageBitmap | HTMLVideoElement);
+		texture.colorSpace = SRGBColorSpace;
+		texture.needsUpdate = true;
+		const [repeatX, repeatY] = repeat ?? [1, 1];
+		if (repeatX !== 1 || repeatY !== 1) {
+			texture.wrapS = RepeatWrapping;
+			texture.wrapT = RepeatWrapping;
+			texture.repeat.set(repeatX, repeatY);
+		}
+		return texture;
+	}
+
+	private applyBackground() {
+		this.disposeBackgroundTexture();
+		const background = normalizeGraphraumBackground(this.theme.background);
+		if (background === null) {
+			this.scene.background = null;
+			this.renderer.setClearColor(0x000000, 0);
+			return;
+		}
+		if (typeof background === "object") {
+			this.backgroundTexture = this.createBackgroundTexture(background.source, background.repeat);
+			this.scene.background = this.backgroundTexture;
+			this.renderer.setClearColor(0x000000, 1);
+			return;
+		}
+		const color = new Color(background);
+		this.scene.background = color;
+		this.renderer.setClearColor(color, 1);
 	}
 
 	private materializeViewport() {

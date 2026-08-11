@@ -184,8 +184,25 @@ export interface GraphraumVisualMapper<NodeAttributes = undefined, EdgeAttribute
 	node?: (node: Readonly<GraphraumNode<NodeAttributes>>) => GraphraumNodeEncoding | undefined;
 }
 
+/**
+ * Canvas backdrop.
+ * - CSS color string paints a solid WebGL clear
+ * - `null` / `"transparent"` leaves the canvas clear so a host CSS color, gradient, or pattern shows through
+ * - `{ type: "pattern", source }` uses an image/canvas/bitmap as `scene.background`
+ */
+export type GraphraumPatternBackground = {
+	type: "pattern";
+	source: CanvasImageSource;
+	/** Horizontal and vertical tile count. Default `[1, 1]` stretches to fill. */
+	repeat?: readonly [number, number];
+};
+
+export type GraphraumBackground = GraphraumColor | GraphraumPatternBackground | "transparent" | null;
+
+export type GraphraumThemeName = "dark" | "light";
+
 export interface GraphraumTheme {
-	background: GraphraumColor;
+	background: GraphraumBackground;
 	dimmedNode: GraphraumColor;
 	edge: GraphraumColor;
 	edgeOpacity: number;
@@ -207,7 +224,8 @@ export interface GraphraumOptions<NodeAttributes = undefined, EdgeAttributes = u
 	maxVisibleNodes?: number;
 	maxPixelRatio?: number;
 	mode?: GraphraumMode;
-	theme?: Partial<GraphraumTheme>;
+	/** Named preset (`"dark"` / `"light"`) or a partial override merged onto dark. */
+	theme?: Partial<GraphraumTheme> | GraphraumThemeName;
 	viewportCulling?: boolean;
 	viewportOverscan?: number;
 	visuals?: GraphraumVisualMapper<NodeAttributes, EdgeAttributes>;
