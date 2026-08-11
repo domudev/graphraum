@@ -23,3 +23,53 @@ export function selectBudgetedLabelIds({ candidates, maxLabels }: SelectBudgeted
 		.slice(0, maxLabels)
 		.map((candidate) => candidate.id);
 }
+
+export interface SelectFocusLabelIdsInput {
+	/** Prefer these ids first (selected, then hovered, then neighbors) — order within each tier is free. */
+	focusIds: readonly string[];
+	candidates: readonly LabelBudgetCandidate[];
+	maxLabels: number;
+}
+
+/**
+ * Labels for a sparse focus set: keep focus ids that are visible, then fill remaining budget
+ * from other visible candidates by importance. Focus order is preserved.
+ */
+export function selectFocusLabelIds({ focusIds, candidates, maxLabels }: SelectFocusLabelIdsInput): string[] {
+	if (!Number.isSafeInteger(maxLabels) || maxLabels < 0) {
+		throw new Error("maxLabels must be a non-negative integer.");
+	}
+	const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+	const chosen: string[] = [];
+	const chosenSet = new Set<string>();
+	for (const id of focusIds) {
+		if (chosen.length >= maxLabels) break;
+		if (chosenSet.has(id)) continue;
+		const candidate = byId.get(id);
+		if (!candidate?.visible) continue;
+		chosen.push(id);
+		chosenSet.add(id);
+	}
+	if (chosen.length >= maxLabels) return chosen;
+	const fillers = selectBudgetedLabelIds({
+		candidates: candidates.filter((candidate) => !chosenSet.has(candidate.id)),
+		maxLabels: maxLabels - chosen.length,
+	});
+	return [...chosen, ...fillers];
+}
+
+/** Builds an ordered focus id list: selected, then hovered, then unique neighbors. */
+export function orderFocusNodeIds(input: {
+	selectedIds: readonly string[];
+	hoveredIds: readonly string[];
+	neighborIds: readonly string[];
+}): string[] {
+	const ordered: string[] = [];
+	const seen = new Set<string>();
+	for (const id of [...input.selectedIds, ...input.hoveredIds, ...input.neighborIds]) {
+		if (seen.has(id)) continue;
+		seen.add(id);
+		ordered.push(id);
+	}
+	return ordered;
+}

@@ -10,8 +10,12 @@ export {
 export type { GraphologyEdgeAttributes, GraphologyNodeAttributes, GraphologyRenderer } from "./graphology";
 export { bindGraphology } from "./graphology";
 export { Graphraum } from "./graphraum";
-export type { LabelBudgetCandidate, SelectBudgetedLabelIdsInput } from "./label-budget";
-export { selectBudgetedLabelIds } from "./label-budget";
+export type {
+	LabelBudgetCandidate,
+	SelectBudgetedLabelIdsInput,
+	SelectFocusLabelIdsInput,
+} from "./label-budget";
+export { orderFocusNodeIds, selectBudgetedLabelIds, selectFocusLabelIds } from "./label-budget";
 export { graphraumNodeShapes } from "./node-shapes";
 export { GraphraumOverlay } from "./overlay";
 export { graphraumTheme } from "./theme";

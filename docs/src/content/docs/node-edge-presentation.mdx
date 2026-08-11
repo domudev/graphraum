@@ -150,18 +150,23 @@ Do not put arbitrary HTML, component instances, closures, or mutable domain obje
 
 `createOverlay()` projects a bounded set of host-created HTML elements over the canvas. It is the same dense-canvas plus sparse-DOM split used by graph editors: WebGL remains responsible for the graph, while your application owns rich text, CSS, buttons, and action handling. The two-draw-call GPU path is unchanged—labels stay in the DOM overlay.
 
-### Auto-budgeted labels
+Pointer move updates hovered node state automatically. Use `getNeighborIds(id)` for 1-hop adjacency when building focus chrome outside the overlay.
 
-Prefer `autoLabels: true` when the host should not guess `setLabels()` every frame. On each view change, graphraum:
+### Label policies
 
-1. Builds candidates from `getLabelCandidates()` — `visible` from screen projection, `importance` from incident edge degree (selected nodes get a large boost so they stay labeled).
-2. Keeps only visible candidates, sorts by importance descending (stable by id on ties), and takes at most `maxLabels` (50 by default).
-3. Syncs the DOM label set to that budgeted id list.
+`labelPolicy` controls which titles appear:
+
+| Policy | Behavior |
+| --- | --- |
+| `manual` (default) | Host calls `setLabels(ids)` |
+| `auto` | Budget by importance among visible nodes (`autoLabels: true` maps here) |
+| `focus` | Prefer selected ∪ hovered ∪ 1-hop neighbors, then fill by importance within `maxLabels` |
 
 ```ts
 const overlay = graph.createOverlay({
-  autoLabels: true,
-  maxLabels: 50,
+  labelPolicy: "focus",
+  autoToolbar: "selected",
+  maxLabels: 24,
   renderLabel: ({ id, presentation }) => {
     const label = document.createElement("span");
     label.className = "my-graph-label";
@@ -181,21 +186,27 @@ const overlay = graph.createOverlay({
     return toolbar;
   },
 });
-
-overlay.setToolbar("person:ada");
 ```
 
-Off-screen nodes stay out of the budgeted set. You can still call `setLabels()` while `autoLabels` is on; the next view change overwrites that list from the budget policy. Export `selectBudgetedLabelIds` if you need the same policy outside the overlay.
+`autoToolbar: "selected" | "hovered"` keeps the toolbar pinned without calling `setToolbar`. With `"hovered"`, selection is the fallback when nothing is hovered. When `autoToolbar` is off (default), call `overlay.setToolbar(nodeId)` yourself.
+
+Off-screen nodes stay out of budgeted sets. Manual `setLabels()` still works under `auto` / `focus` until the next view or focus change overwrites the list. Export `selectBudgetedLabelIds`, `selectFocusLabelIds`, and `orderFocusNodeIds` for the same policies outside the overlay.
 
 ### Manual labels
 
-With `autoLabels` left false (the default), the host chooses ids:
-
 ```ts
+const overlay = graph.createOverlay({
+  renderLabel: ({ id, presentation }) => {
+    const label = document.createElement("span");
+    label.textContent = presentation?.title ?? id;
+    return label;
+  },
+});
 overlay.setLabels(["person:ada", "place:london"]);
+overlay.setToolbar("person:ada");
 ```
 
-`setLabels()` still throws when the list exceeds `maxLabels`. Off-screen and missing nodes are safely hidden or ignored. The overlay tracks camera movement automatically; call `destroy()` with the graph lifecycle.
+`setLabels()` still throws when the list exceeds `maxLabels`. Off-screen and missing nodes are safely hidden or ignored. Call `destroy()` with the graph lifecycle.
 
 ## Density policy
 

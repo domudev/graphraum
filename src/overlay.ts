@@ -1,5 +1,5 @@
 import type { Graphraum } from "./graphraum";
-import { selectBudgetedLabelIds } from "./label-budget";
+import { orderFocusNodeIds, selectBudgetedLabelIds, selectFocusLabelIds } from "./label-budget";
 import type { CompiledGraphraumPresentation, GraphraumOverlayNode, GraphraumOverlayOptions } from "./types";
 
 type OverlayEntry = {
@@ -7,10 +7,17 @@ type OverlayEntry = {
 	presentation: CompiledGraphraumPresentation | null;
 };
 
+type LabelPolicy = "manual" | "auto" | "focus";
+
 function assertElement(element: HTMLElement | null, kind: string) {
 	if (element !== null && !(element instanceof HTMLElement)) {
 		throw new Error(`${kind} renderer must return an HTMLElement or null`);
 	}
+}
+
+function resolveLabelPolicy(options: GraphraumOverlayOptions): LabelPolicy {
+	if (options.labelPolicy) return options.labelPolicy;
+	return options.autoLabels === true ? "auto" : "manual";
 }
 
 /** A bounded DOM layer for labels and a focused-node toolbar. It never participates in WebGL rendering. */
@@ -19,9 +26,11 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	private readonly labels = new Map<string, OverlayEntry>();
 	private toolbar: OverlayEntry | null = null;
 	private toolbarNodeId: string | null = null;
-	private readonly stopObserving: () => void;
+	private readonly stopObservingView: () => void;
+	private readonly stopObservingFocus: () => void;
 	private readonly previousContainerPosition: string | null;
-	private readonly autoLabels: boolean;
+	private readonly labelPolicy: LabelPolicy;
+	private readonly autoToolbar: false | "selected" | "hovered";
 	private readonly maxLabels: number;
 
 	constructor(
@@ -34,19 +43,21 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 			throw new Error("Overlay maxLabels must be a non-negative integer.");
 		}
 		this.maxLabels = maxLabels;
-		this.autoLabels = options.autoLabels === true;
+		this.labelPolicy = resolveLabelPolicy(options);
+		this.autoToolbar = options.autoToolbar ?? false;
 		this.root.className = `graphraum-overlay ${options.overlayClassName ?? ""}`.trim();
 		this.root.style.cssText = "inset:0;pointer-events:none;position:absolute;";
 		this.previousContainerPosition =
 			getComputedStyle(this.container).position === "static" ? this.container.style.position : null;
 		if (this.previousContainerPosition !== null) this.container.style.position = "relative";
 		this.container.append(this.root);
-		this.stopObserving = graph.onViewChange(() => this.update());
+		this.stopObservingView = graph.onViewChange(() => this.update());
+		this.stopObservingFocus = graph.onFocusChange(() => this.update());
 	}
 
 	/**
-	 * Replaces the labeled node set. When `autoLabels` is enabled, the next view change overwrites
-	 * this list from the viewport budget policy.
+	 * Replaces the labeled node set. When `labelPolicy` is `auto` or `focus`, the next view/focus
+	 * change overwrites this list from the policy.
 	 */
 	setLabels(nodeIds: Iterable<string>) {
 		const nodeIdList = [...new Set(nodeIds)];
@@ -56,6 +67,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	}
 
 	setToolbar(nodeId: string | null) {
+		if (this.autoToolbar) return;
 		this.toolbar?.element.remove();
 		this.toolbar = null;
 		this.toolbarNodeId = nodeId;
@@ -64,7 +76,8 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	}
 
 	destroy() {
-		this.stopObserving();
+		this.stopObservingView();
+		this.stopObservingFocus();
 		this.root.remove();
 		if (this.previousContainerPosition !== null && this.container.querySelector(".graphraum-overlay") === null)
 			this.container.style.position = this.previousContainerPosition;
@@ -73,15 +86,40 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	}
 
 	private update() {
-		if (this.autoLabels) {
+		if (this.labelPolicy === "auto") {
 			this.syncLabels(
 				selectBudgetedLabelIds({
 					candidates: this.graph.getLabelCandidates(),
 					maxLabels: this.maxLabels,
 				}),
 			);
+		} else if (this.labelPolicy === "focus") {
+			const selectedIds = this.graph.getSelectedNodeIds();
+			const hoveredIds = this.graph.getHoveredNodeIds();
+			const neighborIds = [...selectedIds, ...hoveredIds].flatMap((id) => this.graph.getNeighborIds(id));
+			this.syncLabels(
+				selectFocusLabelIds({
+					focusIds: orderFocusNodeIds({ selectedIds, hoveredIds, neighborIds }),
+					candidates: this.graph.getLabelCandidates(),
+					maxLabels: this.maxLabels,
+				}),
+			);
 		}
+		if (this.autoToolbar) this.syncToolbar();
 		this.updatePositions();
+	}
+
+	private syncToolbar() {
+		if (!this.options.renderToolbar) return;
+		const nextId =
+			this.autoToolbar === "hovered"
+				? (this.graph.getHoveredNodeIds()[0] ?? this.graph.getSelectedNodeIds()[0] ?? null)
+				: (this.graph.getSelectedNodeIds()[0] ?? null);
+		if (nextId === this.toolbarNodeId && this.toolbar) return;
+		this.toolbar?.element.remove();
+		this.toolbar = null;
+		this.toolbarNodeId = nextId;
+		if (nextId !== null) this.toolbar = this.createEntry(nextId, this.options.renderToolbar, "Toolbar", "auto");
 	}
 
 	private syncLabels(nodeIds: readonly string[]) {
