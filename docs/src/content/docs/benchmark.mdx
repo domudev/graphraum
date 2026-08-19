@@ -52,6 +52,7 @@ Open the [fullscreen Explorer](../explore/) for layouts (grid, circle, force, fo
 - **Frame times:** 120 explicitly scheduled renders at 1k/10k and 30 at 100k, reported as p50, p95, and max.
 - **Long tasks:** browser Performance Observer entries over 50ms during the run.
 - **Selection feedback:** 20 selection changes at 1k/10k and 5 at 100k, measured through the following animation frame.
+- **Progressive force layout:** worker force compute plus transferable `applyLayout` batches. Reported under `phases.layout` as startup, transfer, compute, first useful frame, and complete. Force compute is one blocking worker burst; progressive batches stream positions to the canvas afterward.
 - **Incremental update:** position changes for 1% of existing nodes, including only their node matrices and incident edge endpoints.
 - **Full update:** replacement with a graph containing 1% more nodes and three edges per node.
 - **GPU draw calls:** Three.js renderer calls from the final frame.
@@ -61,4 +62,4 @@ Open the [fullscreen Explorer](../explore/) for layouts (grid, circle, force, fo
 
 ## Interpret honestly
 
-Prove is a rendering microbenchmark. It does not measure network loading, force-layout convergence, label rendering, application state, accessibility overlays, or a production Graph Explorer. The 100k fixture intentionally allocates a large in-memory graph and may expose long tasks while full-snapshot updates remain synchronous. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated fresh-page runs on the same browser and effective pixel ratio.
+Prove is primarily a rendering microbenchmark. Progressive force layout timing is included so layout cost is visible beside renderer cadence; it is not a claim that layout has converged or that Rust/Wasm is required. The 100k fixture intentionally allocates a large in-memory graph and may expose long tasks while full-snapshot updates remain synchronous. Keep the tab visible, avoid DevTools throttling unless that is the experiment, and compare repeated fresh-page runs on the same browser and effective pixel ratio.

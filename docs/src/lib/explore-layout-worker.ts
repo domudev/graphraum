@@ -23,7 +23,13 @@ type WorkerScope = {
 
 const workerScope = self as unknown as WorkerScope;
 let activeLayout:
-	| { nextStart: number; positions?: Float32Array; request: LayoutRequest; timer?: ReturnType<typeof setTimeout> }
+	| {
+			computeMilliseconds?: number;
+			nextStart: number;
+			positions?: Float32Array;
+			request: LayoutRequest;
+			timer?: ReturnType<typeof setTimeout>;
+	  }
 	| undefined;
 
 function stopLiveLayout() {
@@ -80,7 +86,18 @@ function postNextBatch(run: number) {
 		? activeLayout.positions.slice(start * 3, end * 3)
 		: positionsFor(activeLayout.request, start, end);
 	activeLayout.nextStart = end;
-	workerScope.postMessage({ end, positions, run, type: "positions" }, [positions.buffer]);
+	const computeMilliseconds = activeLayout.computeMilliseconds;
+	activeLayout.computeMilliseconds = undefined;
+	workerScope.postMessage(
+		{
+			end,
+			positions,
+			run,
+			type: "positions",
+			...(computeMilliseconds === undefined ? {} : { computeMilliseconds }),
+		},
+		[positions.buffer],
+	);
 }
 
 workerScope.addEventListener("message", ({ data }) => {
@@ -90,18 +107,23 @@ workerScope.addEventListener("message", ({ data }) => {
 			startLiveLayout(data);
 			return;
 		}
+		let computeMilliseconds: number | undefined;
+		let positions: Float32Array | undefined;
+		if (data.layout === "force") {
+			const computeStartedAt = performance.now();
+			positions = computeForcePositions({
+				dimensions: data.dimensions,
+				edges: data.edges ?? new Uint32Array(),
+				iterations: data.iterations,
+				nodeCount: data.nodeCount,
+				settings: data.settings,
+			});
+			computeMilliseconds = performance.now() - computeStartedAt;
+		}
 		activeLayout = {
+			computeMilliseconds,
 			nextStart: 0,
-			positions:
-				data.layout === "force"
-					? computeForcePositions({
-							dimensions: data.dimensions,
-							edges: data.edges ?? new Uint32Array(),
-							iterations: data.iterations,
-							nodeCount: data.nodeCount,
-							settings: data.settings,
-						})
-					: undefined,
+			positions,
 			request: data,
 		};
 		postNextBatch(data.run);

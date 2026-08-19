@@ -5,7 +5,10 @@ export type BenchmarkHistoryMetric =
 	| "frameP95Milliseconds"
 	| "selectionP95Milliseconds"
 	| "incrementalUpdateMilliseconds"
-	| "fullSnapshotUpdateMilliseconds";
+	| "fullSnapshotUpdateMilliseconds"
+	| "layoutFirstUsefulFrameMilliseconds"
+	| "layoutComputeMilliseconds"
+	| "layoutCompleteMilliseconds";
 
 export interface BenchmarkHistoryEntry {
 	id: string;
@@ -19,10 +22,17 @@ export interface BenchmarkHistoryEntry {
 	selectionP95Milliseconds: number;
 	incrementalUpdateMilliseconds: number;
 	fullSnapshotUpdateMilliseconds: number;
+	layoutFirstUsefulFrameMilliseconds?: number;
+	layoutComputeMilliseconds?: number;
+	layoutCompleteMilliseconds?: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
+}
+
+function isOptionalNumber(value: unknown): boolean {
+	return value === undefined || typeof value === "number";
 }
 
 function isHistoryEntry(value: unknown): value is BenchmarkHistoryEntry {
@@ -38,7 +48,10 @@ function isHistoryEntry(value: unknown): value is BenchmarkHistoryEntry {
 		typeof value.frameP95Milliseconds === "number" &&
 		typeof value.selectionP95Milliseconds === "number" &&
 		typeof value.incrementalUpdateMilliseconds === "number" &&
-		typeof value.fullSnapshotUpdateMilliseconds === "number"
+		typeof value.fullSnapshotUpdateMilliseconds === "number" &&
+		isOptionalNumber(value.layoutFirstUsefulFrameMilliseconds) &&
+		isOptionalNumber(value.layoutComputeMilliseconds) &&
+		isOptionalNumber(value.layoutCompleteMilliseconds)
 	);
 }
 
@@ -61,5 +74,13 @@ export function appendHistory(
 }
 
 export function metricValue(entry: BenchmarkHistoryEntry, metric: BenchmarkHistoryMetric): number {
-	return entry[metric];
+	const value = entry[metric];
+	if (typeof value !== "number") {
+		throw new Error(`Benchmark history entry is missing metric: ${metric}`);
+	}
+	return value;
+}
+
+export function entryHasMetric(entry: BenchmarkHistoryEntry, metric: BenchmarkHistoryMetric): boolean {
+	return typeof entry[metric] === "number";
 }

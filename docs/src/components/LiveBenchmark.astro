@@ -59,6 +59,7 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 			<div><span>Full snapshot +1%</span><strong id="metric-snapshot">—</strong><small>complete graph replacement</small></div>
 			<div><span>Visible materialization</span><strong id="metric-visible">—</strong><small id="metric-lod">LOD and edge budget</small></div>
 			<div><span>GPU draw calls</span><strong id="metric-draw-calls">—</strong><small id="metric-picking">per rendered frame</small></div>
+			<div><span>Layout first useful</span><strong id="metric-layout">—</strong><small>progressive force batch</small></div>
 		</div>
 		<section class="benchmark-statistics" aria-labelledby="benchmark-statistics-title">
 			<header>
@@ -92,6 +93,9 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 							<option value="selectionP95Milliseconds">Selection p95</option>
 							<option value="incrementalUpdateMilliseconds">1% node update</option>
 							<option value="fullSnapshotUpdateMilliseconds">Full snapshot +1%</option>
+							<option value="layoutFirstUsefulFrameMilliseconds">Layout first useful</option>
+							<option value="layoutComputeMilliseconds">Layout compute</option>
+							<option value="layoutCompleteMilliseconds">Layout complete</option>
 						</select>
 					</label>
 					<button id="benchmark-history-clear" class="benchmark-secondary" type="button">Clear local history</button>
@@ -127,11 +131,13 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 	import {
 		appendHistory,
 		BENCHMARK_HISTORY_STORAGE_KEY,
+		entryHasMetric,
 		metricValue,
 		parseHistory,
 		type BenchmarkHistoryEntry,
 		type BenchmarkHistoryMetric,
 	} from "../lib/benchmark-history";
+	import { measureProgressiveForceLayout } from "../lib/layout-benchmark";
 
 	type MemoryPerformance = Performance & { memory?: { usedJSHeapSize: number } };
 
@@ -189,6 +195,7 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 	const metricLod = requireElement<HTMLElement>("#metric-lod");
 	const metricDrawCalls = requireElement<HTMLElement>("#metric-draw-calls");
 	const metricPicking = requireElement<HTMLElement>("#metric-picking");
+	const metricLayout = requireElement<HTMLElement>("#metric-layout");
 	const statisticsProtocol = requireElement<HTMLElement>("#statistics-protocol");
 	const statisticsFrameMean = requireElement<HTMLElement>("#statistics-frame-mean");
 	const statisticsFrameP50 = requireElement<HTMLElement>("#statistics-frame-p50");
@@ -229,8 +236,10 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 	}
 
 	function renderHistory() {
-		const history = loadHistory().filter((entry) => entry.nodeCount === Number(sizeSelect.value));
 		const metric = historyMetric.value as BenchmarkHistoryMetric;
+		const history = loadHistory().filter(
+			(entry) => entry.nodeCount === Number(sizeSelect.value) && entryHasMetric(entry, metric),
+		);
 		historyCount.textContent =
 			history.length === 0
 				? "No saved runs for this fixture size yet."
@@ -362,6 +371,16 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 				await nextFrame();
 				selectionFeedback.push(performance.now() - startedAt);
 			}
+			status.textContent = "Measuring progressive force layout…";
+			const layoutTiming = await measureProgressiveForceLayout({
+				applyLayout: (layout) => measureGraph.applyLayout(layout),
+				createWorker: () =>
+					new Worker(new URL("../lib/explore-layout-worker.ts", import.meta.url), { type: "module" }),
+				dimensions: mode === "2d" ? 2 : 3,
+				edges: data.edges,
+				nextFrame,
+				nodeCount,
+			});
 			const incrementalUpdateStartedAt = performance.now();
 			const incrementalNodeCount = Math.max(10, Math.floor(nodeCount * 0.01));
 			measureGraph.updateNodes(
@@ -396,6 +415,7 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 					rendererConstructionMilliseconds,
 					setDataMilliseconds,
 					firstVisibleFrameMilliseconds,
+					layout: layoutTiming,
 				},
 				firstMeaningfulFrameMilliseconds,
 				displayCadence,
@@ -431,6 +451,9 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 				selectionP95Milliseconds: selectionSummary.p95 ?? 0,
 				incrementalUpdateMilliseconds: incrementalNodeUpdateMilliseconds,
 				fullSnapshotUpdateMilliseconds: updateMilliseconds,
+				layoutFirstUsefulFrameMilliseconds: layoutTiming.firstUsefulFrameMilliseconds,
+				layoutComputeMilliseconds: layoutTiming.computeMilliseconds,
+				layoutCompleteMilliseconds: layoutTiming.completeMilliseconds,
 			};
 			const historyPersisted = persistHistory(historyEntry);
 			renderHistory();
@@ -442,6 +465,7 @@ const exploreHref = `${import.meta.env.BASE_URL}explore/`;
 			metricLod.textContent = `${diagnostics.lodLevel} · ${diagnostics.visibleEdges.toLocaleString()} edges`;
 			metricDrawCalls.textContent = String(diagnostics.gpuDrawCalls);
 			metricPicking.textContent = diagnostics.pickingStrategy;
+			metricLayout.textContent = formatMilliseconds(layoutTiming.firstUsefulFrameMilliseconds);
 			statisticsProtocol.textContent = `${warmupFrameCount} warm-up frames · ${frameTimes.count} rendered frames · ${selectionSummary.count} selection changes`;
 			statisticsFrameMean.textContent = formatMilliseconds(frameTimes.mean ?? 0);
 			statisticsFrameP50.textContent = formatMilliseconds(frameTimes.p50 ?? 0);
