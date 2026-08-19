@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { appendHistory, type BenchmarkHistoryEntry, metricValue, parseHistory } from "./benchmark-history";
+import {
+	appendHistory,
+	type BenchmarkHistoryEntry,
+	entryHasMetric,
+	metricValue,
+	parseHistory,
+} from "./benchmark-history";
 
 const entry: BenchmarkHistoryEntry = {
 	id: "run-1",
@@ -19,6 +25,24 @@ describe("benchmark history", () => {
 	it("rejects corrupt or structurally incomplete persisted data", () => {
 		expect(parseHistory("not json")).toEqual([]);
 		expect(parseHistory(JSON.stringify([{ ...entry, nodeCount: "100000" }]))).toEqual([]);
+	});
+
+	it("keeps older runs that omit optional layout metrics", () => {
+		expect(parseHistory(JSON.stringify([entry]))).toEqual([entry]);
+	});
+
+	it("accepts optional progressive layout metrics without breaking older peers", () => {
+		const withLayout = {
+			...entry,
+			id: "run-2",
+			layoutCompleteMilliseconds: 820,
+			layoutComputeMilliseconds: 640,
+			layoutFirstUsefulFrameMilliseconds: 710,
+		};
+		expect(parseHistory(JSON.stringify([entry, withLayout]))).toEqual([entry, withLayout]);
+		expect(entryHasMetric(entry, "layoutFirstUsefulFrameMilliseconds")).toBe(false);
+		expect(entryHasMetric(withLayout, "layoutFirstUsefulFrameMilliseconds")).toBe(true);
+		expect(metricValue(withLayout, "layoutFirstUsefulFrameMilliseconds")).toBe(710);
 	});
 
 	it("retains only the newest bounded runs", () => {
