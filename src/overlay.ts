@@ -1,5 +1,6 @@
 import type { Graphraum } from "./graphraum";
 import { orderFocusNodeIds, selectBudgetedLabelIds, selectFocusLabelIds } from "./label-budget";
+import { boundOverlayIds, type RichNodePolicy, selectRichNodeIds } from "./overlay-budget";
 import type { CompiledGraphraumPresentation, GraphraumOverlayNode, GraphraumOverlayOptions } from "./types";
 
 type OverlayEntry = {
@@ -20,10 +21,11 @@ function resolveLabelPolicy(options: GraphraumOverlayOptions): LabelPolicy {
 	return options.autoLabels === true ? "auto" : "manual";
 }
 
-/** A bounded DOM layer for labels and a focused-node toolbar. It never participates in WebGL rendering. */
+/** A bounded DOM layer for labels, a focused-node toolbar, and optional rich HTML cards. */
 export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private readonly root = document.createElement("div");
 	private readonly labels = new Map<string, OverlayEntry>();
+	private readonly richNodes = new Map<string, OverlayEntry>();
 	private toolbar: OverlayEntry | null = null;
 	private toolbarNodeId: string | null = null;
 	private readonly stopObservingView: () => void;
@@ -31,7 +33,9 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	private readonly previousContainerPosition: string | null;
 	private readonly labelPolicy: LabelPolicy;
 	private readonly autoToolbar: false | "selected" | "hovered";
+	private readonly autoRichNodes: false | RichNodePolicy;
 	private readonly maxLabels: number;
+	private readonly maxRichNodes: number;
 
 	constructor(
 		private readonly graph: Graphraum<NodeAttributes, EdgeAttributes>,
@@ -43,8 +47,14 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 			throw new Error("Overlay maxLabels must be a non-negative integer.");
 		}
 		this.maxLabels = maxLabels;
+		const maxRichNodes = options.maxRichNodes ?? 24;
+		if (!Number.isSafeInteger(maxRichNodes) || maxRichNodes < 0) {
+			throw new Error("Overlay maxRichNodes must be a non-negative integer.");
+		}
+		this.maxRichNodes = maxRichNodes;
 		this.labelPolicy = resolveLabelPolicy(options);
 		this.autoToolbar = options.autoToolbar ?? false;
+		this.autoRichNodes = options.autoRichNodes ?? false;
 		this.root.className = `graphraum-overlay ${options.overlayClassName ?? ""}`.trim();
 		this.root.style.cssText = "inset:0;pointer-events:none;position:absolute;";
 		this.previousContainerPosition =
@@ -60,9 +70,17 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	 * change overwrites this list from the policy.
 	 */
 	setLabels(nodeIds: Iterable<string>) {
-		const nodeIdList = [...new Set(nodeIds)];
-		if (nodeIdList.length > this.maxLabels) throw new Error(`Overlay supports at most ${this.maxLabels} labels.`);
-		this.syncLabels(nodeIdList);
+		this.syncLabels(boundOverlayIds(nodeIds, this.maxLabels, "labels"));
+		this.updatePositions();
+	}
+
+	/**
+	 * Replaces the rich HTML node set. When `autoRichNodes` is set, the next focus change
+	 * overwrites this list from the policy.
+	 */
+	setRichNodes(nodeIds: Iterable<string>) {
+		if (this.autoRichNodes) return;
+		this.syncRichNodes(boundOverlayIds(nodeIds, this.maxRichNodes, "rich nodes"));
 		this.updatePositions();
 	}
 
@@ -82,6 +100,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		if (this.previousContainerPosition !== null && this.container.querySelector(".graphraum-overlay") === null)
 			this.container.style.position = this.previousContainerPosition;
 		this.labels.clear();
+		this.richNodes.clear();
 		this.toolbar = null;
 	}
 
@@ -106,7 +125,20 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 			);
 		}
 		if (this.autoToolbar) this.syncToolbar();
+		if (this.autoRichNodes) this.syncRichNodesFromFocus();
 		this.updatePositions();
+	}
+
+	private syncRichNodesFromFocus() {
+		if (!this.autoRichNodes || !this.options.renderRichNode) return;
+		this.syncRichNodes(
+			selectRichNodeIds({
+				hoveredIds: this.graph.getHoveredNodeIds(),
+				maxRichNodes: this.maxRichNodes,
+				policy: this.autoRichNodes,
+				selectedIds: this.graph.getSelectedNodeIds(),
+			}),
+		);
 	}
 
 	private syncToolbar() {
@@ -136,9 +168,25 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		}
 	}
 
+	private syncRichNodes(nodeIds: readonly string[]) {
+		const nextIds = new Set(nodeIds);
+		for (const [nodeId, entry] of this.richNodes) {
+			if (nextIds.has(nodeId)) continue;
+			entry.element.remove();
+			this.richNodes.delete(nodeId);
+		}
+		for (const nodeId of nodeIds) {
+			if (this.richNodes.has(nodeId)) continue;
+			const entry = this.createEntry(nodeId, this.options.renderRichNode, "Rich", "auto");
+			if (entry) this.richNodes.set(nodeId, entry);
+		}
+	}
+
 	private updatePositions() {
 		for (const [nodeId, entry] of this.labels)
 			this.updateEntry(nodeId, entry, this.options.renderLabel, "label", "none");
+		for (const [nodeId, entry] of this.richNodes)
+			this.updateEntry(nodeId, entry, this.options.renderRichNode, "rich", "auto");
 		if (this.toolbar && this.toolbarNodeId)
 			this.updateEntry(this.toolbarNodeId, this.toolbar, this.options.renderToolbar, "toolbar", "auto");
 	}
@@ -162,6 +210,9 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		if (kind === "Toolbar" && this.options.toolbarClassName) {
 			this.applyClassName(element, this.options.toolbarClassName);
 		}
+		if (kind === "Rich" && this.options.richNodeClassName) {
+			this.applyClassName(element, this.options.richNodeClassName);
+		}
 		element.dataset.graphraumNodeId = nodeId;
 		element.style.position = "absolute";
 		element.style.pointerEvents = pointerEvents;
@@ -173,13 +224,14 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		nodeId: string,
 		entry: OverlayEntry,
 		render: ((node: GraphraumOverlayNode) => HTMLElement | null) | undefined,
-		kind: "label" | "toolbar",
+		kind: "label" | "toolbar" | "rich",
 		pointerEvents: "auto" | "none",
 	) {
 		const position = this.graph.getNodeScreenPosition(nodeId);
 		entry.element.hidden = !position?.visible;
 		if (!position?.visible) return;
-		entry.element.style.transform = `translate(${position.x}px, ${position.y}px) translate(-50%, -100%)`;
+		const anchor = kind === "rich" ? "translate(-50%, 12px)" : "translate(-50%, -100%)";
+		entry.element.style.transform = `translate(${position.x}px, ${position.y}px) ${anchor}`;
 		const presentation = this.graph.getNodePresentation(nodeId);
 		if (presentation === entry.presentation || !render) return;
 		const replacement = render({ id: nodeId, presentation });
@@ -187,6 +239,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		if (!replacement) {
 			entry.element.remove();
 			if (kind === "toolbar") this.toolbar = null;
+			else if (kind === "rich") this.richNodes.delete(nodeId);
 			else this.labels.delete(nodeId);
 			return;
 		}
@@ -197,6 +250,9 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		}
 		if (kind === "toolbar" && this.options.toolbarClassName) {
 			this.applyClassName(replacement, this.options.toolbarClassName);
+		}
+		if (kind === "rich" && this.options.richNodeClassName) {
+			this.applyClassName(replacement, this.options.richNodeClassName);
 		}
 		replacement.dataset.graphraumNodeId = nodeId;
 		replacement.style.cssText = `${entry.element.style.cssText};position:absolute;pointer-events:${pointerEvents};`;

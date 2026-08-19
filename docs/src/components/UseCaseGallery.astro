@@ -113,6 +113,20 @@ const { useCaseId } = Astro.props;
 		theme: { background: "#040f0f", edge: "#356b5a", node: "#3f7b65", selectedNode: "#fcfffc" },
 		visuals: demoVisuals,
 	});
+	const overlay = graph.createOverlay({
+		autoRichNodes: "selected",
+		maxRichNodes: 1,
+		richNodeClassName: "use-case-rich-node",
+		renderRichNode: ({ id, presentation }) => {
+			const card = document.createElement("article");
+			const title = document.createElement("strong");
+			title.textContent = presentation?.title ?? id;
+			const subtitle = document.createElement("span");
+			subtitle.textContent = presentation?.subtitle ?? "GPU node · HTML focus";
+			card.append(title, subtitle);
+			return card;
+		},
+	});
 		let focusedNodeId: string | null = null;
 
 	function renderProperties(items: readonly { label: string; value: boolean | null | number | string }[]) {
@@ -239,7 +253,14 @@ const { useCaseId } = Astro.props;
 	root.querySelector<HTMLButtonElement>("[data-fit-view]")?.addEventListener("click", () => graph.fitView());
 	canvas.addEventListener("click", (event) => selectNode(graph.pick(event.clientX, event.clientY)));
 	activateUseCase(activeUseCase);
-	window.addEventListener("pagehide", () => graph.destroy(), { once: true });
+	window.addEventListener(
+		"pagehide",
+		() => {
+			overlay.destroy();
+			graph.destroy();
+		},
+		{ once: true },
+	);
 </script>
 
 <style is:global>
@@ -394,8 +415,25 @@ const { useCaseId } = Astro.props;
 
 	.use-case-canvas {
 		height: 29rem;
+		position: relative;
 		touch-action: none;
 		width: 100%;
+	}
+
+	.use-case-rich-node {
+		background: #fcfffc;
+		border: 1px solid #17372d;
+		color: #040f0f;
+		display: grid;
+		font-size: 0.72rem;
+		gap: 0.15rem;
+		min-width: 9.5rem;
+		padding: 0.45rem 0.6rem;
+		pointer-events: auto;
+	}
+
+	.use-case-rich-node span {
+		color: #315a51;
 	}
 
 	.presentation-panel {
