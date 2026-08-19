@@ -34,6 +34,7 @@ import {
 	writeEdgeSegmentInstance,
 } from "./edge-rendering";
 import { buildVisibleEdgeLayouts, patchVisibleEdgeInstances, type VisibleEdgeLayout } from "./edge-viewport-patch";
+import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
 import {
@@ -988,7 +989,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private applySelectionColors(nodeIds: Iterable<string>) {
-		if (!this.nodeMesh) return;
+		if (!this.nodeMesh?.instanceColor) return;
+		const slots: number[] = [];
 		for (const nodeId of nodeIds) {
 			const index = this.nodeIndices.get(nodeId);
 			if (index === undefined) continue;
@@ -997,8 +999,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			const node = this.data.nodes[index];
 			if (!node) continue;
 			this.nodeMesh.setColorAt(slot, this.getNodeColor(node));
+			slots.push(slot);
 		}
-		if (this.nodeMesh.instanceColor) this.nodeMesh.instanceColor.needsUpdate = true;
+		markInstanceColorSlots(this.nodeMesh.instanceColor, slots);
 	}
 
 	private getNodeStateIds(state: GraphraumNodeState) {
