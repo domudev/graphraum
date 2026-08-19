@@ -145,6 +145,13 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 					</select>
 				</label>
 			</section>
+			<section>
+				<h2>Overlay</h2>
+				<label class="explorer-check">
+					<input type="checkbox" name="overlay" checked />
+					<span>Focus labels, toolbar, and HTML card</span>
+				</label>
+			</section>
 		</form>
 
 		<footer class="explorer-footer">
@@ -158,7 +165,7 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 
 	<div class="explorer-stage">
 		<div id="explorer-graph" class="explorer-graph" aria-label="Interactive graphraum explorer"></div>
-		<p class="explorer-hint">Drag to pan · scroll to zoom · select a node</p>
+		<p class="explorer-hint">Drag to pan · scroll to zoom · click a node for focus labels and HTML chrome</p>
 	</div>
 </section>
 
@@ -172,7 +179,9 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		type GraphraumEdgeStyle,
 		type GraphraumMode,
 		type GraphraumNodeShape,
+		type GraphraumOverlay,
 	} from "@domudev/graphraum";
+	import { createExplorerOverlayOptions } from "../lib/explorer-overlay";
 	import {
 		createPlaygroundFixture,
 		createPlaygroundVisuals,
@@ -207,13 +216,14 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 	const layoutWorker = new Worker(new URL("../lib/explore-layout-worker.ts", import.meta.url), { type: "module" });
 
 	let graph: Graphraum<PlaygroundNodeAttributes, PlaygroundEdgeAttributes> | null = null;
+	let overlay: GraphraumOverlay<PlaygroundNodeAttributes, PlaygroundEdgeAttributes> | null = null;
 	let layoutRun = 0;
 	let liveFittedRun = -1;
 	let currentLayout: LayoutName = "grid";
 	let currentMode: GraphraumMode = "2d";
 	let currentNodeCount = 1_000;
 
-	function readAppearance(): PlaygroundAppearance & { layout: LayoutName; mode: GraphraumMode } {
+	function readAppearance(): PlaygroundAppearance & { layout: LayoutName; mode: GraphraumMode; overlay: boolean } {
 		const values = new FormData(form);
 		const appearance = defaultPlaygroundAppearance();
 		appearance.nodeCount = Number(formValue(values, "nodeCount"));
@@ -234,6 +244,7 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 			...appearance,
 			layout: formValue(values, "layout") as LayoutName,
 			mode: formValue(values, "mode") as GraphraumMode,
+			overlay: values.get("overlay") === "on",
 		};
 	}
 
@@ -297,6 +308,8 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		currentLayout = state.layout;
 		currentMode = state.mode;
 		currentNodeCount = state.nodeCount;
+		overlay?.destroy();
+		overlay = null;
 		graph?.destroy();
 		const next = new Graphraum(container, {
 			mode: state.mode,
@@ -306,6 +319,14 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		const data = createPlaygroundFixture(state.nodeCount);
 		next.setData(data);
 		graph = next;
+		if (state.overlay) {
+			overlay = next.createOverlay(
+				createExplorerOverlayOptions((nodeId) => {
+					const presentation = next.getNodePresentation(nodeId);
+					status.textContent = `Inspect ${presentation?.title ?? nodeId}`;
+				}),
+			);
+		}
 		status.textContent =
 			state.layout === "grid"
 				? `${state.nodeCount.toLocaleString()} nodes · ${state.mode.toUpperCase()} · grid`
@@ -313,7 +334,22 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		if (state.layout !== "grid") applyLayout(state.layout, data.edges, state.nodeCount, state.mode);
 	}
 
+	container.addEventListener("click", (event) => {
+		if (!graph) return;
+		if (event.target instanceof HTMLElement && event.target.closest("button")) return;
+		const nodeId = graph.pick(event.clientX, event.clientY);
+		graph.setSelection(nodeId ? [nodeId] : []);
+		if (nodeId) {
+			const presentation = graph.getNodePresentation(nodeId);
+			status.textContent = `Selected ${presentation?.title ?? nodeId}`;
+		}
+	});
+
 	form.addEventListener("change", () => mount());
-	window.addEventListener("beforeunload", () => layoutWorker.terminate());
+	window.addEventListener("beforeunload", () => {
+		overlay?.destroy();
+		graph?.destroy();
+		layoutWorker.terminate();
+	});
 	mount();
 </script>

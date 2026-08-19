@@ -148,7 +148,7 @@ Do not put arbitrary HTML, component instances, closures, or mutable domain obje
 
 ## Add styled labels and a focused toolbar
 
-`createOverlay()` projects a bounded set of host-created HTML elements over the canvas. It is the same dense-canvas plus sparse-DOM split used by graph editors: WebGL remains responsible for the graph, while your application owns rich text, CSS, buttons, and action handling. The two-draw-call GPU path is unchanged—labels stay in the DOM overlay.
+`createOverlay()` projects a bounded set of host-created HTML elements over the canvas. It is the same dense-canvas plus sparse-DOM split used by graph editors: WebGL remains responsible for the graph, while your application owns rich text, CSS, buttons, and action handling. The two-draw-call GPU path is unchanged—labels stay in the DOM overlay. The [Explorer](../explore/) can turn this contract on for the dense playground graph: focus labels, a selected-node Inspect toolbar, and one HTML card.
 
 Pointer move updates hovered node state automatically. Use `getNeighborIds(id)` for 1-hop adjacency when building focus chrome outside the overlay.
 

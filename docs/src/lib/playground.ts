@@ -118,7 +118,13 @@ export function createPlaygroundVisuals(appearance: PlaygroundAppearance) {
 		}),
 		node: (node) => {
 			const height = appearance.nodeSize + node.attributes.score * appearance.scoreSize;
+			const index = Number(node.id.slice(5));
 			return {
+				presentation: {
+					actions: [{ id: "inspect", label: "Inspect" }],
+					subtitle: node.attributes.kind,
+					title: `${node.attributes.kind}-${Number.isFinite(index) ? index : node.id}`,
+				},
 				visual: {
 					color: appearance.nodeColors[node.attributes.kind],
 					height,
