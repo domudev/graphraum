@@ -25,7 +25,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
 import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
-import { DETAIL_MAX_SEGMENTS } from "./edge-paths";
+import { DETAIL_MAX_SEGMENTS, type EdgeLodTier } from "./edge-paths";
 import { type PickableEdgeSegment, pickClosestEdgeIndex } from "./edge-picking";
 import {
 	createEdgeGeometry,
@@ -33,6 +33,7 @@ import {
 	writeEdgeMarkerInstance,
 	writeEdgeSegmentInstance,
 } from "./edge-rendering";
+import { buildVisibleEdgeLayouts, patchVisibleEdgeInstances, type VisibleEdgeLayout } from "./edge-viewport-patch";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
 import {
@@ -150,6 +151,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private dimmedNodeIds = new Set<string>();
 	private visibleNodeSlots = new Map<number, number>();
 	private visibleEdgeSlots = new Map<number, number>();
+	private visibleEdgeLayouts = new Map<number, VisibleEdgeLayout>();
+	private lastEdgeLodTier: EdgeLodTier = "detail";
 	private visibleNodeIndices: readonly number[] = [];
 	private pickableEdgeSegments: PickableEdgeSegment[] = [];
 	private visibleEdgeSegmentEdgeIndices: number[] = [];
@@ -409,10 +412,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const nodeStrokeColor = nodeMesh.geometry.getAttribute("instanceStrokeColor") as InstancedBufferAttribute;
 		const viewportBounds = this.getViewportBounds2d();
 		let visibilityChanged = false;
-		// Edge segments/markers are re-packed by materializeViewport rather than patched in
-		// place, so any endpoint move that touches a rendered edge forces a full repack. See
-		// DONE_WITH_CONCERNS in the task report for the perf trade-off during layout streaming.
+		// Edge segments are patched in place when visibility is stable; otherwise materializeViewport
+		// repacks the visible set (visibility, LOD, or segment-count changes).
 		let edgeEndpointsChanged = false;
+		const changedEdgeIndices = new Set<number>();
 
 		for (const update of prepared) {
 			nodes[update.index] = update.next;
@@ -459,6 +462,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				const incidentEdges = this.incidentEdgeIndices[update.index] ?? [];
 				if (incidentEdges.length > 0) edgeEndpointsChanged = true;
 				for (const edgeIndex of incidentEdges) {
+					changedEdgeIndices.add(edgeIndex);
 					const sourceIndex = this.edgeNodeIndices[edgeIndex * 2];
 					const canonicalOffset = edgeIndex * 6 + (sourceIndex === update.index ? 0 : 3);
 					this.canonicalEdgePositions.set(
@@ -473,10 +477,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 
 		this.data = { ...this.data, nodes };
-		if (visibilityChanged || edgeEndpointsChanged) {
+		if (visibilityChanged) {
 			this.materializeViewport();
 			this.requestRender();
 			return;
+		}
+		if (edgeEndpointsChanged) {
+			const patched = this.patchVisibleEdgeEndpoints([...changedEdgeIndices]);
+			if (!patched) this.materializeViewport();
 		}
 		if (prepared.some((update) => update.positionChanged || update.sizeChanged)) {
 			nodeMesh.instanceMatrix.needsUpdate = true;
@@ -491,6 +499,33 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			nodeStrokeColor.needsUpdate = true;
 		}
 		this.requestRender();
+	}
+
+	/** Patches GPU edge instances for moved endpoints when the visible edge set is unchanged. */
+	private patchVisibleEdgeEndpoints(changedEdgeIndices: readonly number[]): boolean {
+		if (!this.edgeMesh || changedEdgeIndices.length === 0) return true;
+		const worldPerPixel = this.worldUnitsPerPixel();
+		const minHitSlop = Math.max(4 * worldPerPixel, this.theme.edgeWidth * worldPerPixel);
+		const edgeVisuals = this.data.edges.map((edge) =>
+			this.selectedEdgeIds.has(edge.id) ? { ...edge, color: this.theme.selectedEdge } : edge,
+		);
+		const result = patchVisibleEdgeInstances(
+			this.edgeMesh.geometry,
+			{
+				changedEdgeIndices,
+				defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
+				edgeVisuals,
+				endpointPositions: this.canonicalEdgePositions,
+				layouts: this.visibleEdgeLayouts,
+				minHitSlop,
+				tier: this.lastEdgeLodTier,
+				worldPerPixel,
+			},
+			this.pickableEdgeSegments,
+		);
+		if (!result.ok) return false;
+		this.pickableEdgeSegments = result.pickableSegments;
+		return true;
 	}
 
 	setSelection(nodeIds: Iterable<string>) {
@@ -1130,6 +1165,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		nodeStrokeColor.needsUpdate = true;
 
 		const lodLevel = resolveLodLevel(this.densityLodActive, edgeCandidates.length, visibleEdgeIndices.length);
+		this.lastEdgeLodTier = edgeTierFromDiagnosticsLod(lodLevel);
 		const worldPerPixel = this.worldUnitsPerPixel();
 		const edgeVisuals = this.data.edges.map((edge) =>
 			this.selectedEdgeIds.has(edge.id) ? { ...edge, color: this.theme.selectedEdge } : edge,
@@ -1139,11 +1175,12 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			edgeVisuals,
 			endpointPositions: this.canonicalEdgePositions,
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
-			tier: edgeTierFromDiagnosticsLod(lodLevel),
+			tier: this.lastEdgeLodTier,
 			maxSegments: this.edgeSegmentCapacity,
 		});
 		const edgeGeometry = this.edgeMesh.geometry;
 		this.visibleEdgeSlots = new Map();
+		this.visibleEdgeLayouts = buildVisibleEdgeLayouts(packed.segments, packed.markers, packed.segments.length);
 		this.pickableEdgeSegments = [];
 		this.visibleEdgeSegmentEdgeIndices = [];
 		let edgeSlot = 0;
@@ -1244,6 +1281,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private disposeGraphObjects() {
 		this.pickableEdgeSegments = [];
 		this.visibleEdgeSegmentEdgeIndices = [];
+		this.visibleEdgeLayouts = new Map();
 		if (this.nodeMesh) {
 			this.scene.remove(this.nodeMesh);
 			this.nodeMesh.geometry.dispose();
