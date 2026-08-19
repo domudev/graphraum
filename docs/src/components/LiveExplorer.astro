@@ -48,6 +48,56 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 					</select>
 				</label>
 			</section>
+			<section>
+				<h2>Force</h2>
+				<label>
+					<span>Iterations</span>
+					<select name="forceIterations">
+						<option value="auto" selected>Auto</option>
+						<option value="8">8</option>
+						<option value="16">16</option>
+						<option value="24">24</option>
+						<option value="32">32</option>
+					</select>
+				</label>
+				<label>
+					<span>Repulsion</span>
+					<select name="forceRepulsion">
+						<option value="100">100</option>
+						<option value="400" selected>400</option>
+						<option value="1000">1,000</option>
+						<option value="2000">2,000</option>
+					</select>
+				</label>
+				<label>
+					<span>Link distance</span>
+					<select name="forceLinkDistance">
+						<option value="12">12</option>
+						<option value="24" selected>24</option>
+						<option value="48">48</option>
+						<option value="96">96</option>
+					</select>
+				</label>
+				<label>
+					<span>Gravity</span>
+					<select name="forceGravity">
+						<option value="0.0005">0.0005</option>
+						<option value="0.002" selected>0.002</option>
+						<option value="0.01">0.01</option>
+						<option value="0.02">0.02</option>
+					</select>
+				</label>
+				<label>
+					<span>Batch size</span>
+					<select name="forceBatchSize">
+						<option value="auto" selected>Auto</option>
+						<option value="250">250</option>
+						<option value="1000">1,000</option>
+						<option value="2000">2,000</option>
+						<option value="4000">4,000</option>
+					</select>
+				</label>
+			</section>
 
 			<section>
 				<h2>Nodes</h2>
@@ -171,7 +221,6 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 
 <script>
 	import {
-		DEFAULT_FORCE_SETTINGS,
 		Graphraum,
 		type GraphraumEdgeMarker,
 		type GraphraumEdgeMarkerEnd,
@@ -181,6 +230,7 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		type GraphraumNodeShape,
 		type GraphraumOverlay,
 	} from "@domudev/graphraum";
+	import { readExplorerForceControls, type ExplorerForceControls } from "../lib/explorer-force";
 	import { createExplorerOverlayOptions } from "../lib/explorer-overlay";
 	import {
 		createPlaygroundFixture,
@@ -223,7 +273,12 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 	let currentMode: GraphraumMode = "2d";
 	let currentNodeCount = 1_000;
 
-	function readAppearance(): PlaygroundAppearance & { layout: LayoutName; mode: GraphraumMode; overlay: boolean } {
+	function readAppearance(): PlaygroundAppearance & {
+		force: ExplorerForceControls;
+		layout: LayoutName;
+		mode: GraphraumMode;
+		overlay: boolean;
+	} {
 		const values = new FormData(form);
 		const appearance = defaultPlaygroundAppearance();
 		appearance.nodeCount = Number(formValue(values, "nodeCount"));
@@ -242,6 +297,7 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		appearance.edgeOpacity = Number(formValue(values, "edgeOpacity"));
 		return {
 			...appearance,
+			force: readExplorerForceControls(values, appearance.nodeCount),
 			layout: formValue(values, "layout") as LayoutName,
 			mode: formValue(values, "mode") as GraphraumMode,
 			overlay: values.get("overlay") === "on",
@@ -257,7 +313,13 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		return result;
 	}
 
-	function applyLayout(layout: LayoutName, edges: readonly { source: string; target: string }[], nodeCount: number, mode: GraphraumMode) {
+	function applyLayout(
+		layout: LayoutName,
+		edges: readonly { source: string; target: string }[],
+		nodeCount: number,
+		mode: GraphraumMode,
+		force: ExplorerForceControls,
+	) {
 		if (layout === "grid" || !graph) return;
 		const run = ++layoutRun;
 		status.textContent = `Computing ${layout} layout…`;
@@ -265,14 +327,15 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 		const transfer = packedEdges?.buffer ? [packedEdges.buffer] : [];
 		layoutWorker.postMessage(
 			{
-				batchSize: Math.max(1_000, Math.ceil(nodeCount / 8)),
+				batchSize: force.batchSize,
 				dimensions: mode === "2d" ? 2 : 3,
 				edges: packedEdges,
+				iterations: force.iterations,
 				layout,
 				maxFps: 30,
 				nodeCount,
 				run,
-				settings: DEFAULT_FORCE_SETTINGS,
+				settings: force.settings,
 				type: "start",
 			},
 			transfer,
@@ -331,7 +394,7 @@ const proveHref = `${import.meta.env.BASE_URL}benchmark/`;
 			state.layout === "grid"
 				? `${state.nodeCount.toLocaleString()} nodes · ${state.mode.toUpperCase()} · grid`
 				: `Computing ${state.layout} layout…`;
-		if (state.layout !== "grid") applyLayout(state.layout, data.edges, state.nodeCount, state.mode);
+		if (state.layout !== "grid") applyLayout(state.layout, data.edges, state.nodeCount, state.mode, state.force);
 	}
 
 	container.addEventListener("click", (event) => {

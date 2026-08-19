@@ -6,6 +6,7 @@ type LayoutRequest = {
 	batchSize: number;
 	dimensions: 2 | 3;
 	edges?: Uint32Array;
+	iterations?: number;
 	layout: LayoutName;
 	maxFps: number;
 	nodeCount: number;
@@ -96,6 +97,7 @@ workerScope.addEventListener("message", ({ data }) => {
 					? computeForcePositions({
 							dimensions: data.dimensions,
 							edges: data.edges ?? new Uint32Array(),
+							iterations: data.iterations,
 							nodeCount: data.nodeCount,
 							settings: data.settings,
 						})
