@@ -213,6 +213,8 @@ Missing coordinates default to zero so layout does not block the first render. M
   <div><code>pick(clientX, clientY)</code><p>Returns the nearest node ID or <code>null</code>. Uses the spatial grid in 2D and instance raycasting in 3D.</p></div>
   <div><code>setMode(mode)</code><p>Switches between orthographic 2D and perspective 3D, replaces controls, and fits the current graph.</p></div>
   <div><code>getMode()</code><p>Returns the active <code>"2d"</code> or <code>"3d"</code> mode.</p></div>
+  <div><code>setTheme(theme)</code><p>Applies a named preset (<code>"dark"</code> / <code>"light"</code>) or merges a partial palette, then rematerializes colors.</p></div>
+  <div><code>setBackground(background)</code><p>Sets a solid color, <code>"transparent"</code> / <code>null</code> for host CSS, or a <code>{'{ type: "pattern", source }'}</code> texture.</p></div>
   <div><code>fitView()</code><p>Fits the active camera to the complete graph bounds and rematerializes the viewport.</p></div>
   <div><code>resize()</code><p>Synchronizes the renderer and active camera immediately. A <code>ResizeObserver</code> already calls this for normal container changes.</p></div>
   <div><code>destroy()</code><p>Disconnects observation and controls, cancels pending rendering, disposes GPU resources, and removes the canvas.</p></div>
@@ -220,13 +222,19 @@ Missing coordinates default to zero so layout does not block the first render. M
 
 ## Theme
 
-`graphraumTheme` is immutable. Constructor overrides are copied per renderer, so one graph cannot change another graph's defaults.
+`graphraumThemes.dark` / `graphraumThemes.light` (and the `graphraumTheme` dark alias) are immutable. Constructor options and `setTheme` copy values per renderer.
 
 ```ts
 const graph = new Graphraum(container, {
-  theme: { ...graphraumTheme, edgeWidth: 2, selectedNode: "#73c7a5" },
+  theme: "light", // or { ...graphraumTheme, edgeWidth: 2 }
 });
+
+graph.setTheme("dark");
+graph.setBackground("transparent");
+graph.setBackground({ type: "pattern", source: image, repeat: [2, 2] });
 ```
+
+`background` accepts a CSS color, `"transparent"` / `null` (clear canvas for host CSS), or a pattern object as shown in the example above.
 
 `edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. `nodeStroke` is the fallback stroke color for a node that sets `strokeWidth` but no `strokeColor`. See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
 
