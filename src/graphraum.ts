@@ -160,6 +160,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private gpuFrameMilliseconds: number | null = null;
 	private gpuTimer: GpuTimer | null = null;
 	private readonly viewListeners = new Set<() => void>();
+	private readonly focusListeners = new Set<() => void>();
+	private lastHoveredNodeId: string | null = null;
 
 	constructor(container: HTMLElement, options: GraphraumOptions<NodeAttributes, EdgeAttributes> = {}) {
 		this.container = container;
@@ -191,6 +193,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.renderer.domElement.style.height = "100%";
 		this.renderer.domElement.style.width = "100%";
 		this.container.append(this.renderer.domElement);
+		this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
+		this.renderer.domElement.addEventListener("pointerleave", this.handlePointerLeave);
 
 		this.camera = this.createCamera();
 		this.controls = this.createControls();
@@ -502,9 +506,33 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				(nodeId) => currentSelection.has(nodeId) !== nextSelection.has(nodeId),
 			),
 		);
+		if (changedNodeIds.size === 0) return;
 		this.setNodeStateIds(state, nextSelection);
 		this.applySelectionColors(changedNodeIds);
 		this.requestRender();
+		if (state === "selected" || state === "hovered") this.notifyFocusChange();
+	}
+
+	/** One-hop neighbor node ids via incident edges (undirected adjacency). */
+	getNeighborIds(nodeId: string): string[] {
+		const index = this.nodeIndices.get(nodeId);
+		if (index === undefined) return [];
+		const neighbors = new Set<string>();
+		for (const edgeIndex of this.incidentEdgeIndices[index] ?? []) {
+			const edge = this.data.edges[edgeIndex];
+			if (!edge) continue;
+			if (edge.source !== nodeId) neighbors.add(edge.source);
+			if (edge.target !== nodeId) neighbors.add(edge.target);
+		}
+		return [...neighbors];
+	}
+
+	getSelectedNodeIds(): readonly string[] {
+		return [...this.selectedNodeIds];
+	}
+
+	getHoveredNodeIds(): readonly string[] {
+		return [...this.hoveredNodeIds];
 	}
 
 	/** Schedules one render on the next animation frame. Repeated calls in one frame are coalesced. */
@@ -606,6 +634,30 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		listener();
 		return () => this.viewListeners.delete(listener);
 	}
+
+	/** Subscribes to selection and hover changes that affect overlay focus chrome. */
+	onFocusChange(listener: () => void) {
+		this.focusListeners.add(listener);
+		listener();
+		return () => this.focusListeners.delete(listener);
+	}
+
+	private notifyFocusChange() {
+		for (const listener of this.focusListeners) listener();
+	}
+
+	private handlePointerMove = (event: PointerEvent) => {
+		const nodeId = this.pickNode(event.clientX, event.clientY);
+		if (nodeId === this.lastHoveredNodeId) return;
+		this.lastHoveredNodeId = nodeId;
+		this.setNodeState("hovered", nodeId ? [nodeId] : []);
+	};
+
+	private handlePointerLeave = () => {
+		if (this.lastHoveredNodeId === null && this.hoveredNodeIds.size === 0) return;
+		this.lastHoveredNodeId = null;
+		this.setNodeState("hovered", []);
+	};
 
 	getEdgePresentation(edgeId: string): CompiledGraphraumPresentation | null {
 		return this.edgePresentations.get(edgeId) ?? null;
@@ -716,6 +768,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	destroy() {
 		this.resizeObserver.disconnect();
+		this.renderer.domElement.removeEventListener("pointermove", this.handlePointerMove);
+		this.renderer.domElement.removeEventListener("pointerleave", this.handlePointerLeave);
 		this.controls.removeEventListener("change", this.handleViewChange);
 		this.controls.dispose();
 		if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);

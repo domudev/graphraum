@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { selectBudgetedLabelIds } from "./label-budget";
+import { orderFocusNodeIds, selectBudgetedLabelIds, selectFocusLabelIds } from "./label-budget";
 
 describe("selectBudgetedLabelIds", () => {
 	test("drops non-visible candidates", () => {
@@ -64,5 +64,50 @@ describe("selectBudgetedLabelIds", () => {
 				maxLabels: 1.5,
 			}),
 		).toThrow("non-negative integer");
+	});
+});
+
+describe("orderFocusNodeIds", () => {
+	test("orders selected, then hovered, then neighbors without duplicates", () => {
+		expect(
+			orderFocusNodeIds({
+				selectedIds: ["s", "shared"],
+				hoveredIds: ["h", "shared"],
+				neighborIds: ["n", "h", "s"],
+			}),
+		).toEqual(["s", "shared", "h", "n"]);
+	});
+});
+
+describe("selectFocusLabelIds", () => {
+	test("keeps visible focus ids first, then fills by importance", () => {
+		expect(
+			selectFocusLabelIds({
+				focusIds: ["sel", "hover", "neighbor"],
+				candidates: [
+					{ id: "sel", importance: 1, visible: true },
+					{ id: "hover", importance: 1, visible: true },
+					{ id: "neighbor", importance: 1, visible: false },
+					{ id: "other-high", importance: 50, visible: true },
+					{ id: "other-low", importance: 2, visible: true },
+				],
+				maxLabels: 3,
+			}),
+		).toEqual(["sel", "hover", "other-high"]);
+	});
+
+	test("respects maxLabels before fillers", () => {
+		expect(
+			selectFocusLabelIds({
+				focusIds: ["a", "b", "c"],
+				candidates: [
+					{ id: "a", importance: 1, visible: true },
+					{ id: "b", importance: 1, visible: true },
+					{ id: "c", importance: 1, visible: true },
+					{ id: "d", importance: 99, visible: true },
+				],
+				maxLabels: 2,
+			}),
+		).toEqual(["a", "b"]);
 	});
 });

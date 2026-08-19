@@ -146,8 +146,21 @@ export interface GraphraumLabelCandidate {
 }
 
 export interface GraphraumOverlayOptions {
-	/** When true, the overlay refreshes labels from `getLabelCandidates()` on every view change within `maxLabels`. Manual `setLabels()` still works until the next view change. Default false. */
+	/**
+	 * Label refresh policy. `manual` only shows ids from `setLabels()`. `auto` budgets by
+	 * importance on view change. `focus` budgets selected ∪ hovered ∪ 1-hop neighbors first.
+	 * When omitted, `autoLabels: true` maps to `auto` for compatibility; otherwise `manual`.
+	 */
+	labelPolicy?: "manual" | "auto" | "focus";
+	/**
+	 * @deprecated Prefer `labelPolicy: "auto"`. When `labelPolicy` is omitted, `true` enables `auto`.
+	 */
 	autoLabels?: boolean;
+	/**
+	 * When set with `renderToolbar`, keeps the toolbar pinned to the selected or hovered node.
+	 * Default `false` — host calls `setToolbar` manually.
+	 */
+	autoToolbar?: false | "selected" | "hovered";
 	overlayClassName?: string;
 	maxLabels?: number;
 	labelClassName?: string;
