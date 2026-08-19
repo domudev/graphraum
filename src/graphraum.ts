@@ -630,7 +630,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		return { x: world.x, y: world.y, z: world.z };
 	}
 
-	/** Creates a bounded DOM layer for styled labels and a focused-node toolbar. */
+	/** Creates a bounded DOM layer for labels, a toolbar, and optional rich HTML focus cards. */
 	createOverlay(options: GraphraumOverlayOptions = {}) {
 		return new GraphraumOverlay(this, this.container, options);
 	}

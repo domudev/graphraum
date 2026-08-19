@@ -190,7 +190,25 @@ const overlay = graph.createOverlay({
 
 `autoToolbar: "selected" | "hovered"` keeps the toolbar pinned without calling `setToolbar`. With `"hovered"`, selection is the fallback when nothing is hovered. When `autoToolbar` is off (default), call `overlay.setToolbar(nodeId)` yourself.
 
-Off-screen nodes stay out of budgeted sets. Manual `setLabels()` still works under `auto` / `focus` until the next view or focus change overwrites the list. Export `selectBudgetedLabelIds`, `selectFocusLabelIds`, and `orderFocusNodeIds` for the same policies outside the overlay.
+### Rich HTML focus cards
+
+Dense nodes stay on the GPU. For a handful of selected or hovered nodes, `renderRichNode` projects host HTML (any framework) under the node. This is the focus tier in the [fidelity-on-demand ADR](https://github.com/domudev/graphraum/blob/main/docs/adrs/adr-fidelity-on-demand.md).
+
+```ts
+const overlay = graph.createOverlay({
+  autoRichNodes: "selected",
+  maxRichNodes: 4,
+  renderRichNode: ({ id, presentation }) => {
+    const card = document.createElement("article");
+    card.textContent = presentation?.title ?? id;
+    return card;
+  },
+});
+```
+
+`autoRichNodes` is `"selected"`, `"hovered"`, or `"focus"` (selected then hovered, no neighbors). It slices to `maxRichNodes`. Manual `setRichNodes(ids)` throws when the list is longer than the cap. Rich HTML edges are not in this API.
+
+Off-screen nodes stay out of budgeted sets. Manual `setLabels()` still works under `auto` / `focus` until the next view or focus change overwrites the list. Export `selectBudgetedLabelIds`, `selectFocusLabelIds`, `orderFocusNodeIds`, `boundOverlayIds`, and `selectRichNodeIds` for the same policies outside the overlay.
 
 ### Manual labels
 
@@ -210,4 +228,4 @@ overlay.setToolbar("person:ada");
 
 ## Density policy
 
-Color, shape, and size can remain visible across the graph. Titles use the budgeted overlay policy above (`autoLabels` or a host-owned `setLabels()` list). Full properties and actions belong to a bounded focused or selected subset in host HTML. This preserves both accessibility and the dense rendering path.
+Color, shape, and size can remain visible across the graph. Titles use the budgeted overlay policy above (`autoLabels` or a host-owned `setLabels()` list). Full properties, actions, and rich HTML cards belong to a bounded focused or selected subset. This preserves both accessibility and the dense rendering path.

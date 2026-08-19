@@ -17,6 +17,8 @@ export type {
 } from "./label-budget";
 export { orderFocusNodeIds, selectBudgetedLabelIds, selectFocusLabelIds } from "./label-budget";
 export { graphraumNodeShapes } from "./node-shapes";
+export type { RichNodePolicy } from "./overlay-budget";
+export { boundOverlayIds, selectRichNodeIds } from "./overlay-budget";
 export { GraphraumOverlay } from "./overlay";
 export {
 	graphraumTheme,

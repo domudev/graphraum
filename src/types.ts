@@ -163,10 +163,23 @@ export interface GraphraumOverlayOptions {
 	autoToolbar?: false | "selected" | "hovered";
 	overlayClassName?: string;
 	maxLabels?: number;
+	/**
+	 * Hard cap for host HTML focus cards. Default 24. Manual `setRichNodes` throws when exceeded;
+	 * `autoRichNodes` slices to the cap.
+	 */
+	maxRichNodes?: number;
 	labelClassName?: string;
 	toolbarClassName?: string;
+	richNodeClassName?: string;
+	/**
+	 * When set with `renderRichNode`, keeps focus cards on selected and/or hovered nodes.
+	 * Default `false` — host calls `setRichNodes`.
+	 */
+	autoRichNodes?: false | "selected" | "hovered" | "focus";
 	renderLabel?: (node: GraphraumOverlayNode) => HTMLElement | null;
 	renderToolbar?: (node: GraphraumOverlayNode) => HTMLElement | null;
+	/** Host HTML for a strictly bounded focused subset. Not the dense node path. */
+	renderRichNode?: (node: GraphraumOverlayNode) => HTMLElement | null;
 }
 
 export interface GraphraumNodeEncoding {
