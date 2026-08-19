@@ -23,6 +23,14 @@ test("reduces force iterations as node count grows", () => {
 	expect(forceIterationCount(1_000_000)).toBeGreaterThanOrEqual(8);
 });
 
+test("honors an explicit iteration count", () => {
+	const request = { dimensions: 2 as const, edges: new Uint32Array([0, 1]), nodeCount: 8 };
+	const once = computeForcePositions({ ...request, iterations: 1 });
+	const twice = computeForcePositions({ ...request, iterations: 2 });
+	expect(twice).not.toEqual(once);
+	expect(() => computeForcePositions({ ...request, iterations: 0 })).toThrow(/positive integer/);
+});
+
 test("keeps a 10k-node force layout finite", () => {
 	const nodeCount = 10_000;
 	const edges = new Uint32Array((nodeCount - 1) * 2);

@@ -2,6 +2,8 @@
 export interface ForceLayoutRequest {
 	dimensions: 2 | 3;
 	edges: Uint32Array;
+	/** When omitted, `forceIterationCount(nodeCount)` is used. */
+	iterations?: number;
 	nodeCount: number;
 	settings?: ForceSettings;
 }
@@ -34,6 +36,14 @@ function normalizeForceSettings(settings = DEFAULT_FORCE_SETTINGS): ForceSetting
 
 export function forceIterationCount(nodeCount: number) {
 	return Math.max(8, Math.min(32, Math.ceil(240 / Math.log2(nodeCount + 2))));
+}
+
+function resolveForceIterations(nodeCount: number, iterations?: number) {
+	if (iterations === undefined) return forceIterationCount(nodeCount);
+	if (!Number.isSafeInteger(iterations) || iterations < 1) {
+		throw new Error("Force iterations must be a positive integer.");
+	}
+	return Math.min(64, iterations);
 }
 
 function initialPositions({ dimensions, nodeCount }: Pick<ForceLayoutRequest, "dimensions" | "nodeCount">) {
@@ -198,7 +208,7 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 
 export function computeForcePositions(request: ForceLayoutRequest) {
 	const simulation = createForceSimulation(request);
-	const iterations = forceIterationCount(request.nodeCount);
+	const iterations = resolveForceIterations(request.nodeCount, request.iterations);
 	for (let iteration = 0; iteration < iterations; iteration += 1) simulation.step(1 - iteration / iterations);
 	return simulation.positions;
 }
