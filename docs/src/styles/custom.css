@@ -1363,7 +1363,10 @@ html.explore-page body {
 	border: 1px solid rgba(115, 199, 165, 0.28);
 	border-radius: 4px;
 	color: #fcfffc;
-	font: 500 11px/1.25 ui-sans-serif, system-ui, sans-serif;
+	font:
+		500 11px / 1.25 ui-sans-serif,
+		system-ui,
+		sans-serif;
 	max-width: 12rem;
 	overflow: hidden;
 	padding: 2px 6px;
@@ -1382,7 +1385,10 @@ html.explore-page body {
 	border-radius: 4px;
 	color: #040f0f;
 	cursor: pointer;
-	font: 650 11px/1 ui-sans-serif, system-ui, sans-serif;
+	font:
+		650 11px / 1 ui-sans-serif,
+		system-ui,
+		sans-serif;
 	padding: 0.3rem 0.5rem;
 }
 
