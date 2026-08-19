@@ -125,7 +125,7 @@ interface GraphraumEdgeVisual {
 
 <div class="api-grid not-content">
   <div><code>setData(data)</code><p>Validates and replaces the complete topology, rebuilds canonical buffers, fits the camera, materializes the viewport, and schedules a render.</p></div>
-  <div><code>applyDataPatch(patch)</code><p>Merges streamed additions and removals without fitting the camera. Additions within the preallocated capacity update existing GPU buffers; capacity growth falls back to one controlled rebuild.</p></div>
+  <div><code>applyDataPatch(patch)</code><p>Merges streamed additions and removals without fitting the camera. Changes that stay within the preallocated capacity reuse existing GPU meshes; capacity growth falls back to one controlled rebuild.</p></div>
   <div><code>updateNodes(updates)</code><p>Changes position, size, shape, or color for existing nodes and updates only the affected instance data and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
   <div><code>applyLayout(layout)</code><p>Applies a transferable XYZ position batch for existing nodes. Call it repeatedly as a worker produces progressive positions.</p></div>
   <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>

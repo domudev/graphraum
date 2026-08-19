@@ -24,6 +24,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { compileGraph } from "./compile-graph";
+import { dataPatchFitsCapacity, isAppendOnlyDataPatch, type MergedGraphData, mergeDataPatch } from "./data-patch";
 import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
 import { DETAIL_MAX_SEGMENTS, type EdgeLodTier } from "./edge-paths";
 import { type PickableEdgeSegment, pickClosestEdgeIndex } from "./edge-picking";
@@ -224,27 +225,20 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const addedEdgeIds = new Set((patch.addedEdges ?? []).map((edge) => edge.id));
 		if (addedNodeIds.size !== (patch.addedNodes ?? []).length) throw new Error("Duplicate added node ID.");
 		if (addedEdgeIds.size !== (patch.addedEdges ?? []).length) throw new Error("Duplicate added edge ID.");
-		if (this.canAppendDataPatch(patch)) {
+		if (isAppendOnlyDataPatch(patch) && this.canAppendDataPatch(patch)) {
 			this.appendDataPatch(patch);
 			return;
 		}
-		const removedNodes = new Set(patch.removedNodeIds ?? []);
-		const removedEdges = new Set(patch.removedEdgeIds ?? []);
-		const nodes = new Map(this.data.nodes.map((node) => [node.id, node]));
-		const edges = new Map(this.data.edges.map((edge) => [edge.id, edge]));
-
-		for (const id of removedNodes) nodes.delete(id);
-		for (const id of removedEdges) edges.delete(id);
-		for (const node of patch.addedNodes ?? []) nodes.set(node.id, node);
-		for (const edge of patch.addedEdges ?? []) edges.set(edge.id, edge);
-
-		const validEdges = [...edges.values()].filter((edge) => nodes.has(edge.source) && nodes.has(edge.target));
-		this.replaceData({ nodes: [...nodes.values()], edges: validEdges }, false);
+		const merged = mergeDataPatch(this.data.nodes, this.data.edges, patch);
+		if (this.canMutateDataInPlace(merged)) {
+			this.mutateDataInPlace(merged);
+			return;
+		}
+		this.replaceData(merged, false);
 	}
 
 	private canAppendDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
 		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeMesh) return false;
-		if ((patch.removedNodeIds?.length ?? 0) > 0 || (patch.removedEdgeIds?.length ?? 0) > 0) return false;
 		const nodeIds = new Set(this.data.nodes.map((node) => node.id));
 		if ((patch.addedNodes ?? []).some((node) => nodeIds.has(node.id))) return false;
 		const edgeIds = new Set(this.data.edges.map((edge) => edge.id));
@@ -255,6 +249,41 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			(patch.addedEdges?.length ?? 0) + this.data.edges.length <= this.edgeCapacity &&
 			(patch.addedEdges ?? []).every((edge) => allNodeIds.has(edge.source) && allNodeIds.has(edge.target))
 		);
+	}
+
+	private canMutateDataInPlace(merged: MergedGraphData<NodeAttributes, EdgeAttributes>) {
+		if (!this.nodeMesh || !this.nodePickMesh || !this.edgeMesh) return false;
+		return dataPatchFitsCapacity(merged, { edges: this.edgeCapacity, nodes: this.nodeCapacity });
+	}
+
+	private mutateDataInPlace(merged: MergedGraphData<NodeAttributes, EdgeAttributes>) {
+		const compiled = compileGraph(merged, this.visuals);
+		this.data = {
+			edges: merged.edges.map((edge, index) => ({ ...edge, ...compiled.edgeVisuals[index] })),
+			nodes: merged.nodes.map((node, index) => ({
+				...node,
+				...compiled.nodeVisuals[index],
+				position: { ...node.position },
+			})),
+		};
+		this.nodeIds = compiled.nodeIds;
+		this.nodeIndices = new Map(compiled.nodeIndices);
+		this.edgeNodeIndices = compiled.edgeNodeIndices;
+		this.canonicalEdgePositions = compiled.edgePositions;
+		this.incidentEdgeIndices = compiled.incidentEdgeIndices;
+		this.nodePresentations = new Map(compiled.nodePresentations);
+		this.edgePresentations = new Map(compiled.edgePresentations);
+		this.spatialGrid2d = new SpatialGrid2D();
+		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
+		const liveNodeIds = new Set(this.nodeIds);
+		const liveEdgeIds = new Set(this.data.edges.map((edge) => edge.id));
+		this.selectedNodeIds = new Set([...this.selectedNodeIds].filter((id) => liveNodeIds.has(id)));
+		this.hoveredNodeIds = new Set([...this.hoveredNodeIds].filter((id) => liveNodeIds.has(id)));
+		this.focusedNodeIds = new Set([...this.focusedNodeIds].filter((id) => liveNodeIds.has(id)));
+		this.dimmedNodeIds = new Set([...this.dimmedNodeIds].filter((id) => liveNodeIds.has(id)));
+		this.selectedEdgeIds = new Set([...this.selectedEdgeIds].filter((id) => liveEdgeIds.has(id)));
+		this.materializeViewport();
+		this.requestRender();
 	}
 
 	private appendDataPatch(patch: GraphraumDataPatch<NodeAttributes, EdgeAttributes>) {
@@ -378,7 +407,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.scene.add(edgeMesh);
 
 		if (fitView) this.fitView();
-		else this.requestRender();
+		else {
+			this.materializeViewport();
+			this.requestRender();
+		}
 	}
 
 	updateNodes(updates: readonly GraphraumNodeUpdate[]) {
