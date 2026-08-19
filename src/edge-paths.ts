@@ -3,15 +3,15 @@ import type { GraphraumEdgePath, GraphraumPosition } from "./types";
 export type EdgeLodTier = "overview" | "detail";
 
 /** Worst-case detail segment count (cubic). Used for GPU buffer capacity. */
-export const DETAIL_MAX_SEGMENTS = 12;
+export const DETAIL_MAX_SEGMENTS = 24;
 
-const AUTO_OFFSET_FRACTION = 0.25;
+const AUTO_OFFSET_FRACTION = 0.18;
 
 export function segmentCountForPath(path: GraphraumEdgePath | undefined, tier: EdgeLodTier): number {
 	if (tier === "overview") return 1;
 	const resolved = path ?? "straight";
-	if (resolved === "quadratic") return 8;
-	if (resolved === "cubic") return 12;
+	if (resolved === "quadratic") return 16;
+	if (resolved === "cubic") return 24;
 	return 1;
 }
 
