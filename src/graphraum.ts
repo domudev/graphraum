@@ -372,6 +372,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const edgeMaterial = createEdgeMaterial(this.mode === "3d");
 		const edgeMesh = new InstancedMesh(edgeGeometry, edgeMaterial, this.edgeInstanceCapacity);
 		edgeMesh.frustumCulled = false;
+		edgeMesh.renderOrder = this.mode === "2d" ? -1 : 0;
 		this.edgeMesh = edgeMesh;
 		this.scene.add(edgeMesh);
 
@@ -599,6 +600,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.edgeMesh.material.depthTest = mode === "3d";
 			this.edgeMesh.material.depthWrite = mode === "3d";
 			this.edgeMesh.material.needsUpdate = true;
+			this.edgeMesh.renderOrder = mode === "2d" ? -1 : 0;
 		}
 		this.fitView();
 	}
@@ -814,6 +816,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (this.camera instanceof PerspectiveCamera) {
 			this.camera.aspect = width / height;
 			this.camera.updateProjectionMatrix();
+		} else if (this.camera instanceof OrthographicCamera) {
+			// Ortho frustum must track container aspect or the canvas stretches and the graph skews.
+			this.fitView();
+			return;
 		}
 		this.materializeViewport();
 		this.requestRender();
