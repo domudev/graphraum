@@ -30,7 +30,7 @@ describe("packEdgeInstances", () => {
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
 			tier: "detail",
 		});
-		expect(quadratic.segments).toHaveLength(8);
+		expect(quadratic.segments).toHaveLength(16);
 
 		const cubic = packEdgeInstances({
 			edgeIndices: [0],
@@ -39,7 +39,7 @@ describe("packEdgeInstances", () => {
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
 			tier: "detail",
 		});
-		expect(cubic.segments).toHaveLength(12);
+		expect(cubic.segments).toHaveLength(24);
 	});
 
 	it("packs triangle markers using end-segment tangents in detail", () => {
