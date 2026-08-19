@@ -37,6 +37,11 @@ describe("playground helpers", () => {
 			shape: "hexagon",
 			strokeWidth: 1.5,
 		});
+		expect(visuals.node?.(node)?.presentation).toEqual({
+			actions: [{ id: "inspect", label: "Inspect" }],
+			subtitle: "concept",
+			title: "concept-0",
+		});
 		expect(visuals.edge?.(edge)?.visual).toMatchObject({
 			style: "dashed",
 			path: "quadratic",
