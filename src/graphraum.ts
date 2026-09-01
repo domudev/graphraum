@@ -23,6 +23,7 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
+import { applyPerspectiveContainerAspect, containerAspect } from "./camera-aspect";
 import { compileGraph } from "./compile-graph";
 import { dataPatchFitsCapacity, isAppendOnlyDataPatch, type MergedGraphData, mergeDataPatch } from "./data-patch";
 import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
@@ -816,6 +817,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.camera.bottom = -visibleHeight / 2;
 			this.camera.position.set(center.x, center.y, center.z + Math.max(size.z, 1000));
 		} else {
+			applyPerspectiveContainerAspect(this.camera, width, height);
 			const radius = Math.max(size.length() / 2, 1);
 			const distance = radius / Math.sin((this.camera.fov * Math.PI) / 360);
 			this.camera.position.set(center.x, center.y, center.z + distance * 1.15);
@@ -847,7 +849,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const height = Math.max(this.container.clientHeight, 1);
 		this.renderer.setSize(width, height, false);
 		if (this.camera instanceof PerspectiveCamera) {
-			this.camera.aspect = width / height;
+			applyPerspectiveContainerAspect(this.camera, width, height);
 			this.camera.updateProjectionMatrix();
 		} else if (this.camera instanceof OrthographicCamera) {
 			// Ortho frustum must track container aspect or the canvas stretches and the graph skews.
@@ -913,9 +915,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	};
 
 	private createCamera(): GraphraumCamera {
+		const aspect = containerAspect(this.container.clientWidth, this.container.clientHeight);
 		return this.mode === "2d"
 			? new OrthographicCamera(-1, 1, 1, -1, -100_000, 100_000)
-			: new PerspectiveCamera(45, 1, 0.1, 100_000);
+			: new PerspectiveCamera(45, aspect, 0.1, 100_000);
 	}
 
 	private createControls() {
