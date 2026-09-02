@@ -153,6 +153,11 @@ export interface GraphraumOverlayOptions {
 	 */
 	labelPolicy?: "manual" | "auto" | "focus";
 	/**
+	 * When `labelPolicy` is `focus`, controls whether leftover budget is filled by importance.
+	 * Default `importance`. Use `none` for selected/hover/neighbor labels only.
+	 */
+	focusLabelFill?: "importance" | "none";
+	/**
 	 * @deprecated Prefer `labelPolicy: "auto"`. When `labelPolicy` is omitted, `true` enables `auto`.
 	 */
 	autoLabels?: boolean;
@@ -220,6 +225,8 @@ export interface GraphraumTheme {
 	edge: GraphraumColor;
 	edgeOpacity: number;
 	edgeWidth: number;
+	/** How edge ends meet nodes. Default `boundary`. */
+	endpointAttach: "boundary" | "center";
 	focusedNode: GraphraumColor;
 	hoveredNode: GraphraumColor;
 	node: GraphraumColor;

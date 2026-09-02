@@ -1,3 +1,10 @@
+import {
+	DEFAULT_ENDPOINT_ATTACH,
+	DEFAULT_ENDPOINT_CLEARANCE,
+	type EndpointAttach,
+	type EndpointOutline,
+	trimEdgeEndpoints,
+} from "./edge-endpoint-attach";
 import { type EdgeLodTier, sampleEdgePath } from "./edge-paths";
 import type { GraphraumColor, GraphraumEdgeMarkerEnd, GraphraumEdgeStyle, GraphraumEdgeVisual } from "./types";
 
@@ -39,19 +46,49 @@ export function packEdgeInstances(input: {
 	tier: EdgeLodTier;
 	/** Soft cap on segment instances; remaining edges are skipped when exceeded. */
 	maxSegments?: number;
+	/** Default `boundary`. Pass `center` to keep historical center-to-center joins. */
+	endpointAttach?: EndpointAttach;
+	/** World-unit gap between the rim and the line end. */
+	endpointClearance?: number;
+	/** Parallel to compiled nodes; required for boundary attach. */
+	nodeOutlines?: readonly EndpointOutline[];
+	/** Two node indices per edge (source, target), same order as compile-graph. */
+	edgeNodeIndices?: Uint32Array;
 }): { segments: EdgeSegmentInstance[]; markers: EdgeMarkerInstance[]; truncated: boolean } {
 	const segments: EdgeSegmentInstance[] = [];
 	const markers: EdgeMarkerInstance[] = [];
 	let truncated = false;
+	const attach = input.endpointAttach ?? DEFAULT_ENDPOINT_ATTACH;
+	const clearance = input.endpointClearance ?? DEFAULT_ENDPOINT_CLEARANCE;
 	for (const edgeIndex of input.edgeIndices) {
 		const visual = input.edgeVisuals[edgeIndex] ?? {};
 		const base = edgeIndex * 6;
-		const x1 = input.endpointPositions[base] ?? 0;
-		const y1 = input.endpointPositions[base + 1] ?? 0;
-		const z1 = input.endpointPositions[base + 2] ?? 0;
-		const x2 = input.endpointPositions[base + 3] ?? 0;
-		const y2 = input.endpointPositions[base + 4] ?? 0;
-		const z2 = input.endpointPositions[base + 5] ?? 0;
+		let x1 = input.endpointPositions[base] ?? 0;
+		let y1 = input.endpointPositions[base + 1] ?? 0;
+		let z1 = input.endpointPositions[base + 2] ?? 0;
+		let x2 = input.endpointPositions[base + 3] ?? 0;
+		let y2 = input.endpointPositions[base + 4] ?? 0;
+		let z2 = input.endpointPositions[base + 5] ?? 0;
+		if (attach === "boundary" && input.nodeOutlines && input.edgeNodeIndices) {
+			const sourceIndex = input.edgeNodeIndices[edgeIndex * 2] ?? 0;
+			const targetIndex = input.edgeNodeIndices[edgeIndex * 2 + 1] ?? 0;
+			const sourceOutline = input.nodeOutlines[sourceIndex] ?? {};
+			const targetOutline = input.nodeOutlines[targetIndex] ?? {};
+			const trimmed = trimEdgeEndpoints({
+				attach,
+				clearance,
+				source: { x: x1, y: y1, z: z1 },
+				target: { x: x2, y: y2, z: z2 },
+				sourceOutline,
+				targetOutline,
+			});
+			x1 = trimmed.source.x;
+			y1 = trimmed.source.y;
+			z1 = trimmed.source.z ?? 0;
+			x2 = trimmed.target.x;
+			y2 = trimmed.target.y;
+			z2 = trimmed.target.z ?? 0;
+		}
 		const color = visual.color ?? input.defaults.color;
 		const width = input.tier === "overview" ? input.defaults.width : (visual.width ?? input.defaults.width);
 		const opacity = input.tier === "overview" ? input.defaults.opacity : (visual.opacity ?? input.defaults.opacity);
