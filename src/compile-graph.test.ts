@@ -385,4 +385,28 @@ describe("compileGraph", () => {
 			{ width: 3, opacity: 0.9, style: "dotted", marker: "triangle", markerEnd: "source" },
 		]);
 	});
+
+	test("keeps edge path from data when the mapper omits path", () => {
+		const graph = compileGraph(
+			{
+				nodes: [
+					{ id: "a", position: { x: 0, y: 0 } },
+					{ id: "b", position: { x: 1, y: 0 } },
+				],
+				edges: [{ id: "a-b", source: "a", target: "b", path: "straight", color: "#111" }],
+			},
+			defineVisuals({
+				edge: () => ({
+					visual: { color: "#226f54", marker: "triangle", markerEnd: "target" },
+				}),
+			}),
+		);
+
+		expect(graph.edgeVisuals[0]).toMatchObject({
+			color: "#226f54",
+			marker: "triangle",
+			markerEnd: "target",
+			path: "straight",
+		});
+	});
 });
