@@ -151,20 +151,18 @@ export function compileGraph<NodeAttributes = undefined, EdgeAttributes = undefi
 		if (edgeIds.has(edge.id)) throw new Error(`Duplicate edge id: "${edge.id}"`);
 		edgeIds.add(edge.id);
 		const encoding = visuals?.edge?.(edge);
-		const visual = compileEdgeVisual(
-			edge.id,
-			encoding?.visual ?? {
-				color: edge.color,
-				width: edge.width,
-				opacity: edge.opacity,
-				style: edge.style,
-				marker: edge.marker,
-				markerSize: edge.markerSize,
-				markerEnd: edge.markerEnd,
-				path: edge.path,
-				controlPoints: edge.controlPoints,
-			},
-		);
+		const visual = compileEdgeVisual(edge.id, {
+			color: edge.color,
+			width: edge.width,
+			opacity: edge.opacity,
+			style: edge.style,
+			marker: edge.marker,
+			markerSize: edge.markerSize,
+			markerEnd: edge.markerEnd,
+			path: edge.path,
+			controlPoints: edge.controlPoints,
+			...encoding?.visual,
+		});
 		edgeVisuals.push(visual);
 		if (encoding?.presentation) {
 			edgePresentations.set(edge.id, compilePresentation("Edge", edge.id, encoding.presentation));

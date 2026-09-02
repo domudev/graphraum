@@ -99,3 +99,43 @@ test("adds nodes and edges without resetting existing layout state", () => {
 	simulation.step(0.2);
 	expect(simulation.positions.every(Number.isFinite)).toBe(true);
 });
+
+test("omitted per-edge spring arrays match global-only layout", () => {
+	const request = { dimensions: 2 as const, edges: new Uint32Array([0, 1, 1, 2]), nodeCount: 4, iterations: 8 };
+	const baseline = computeForcePositions(request);
+	const withSameDefaults = computeForcePositions({
+		...request,
+		linkDistances: new Float32Array([DEFAULT_FORCE_SETTINGS.linkDistance, DEFAULT_FORCE_SETTINGS.linkDistance]),
+		springStrengths: new Float32Array([DEFAULT_FORCE_SETTINGS.springStrength, DEFAULT_FORCE_SETTINGS.springStrength]),
+	});
+	expect(Array.from(withSameDefaults)).toEqual(Array.from(baseline));
+});
+
+test("per-edge link distances change rest length versus global defaults", () => {
+	const edges = new Uint32Array([0, 1]);
+	const short = computeForcePositions({
+		dimensions: 2,
+		edges,
+		nodeCount: 2,
+		iterations: 24,
+		linkDistances: new Float32Array([8]),
+	});
+	const long = computeForcePositions({
+		dimensions: 2,
+		edges,
+		nodeCount: 2,
+		iterations: 24,
+		linkDistances: new Float32Array([80]),
+	});
+	const shortDist = Math.hypot((short[0] ?? 0) - (short[3] ?? 0), (short[1] ?? 0) - (short[4] ?? 0));
+	const longDist = Math.hypot((long[0] ?? 0) - (long[3] ?? 0), (long[1] ?? 0) - (long[4] ?? 0));
+	expect(longDist).toBeGreaterThan(shortDist);
+});
+
+test("rejects per-edge spring arrays whose length does not match the edge count", () => {
+	const request = { dimensions: 2 as const, edges: new Uint32Array([0, 1, 1, 2]), nodeCount: 3 };
+	expect(() => createForceSimulation({ ...request, linkDistances: new Float32Array([10]) })).toThrow(/linkDistances/);
+	expect(() => createForceSimulation({ ...request, springStrengths: new Float32Array([0.01]) })).toThrow(
+		/springStrengths/,
+	);
+});

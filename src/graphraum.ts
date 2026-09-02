@@ -549,10 +549,19 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			{
 				changedEdgeIndices,
 				defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
+				edgeNodeIndices: this.edgeNodeIndices,
 				edgeVisuals,
+				endpointAttach: this.theme.endpointAttach,
 				endpointPositions: this.canonicalEdgePositions,
 				layouts: this.visibleEdgeLayouts,
 				minHitSlop,
+				nodeOutlines: this.data.nodes.map((node) => ({
+					height: node.height,
+					shape: node.shape,
+					size: node.size,
+					strokeWidth: node.strokeWidth,
+					width: node.width,
+				})),
 				tier: this.lastEdgeLodTier,
 				worldPerPixel,
 			},
@@ -1221,6 +1230,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
 			tier: this.lastEdgeLodTier,
 			maxSegments: this.edgeSegmentCapacity,
+			endpointAttach: this.theme.endpointAttach,
+			edgeNodeIndices: this.edgeNodeIndices,
+			nodeOutlines: this.data.nodes.map((node) => ({
+				height: node.height,
+				shape: node.shape,
+				size: node.size,
+				strokeWidth: node.strokeWidth,
+				width: node.width,
+			})),
 		});
 		const edgeGeometry = this.edgeMesh.geometry;
 		this.visibleEdgeSlots = new Map();

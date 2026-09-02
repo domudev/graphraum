@@ -29,13 +29,23 @@ export interface SelectFocusLabelIdsInput {
 	focusIds: readonly string[];
 	candidates: readonly LabelBudgetCandidate[];
 	maxLabels: number;
+	/**
+	 * When `"importance"` (default), leftover budget is filled by visible importance.
+	 * When `"none"`, only focus ids are labeled.
+	 */
+	fill?: "importance" | "none";
 }
 
 /**
- * Labels for a sparse focus set: keep focus ids that are visible, then fill remaining budget
- * from other visible candidates by importance. Focus order is preserved.
+ * Labels for a sparse focus set: keep focus ids that are visible, then optionally fill
+ * remaining budget from other visible candidates by importance. Focus order is preserved.
  */
-export function selectFocusLabelIds({ focusIds, candidates, maxLabels }: SelectFocusLabelIdsInput): string[] {
+export function selectFocusLabelIds({
+	focusIds,
+	candidates,
+	maxLabels,
+	fill = "importance",
+}: SelectFocusLabelIdsInput): string[] {
 	if (!Number.isSafeInteger(maxLabels) || maxLabels < 0) {
 		throw new Error("maxLabels must be a non-negative integer.");
 	}
@@ -50,7 +60,7 @@ export function selectFocusLabelIds({ focusIds, candidates, maxLabels }: SelectF
 		chosen.push(id);
 		chosenSet.add(id);
 	}
-	if (chosen.length >= maxLabels) return chosen;
+	if (fill === "none" || chosen.length >= maxLabels) return chosen;
 	const fillers = selectBudgetedLabelIds({
 		candidates: candidates.filter((candidate) => !chosenSet.has(candidate.id)),
 		maxLabels: maxLabels - chosen.length,

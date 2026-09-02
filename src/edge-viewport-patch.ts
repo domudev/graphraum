@@ -1,5 +1,6 @@
 import type { BufferGeometry, InstancedBufferAttribute } from "three";
 
+import type { EndpointAttach, EndpointOutline } from "./edge-endpoint-attach";
 import { type EdgeMarkerInstance, type EdgeSegmentInstance, packEdgeInstances } from "./edge-materialize";
 import type { EdgeLodTier } from "./edge-paths";
 import type { PickableEdgeSegment } from "./edge-picking";
@@ -58,10 +59,13 @@ export function buildVisibleEdgeLayouts(
 export interface PatchVisibleEdgesInput {
 	changedEdgeIndices: readonly number[];
 	defaults: { color: GraphraumColor; opacity: number; width: number };
+	edgeNodeIndices?: Uint32Array;
 	edgeVisuals: readonly Readonly<GraphraumEdgeVisual>[];
+	endpointAttach?: EndpointAttach;
 	endpointPositions: Float32Array;
 	layouts: ReadonlyMap<number, VisibleEdgeLayout>;
 	minHitSlop: number;
+	nodeOutlines?: readonly EndpointOutline[];
 	tier: EdgeLodTier;
 	worldPerPixel: number;
 }
@@ -99,6 +103,9 @@ export function patchVisibleEdgeInstances(
 			endpointPositions: input.endpointPositions,
 			defaults: input.defaults,
 			tier: input.tier,
+			endpointAttach: input.endpointAttach,
+			edgeNodeIndices: input.edgeNodeIndices,
+			nodeOutlines: input.nodeOutlines,
 		});
 		if (packed.segments.length !== layout.segmentCount || packed.markers.length !== layout.markerCount) {
 			return { dirtySlotCount: 0, dirtySlotStart: 0, ok: false, pickableSegments: nextPickable };

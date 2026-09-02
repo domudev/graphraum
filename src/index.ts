@@ -1,3 +1,10 @@
+export type { EndpointAttach, EndpointOutline } from "./edge-endpoint-attach";
+export {
+	attachPointOnOutline,
+	DEFAULT_ENDPOINT_ATTACH,
+	DEFAULT_ENDPOINT_CLEARANCE,
+	trimEdgeEndpoints,
+} from "./edge-endpoint-attach";
 export { graphraumEdgePaths } from "./edge-styles";
 export type { ForceLayoutRequest, ForceSettings } from "./force-layout";
 export {

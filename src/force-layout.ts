@@ -4,8 +4,18 @@ export interface ForceLayoutRequest {
 	edges: Uint32Array;
 	/** When omitted, `forceIterationCount(nodeCount)` is used. */
 	iterations?: number;
+	/**
+	 * Optional rest length per edge (`edges.length / 2` values).
+	 * Omitted → `settings.linkDistance` for every edge.
+	 */
+	linkDistances?: Float32Array;
 	nodeCount: number;
 	settings?: ForceSettings;
+	/**
+	 * Optional spring strength per edge (`edges.length / 2` values).
+	 * Omitted → `settings.springStrength` for every edge.
+	 */
+	springStrengths?: Float32Array;
 }
 
 export interface ForceSettings {
@@ -32,6 +42,31 @@ function normalizeForceSettings(settings = DEFAULT_FORCE_SETTINGS): ForceSetting
 		repulsion: Math.max(0, Math.min(5_000, settings.repulsion)),
 		springStrength: Math.max(0.0001, Math.min(0.05, settings.springStrength)),
 	};
+}
+
+function clampLinkDistance(value: number): number {
+	return Math.max(1, Math.min(500, value));
+}
+
+function clampSpringStrength(value: number): number {
+	return Math.max(0.0001, Math.min(0.05, value));
+}
+
+function normalizePerEdgeArray(
+	name: "linkDistances" | "springStrengths",
+	values: Float32Array | undefined,
+	edgeCount: number,
+	clamp: (value: number) => number,
+): Float32Array | null {
+	if (values === undefined) return null;
+	if (values.length !== edgeCount) {
+		throw new Error(`${name} length (${values.length}) must equal edge count (${edgeCount}).`);
+	}
+	const normalized = new Float32Array(edgeCount);
+	for (let index = 0; index < edgeCount; index += 1) {
+		normalized[index] = clamp(values[index] ?? 0);
+	}
+	return normalized;
 }
 
 export function forceIterationCount(nodeCount: number) {
@@ -78,6 +113,15 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 	const settings = normalizeForceSettings(request.settings);
 	let nodeCount = request.nodeCount;
 	let edges = new Uint32Array(request.edges);
+	if (edges.length % 2 !== 0) throw new Error("Force edges must contain source/target pairs.");
+	const edgeCount = edges.length / 2;
+	let linkDistances = normalizePerEdgeArray("linkDistances", request.linkDistances, edgeCount, clampLinkDistance);
+	let springStrengths = normalizePerEdgeArray(
+		"springStrengths",
+		request.springStrengths,
+		edgeCount,
+		clampSpringStrength,
+	);
 	let positions = initialPositions(request);
 	let velocities = new Float32Array(positions.length);
 	let forces = new Float32Array(positions.length);
@@ -122,10 +166,23 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 			for (const index of nextEdges) {
 				if (index >= nodeCount) throw new Error(`Force edge references missing node index: ${index}`);
 			}
+			const addedEdgeCount = nextEdges.length / 2;
 			const merged = new Uint32Array(edges.length + nextEdges.length);
 			merged.set(edges);
 			merged.set(nextEdges, edges.length);
 			edges = merged;
+			if (linkDistances) {
+				const next = new Float32Array(linkDistances.length + addedEdgeCount);
+				next.set(linkDistances);
+				next.fill(settings.linkDistance, linkDistances.length);
+				linkDistances = next;
+			}
+			if (springStrengths) {
+				const next = new Float32Array(springStrengths.length + addedEdgeCount);
+				next.set(springStrengths);
+				next.fill(settings.springStrength, springStrengths.length);
+				springStrengths = next;
+			}
 		},
 		step(alpha: number) {
 			if (nodeCount === 0) return;
@@ -151,14 +208,16 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 				}
 			}
 			for (let index = 0; index < edges.length; index += 2) {
+				const edgeIndex = index / 2;
 				const source = (edges[index] ?? 0) * 3;
 				const target = (edges[index + 1] ?? 0) * 3;
 				const dx = (positions[target] ?? 0) - (positions[source] ?? 0);
 				const dy = (positions[target + 1] ?? 0) - (positions[source + 1] ?? 0);
 				const dz = request.dimensions === 3 ? (positions[target + 2] ?? 0) - (positions[source + 2] ?? 0) : 0;
 				const distance = Math.sqrt(Math.max(dx * dx + dy * dy + dz * dz, 0.0001));
-				const force =
-					Math.max(-1, Math.min(1, (distance - settings.linkDistance) * settings.springStrength * alpha)) / distance;
+				const linkDistance = linkDistances?.[edgeIndex] ?? settings.linkDistance;
+				const springStrength = springStrengths?.[edgeIndex] ?? settings.springStrength;
+				const force = Math.max(-1, Math.min(1, (distance - linkDistance) * springStrength * alpha)) / distance;
 				forces[source] += dx * force;
 				forces[source + 1] += dy * force;
 				forces[target] -= dx * force;

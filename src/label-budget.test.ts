@@ -110,4 +110,18 @@ describe("selectFocusLabelIds", () => {
 			}),
 		).toEqual(["a", "b"]);
 	});
+
+	test("skips importance fillers when fill is none", () => {
+		expect(
+			selectFocusLabelIds({
+				focusIds: ["sel"],
+				candidates: [
+					{ id: "sel", importance: 1, visible: true },
+					{ id: "other-high", importance: 50, visible: true },
+				],
+				maxLabels: 8,
+				fill: "none",
+			}),
+		).toEqual(["sel"]);
+	});
 });

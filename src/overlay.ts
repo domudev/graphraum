@@ -32,6 +32,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 	private readonly stopObservingFocus: () => void;
 	private readonly previousContainerPosition: string | null;
 	private readonly labelPolicy: LabelPolicy;
+	private readonly focusLabelFill: "importance" | "none";
 	private readonly autoToolbar: false | "selected" | "hovered";
 	private readonly autoRichNodes: false | RichNodePolicy;
 	private readonly maxLabels: number;
@@ -53,6 +54,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 		}
 		this.maxRichNodes = maxRichNodes;
 		this.labelPolicy = resolveLabelPolicy(options);
+		this.focusLabelFill = options.focusLabelFill ?? "importance";
 		this.autoToolbar = options.autoToolbar ?? false;
 		this.autoRichNodes = options.autoRichNodes ?? false;
 		this.root.className = `graphraum-overlay ${options.overlayClassName ?? ""}`.trim();
@@ -121,6 +123,7 @@ export class GraphraumOverlay<NodeAttributes = undefined, EdgeAttributes = undef
 					focusIds: orderFocusNodeIds({ selectedIds, hoveredIds, neighborIds }),
 					candidates: this.graph.getLabelCandidates(),
 					maxLabels: this.maxLabels,
+					fill: this.focusLabelFill,
 				}),
 			);
 		}

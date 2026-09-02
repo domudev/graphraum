@@ -76,6 +76,27 @@ describe("packEdgeInstances", () => {
 		expect(packed.truncated).toBe(true);
 		expect(packed.segments).toHaveLength(0);
 	});
+
+	it("boundary attach shortens straight segments toward node rims", () => {
+		const packed = packEdgeInstances({
+			edgeIndices: [0],
+			edgeVisuals: [{ path: "straight" }],
+			endpointPositions: endpoints.positions,
+			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			tier: "detail",
+			endpointAttach: "boundary",
+			edgeNodeIndices: new Uint32Array([0, 1]),
+			nodeOutlines: [
+				{ shape: "circle", size: 4, strokeWidth: 1 },
+				{ shape: "circle", size: 4, strokeWidth: 1 },
+			],
+		});
+		expect(packed.segments).toHaveLength(1);
+		const segment = packed.segments[0];
+		expect(segment?.x1).toBeGreaterThan(0);
+		expect(segment?.x2).toBeLessThan(10);
+		expect((segment?.x2 ?? 0) - (segment?.x1 ?? 0)).toBeLessThan(10);
+	});
 });
 
 describe("edgeTierFromDiagnosticsLod", () => {
