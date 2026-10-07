@@ -35,7 +35,22 @@ console.log(graphraumThemes.light.background); // "#fcfffc"
   <div><strong>Hidden</strong><span>Not materialized</span><p>Viewport culling removes off-screen 2D nodes from the active instance range.</p></div>
 </div>
 
-Selection is a color change inside the existing instanced node mesh. It deliberately does not add a halo mesh or another rendering pass, so the two-draw-call baseline remains true.
+Selection is a color change inside the existing instanced node mesh. Selecting, hovering, or focusing a node never adds a halo mesh or another rendering pass, so the two-draw-call baseline stays true. The only exception is the opt-in [glow](#glow) below, which you enable per node and which adds a third draw call while it is visible.
+
+## Glow
+
+`glow` (0 to 1) is an opt-in soft halo for a sparse set of nodes that deserve attention, such as a search hit or an alert. It is the one documented exception to the two-draw-call baseline.
+
+```ts
+graph.updateNodes([{ id: "alert:42", glow: 0.8 }]);
+```
+
+- **Shape:** a camera-facing disc in the node's current color, including selected, hovered, focused, and dimmed state colors. Its radius is `extent × (1 + 2.4 × glow)` where `extent` is the node's half-extent `max(width, height)`, so `glow: 1` reaches 3.4× the node extent. Opacity fades quadratically from the center to 0 at the rim; peak opacity is `glow` on dark backgrounds and `0.6 × glow` on light ones.
+- **Blending:** on a dark solid background, and on transparent or pattern backgrounds, halos add light (additive blending). On a solid background with relative luminance of 0.5 or more, such as the light preset, additive light would vanish, so halos switch to a normal-blended tint. `setTheme` and `setBackground` switch the mode automatically.
+- **Order:** halos write no depth and render before edges and nodes in 2D and 3D, so they never hide a node or an edge. In 3D this means a halo sits under everything: a node farther from the camera can cover part of a nearer node's halo.
+- **Cost:** while no node glows, nothing changes: two draw calls and no extra per-frame work. While at least one visible node glows, graphraum adds exactly one batched draw call for all halos, so diagnostics report three draw calls. At most 256 halos render, highest `glow` first with ties broken by input order, and halos are skipped in the density LOD tier. `visibleGlowNodes` in diagnostics reports the rendered count.
+
+The extra draw call is a bounded trade-off: GPU halo work is capped at 256 instances regardless of graph size. CPU work is not capped in the same way: each viewport update sorts every visible glowing node to pick the top 256, and changing `glow` rescans the node list. Keep `glow` sparse; it is an emphasis tool, not a styling default for every node. Its GPU cost has not yet been measured in a real browser; the local benchmark lab (`bun run dev`) has a **Glowing nodes** control for that measurement.
 
 Edges have two host states. `setEdgeSelection(ids)` paints `theme.selectedEdge`; `setEdgeState("dimmed", ids)` recedes edges to `theme.dimmedEdge` at `theme.dimmedEdgeOpacity` (Turf-tinted and faint, but still readable as structure). Selection wins when an edge is in both sets. Both are color changes inside the existing edge batch, so they add no draw calls either.
 

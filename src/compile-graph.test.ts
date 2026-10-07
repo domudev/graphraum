@@ -264,6 +264,22 @@ describe("compileGraph", () => {
 		expect(graph.nodeVisuals).toEqual([{ strokeWidth: 0 }]);
 	});
 
+	test("compiles node glow from snapshot fields and mapper visuals", () => {
+		const snapshot = compileGraph({ edges: [], nodes: [{ glow: 0.6, id: "a", position: { x: 0, y: 0 } }] });
+		expect(snapshot.nodeVisuals).toEqual([{ glow: 0.6 }]);
+		const mapped = compileGraph(
+			{ edges: [], nodes: [{ id: "a", position: { x: 0, y: 0 } }] },
+			defineVisuals({ node: () => ({ visual: { glow: 1 } }) }),
+		);
+		expect(mapped.nodeVisuals).toEqual([{ glow: 1 }]);
+	});
+
+	test.each([-0.5, 1.5, Number.NaN])("rejects node glow %s", (glow) => {
+		expect(() => compileGraph({ edges: [], nodes: [{ glow, id: "a", position: { x: 0, y: 0 } }] })).toThrow(
+			'Node "a" glow must be a finite number between 0 and 1',
+		);
+	});
+
 	test("rejects duplicate node identities before rendering", () => {
 		expect(() =>
 			compileGraph({

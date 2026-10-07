@@ -8,6 +8,7 @@ function options(encoding: Encoding): FixtureOptions {
 		edgeColors: { mentions: "#111111", related: "#222222" },
 		edgeMultiplier: 2,
 		encoding,
+		glowNodes: 0,
 		nodeAspect: 1,
 		nodeColors: { concept: "#333333", document: "#444444", person: "#555555" },
 		nodeCount: 11,
@@ -37,6 +38,20 @@ describe("createFixture", () => {
 		expect(snapshot.edges[1]).toHaveProperty("color", "#222222");
 		expect(snapshot.nodes[0]).not.toHaveProperty("color");
 		expect(snapshot.edges[0]).not.toHaveProperty("color");
+	});
+
+	test("marks the first glowNodes nodes as glowing in both encodings", () => {
+		const mapper = createFixture({ ...options("mapper"), glowNodes: 3 });
+		const snapshot = createFixture({ ...options("snapshot"), glowNodes: 3 });
+
+		expect(mapper.nodes.map((node) => node.attributes.glow)).toEqual([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+		expect(mapper.nodes[0]).not.toHaveProperty("glow");
+		expect(snapshot.nodes.filter((node) => node.glow === 1).map((node) => node.id)).toEqual([
+			"node-0",
+			"node-1",
+			"node-2",
+		]);
+		expect(snapshot.nodes[3]).not.toHaveProperty("glow");
 	});
 
 	test("generates random edges without self loops", () => {
