@@ -168,22 +168,41 @@ export interface PatchVisibleEdgePaintInput {
 	defaults: EdgePaint;
 	edgeStates: EdgeStateStyling;
 	edgeVisuals: readonly Readonly<GraphraumEdgeVisual>[];
+	/** Instances currently drawn (`edgeMesh.count`); every repainted slot must lie below it. */
+	instanceCount: number;
 	layouts: ReadonlyMap<number, VisibleEdgeLayout>;
 	tier: EdgeLodTier;
+}
+
+export interface PatchVisibleEdgePaintResult {
+	/** False when a layout no longer fits the drawn instances; nothing was written and callers must rematerialize. */
+	ok: boolean;
+	patchedSlots: number;
 }
 
 /**
  * Repaints the color and opacity of visible edges whose host state changed. Slot layout,
  * geometry, and picking stay untouched, so only the changed `instanceColor` ranges upload.
  * Edges without visible slots are skipped; the next materialize paints them from the same state.
- * Returns the number of repainted instance slots.
  */
-export function patchVisibleEdgePaint(geometry: BufferGeometry, input: PatchVisibleEdgePaintInput): number {
+export function patchVisibleEdgePaint(
+	geometry: BufferGeometry,
+	input: PatchVisibleEdgePaintInput,
+): PatchVisibleEdgePaintResult {
+	const visible = [...input.changedEdgeIndices].flatMap((edgeIndex) => {
+		const layout = input.layouts.get(edgeIndex);
+		return layout ? [{ edgeIndex, layout }] : [];
+	});
+	const fits = visible.every(
+		({ layout }) =>
+			layout.segmentStart + layout.segmentCount <= input.instanceCount &&
+			layout.markerStart + layout.markerCount <= input.instanceCount,
+	);
+	if (!fits) return { ok: false, patchedSlots: 0 };
+
 	const color = getInstancedAttribute(geometry, "instanceColor");
 	let patchedSlots = 0;
-	for (const edgeIndex of input.changedEdgeIndices) {
-		const layout = input.layouts.get(edgeIndex);
-		if (!layout) continue;
+	for (const { edgeIndex, layout } of visible) {
 		const paint = resolveEdgePaint(
 			edgeIndex,
 			input.edgeVisuals[edgeIndex] ?? {},
@@ -202,5 +221,5 @@ export function patchVisibleEdgePaint(geometry: BufferGeometry, input: PatchVisi
 		}
 	}
 	if (patchedSlots > 0) color.needsUpdate = true;
-	return patchedSlots;
+	return { ok: true, patchedSlots };
 }

@@ -623,20 +623,22 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	/**
 	 * Visible slots, LOD tier, and geometry only change through materialize or endpoint patches,
-	 * which keep `visibleEdgeLayouts` current, so a state change can always repaint in place.
+	 * which keep `visibleEdgeLayouts` current, so a state change repaints in place. If a layout no
+	 * longer fits the drawn instances, that invariant broke: fall back to a full materialize.
 	 */
 	private repaintEdgeStates(changedEdgeIds: readonly string[]) {
 		if (!this.edgeMesh || changedEdgeIds.length === 0) return;
 		const indices = this.edgeIndicesById();
-		const edgeIndices = changedEdgeIds.flatMap((id) => indices.get(id) ?? []);
-		patchVisibleEdgePaint(this.edgeMesh.geometry, {
-			changedEdgeIndices: edgeIndices,
+		const result = patchVisibleEdgePaint(this.edgeMesh.geometry, {
+			changedEdgeIndices: changedEdgeIds.flatMap((id) => indices.get(id) ?? []),
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity },
 			edgeStates: this.edgeStateStyling(),
 			edgeVisuals: this.data.edges,
+			instanceCount: this.edgeMesh.count,
 			layouts: this.visibleEdgeLayouts,
 			tier: this.lastEdgeLodTier,
 		});
+		if (!result.ok) this.materializeViewport();
 		this.requestRender();
 	}
 

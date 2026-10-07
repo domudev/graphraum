@@ -165,7 +165,10 @@ describe("patchVisibleEdgePaint", () => {
 		for (const [offset, marker] of packed.markers.entries()) {
 			writeEdgeMarkerInstance(geometry, packed.segments.length + offset, marker);
 		}
-		return buildVisibleEdgeLayouts(packed.segments, packed.markers, packed.segments.length);
+		return {
+			instanceCount: packed.segments.length + packed.markers.length,
+			layouts: buildVisibleEdgeLayouts(packed.segments, packed.markers, packed.segments.length),
+		};
 	}
 
 	test("rewrites only the changed edge colors to match a full pack", () => {
@@ -178,22 +181,24 @@ describe("patchVisibleEdgePaint", () => {
 		const expected = createEdgeGeometry(64);
 		packInto(expected, selected);
 		const geometry = createEdgeGeometry(64);
-		const layouts = packInto(geometry);
+		const { instanceCount, layouts } = packInto(geometry);
 		const color = geometry.getAttribute("instanceColor") as InstancedBufferAttribute;
 		color.clearUpdateRanges();
 		color.needsUpdate = false;
 
-		const patchedSlots = patchVisibleEdgePaint(geometry, {
+		const result = patchVisibleEdgePaint(geometry, {
 			changedEdgeIndices: [0, 7],
 			defaults,
 			edgeStates: selected,
 			edgeVisuals,
+			instanceCount,
 			layouts,
 			tier: "detail",
 		});
 
 		const layout = layouts.get(0);
-		expect(patchedSlots).toBe((layout?.segmentCount ?? 0) + (layout?.markerCount ?? 0));
+		expect(result.ok).toBe(true);
+		expect(result.patchedSlots).toBe((layout?.segmentCount ?? 0) + (layout?.markerCount ?? 0));
 		expect(Array.from(color.array)).toEqual(Array.from(expected.getAttribute("instanceColor").array));
 		expect(color.updateRanges).toEqual([
 			{ start: (layout?.segmentStart ?? 0) * 4, count: (layout?.segmentCount ?? 0) * 4 },
@@ -207,7 +212,7 @@ describe("patchVisibleEdgePaint", () => {
 
 	test("does nothing for edges without visible slots", () => {
 		const geometry = createEdgeGeometry(64);
-		const layouts = packInto(geometry);
+		const { instanceCount, layouts } = packInto(geometry);
 		const color = geometry.getAttribute("instanceColor") as InstancedBufferAttribute;
 		const version = color.version;
 		expect(
@@ -216,10 +221,33 @@ describe("patchVisibleEdgePaint", () => {
 				defaults,
 				edgeStates: { dimmedColor: "#315a51", dimmedOpacity: 0.25, selectedColor: "#fcfffc", stateOf: () => "dimmed" },
 				edgeVisuals,
+				instanceCount,
 				layouts,
 				tier: "detail",
 			}),
-		).toBe(0);
+		).toEqual({ ok: true, patchedSlots: 0 });
 		expect(color.version).toBe(version);
+	});
+
+	test("refuses to write when a layout lies outside the drawn instances", () => {
+		const geometry = createEdgeGeometry(64);
+		const { instanceCount, layouts } = packInto(geometry);
+		const color = geometry.getAttribute("instanceColor") as InstancedBufferAttribute;
+		const before = Array.from(color.array);
+		const version = color.version;
+		color.clearUpdateRanges();
+		const result = patchVisibleEdgePaint(geometry, {
+			changedEdgeIndices: [1, 0],
+			defaults,
+			edgeStates: { dimmedColor: "#315a51", dimmedOpacity: 0.25, selectedColor: "#fcfffc", stateOf: () => "dimmed" },
+			edgeVisuals,
+			instanceCount: instanceCount - 1,
+			layouts,
+			tier: "detail",
+		});
+		expect(result).toEqual({ ok: false, patchedSlots: 0 });
+		expect(Array.from(color.array)).toEqual(before);
+		expect(color.version).toBe(version);
+		expect(color.updateRanges).toEqual([]);
 	});
 });
