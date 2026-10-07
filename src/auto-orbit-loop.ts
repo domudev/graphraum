@@ -8,12 +8,20 @@ import {
 } from "./auto-orbit";
 import type { GraphraumAutoOrbitStatus } from "./types";
 
+/** The OrbitControls events the loop needs: `start` when a drag or wheel begins, `end` when the last pointer lifts. */
+export interface AutoOrbitInteractionSource {
+	addEventListener(type: "end" | "start", listener: () => void): void;
+	removeEventListener(type: "end" | "start", listener: () => void): void;
+}
+
 /**
  * Owns the auto-orbit frame loop and the browser signals that stop it. The loop exists only
  * while the orbit is active: pointer, wheel and key input pause it until `resumeAfterMs` of
  * idle, and a hidden document or an off-screen element stop it until they change back.
  * Decisions come from the pure state in `auto-orbit.ts`; this class only wires DOM events,
- * the resume timer and `requestAnimationFrame`.
+ * the resume timer and `requestAnimationFrame`. Interaction comes from the controls' `start`
+ * and `end` events, so multi-touch and lost pointer capture end the pause only once the last
+ * pointer lifts. DOM overlays above the canvas do not reach the controls and do not pause it.
  */
 export class AutoOrbitLoop {
 	private state: AutoOrbitState;
@@ -24,15 +32,13 @@ export class AutoOrbitLoop {
 
 	constructor(
 		private readonly element: HTMLElement,
+		private readonly interactions: AutoOrbitInteractionSource,
 		private resumeAfterMs: number,
 		private readonly step: (deltaSeconds: number) => void,
 	) {
 		this.state = nextAutoOrbitState(AUTO_ORBIT_OFF, { type: "enable", hidden: element.ownerDocument.hidden });
-		element.addEventListener("pointerdown", this.handlePointerDown);
-		element.addEventListener("pointerup", this.handlePointerRelease);
-		element.addEventListener("pointercancel", this.handlePointerRelease);
-		element.addEventListener("wheel", this.handleDiscreteInput, { passive: true });
-		element.addEventListener("keydown", this.handleDiscreteInput);
+		interactions.addEventListener("start", this.handleInteractionStart);
+		interactions.addEventListener("end", this.handleInteractionEnd);
 		element.ownerDocument.addEventListener("visibilitychange", this.handleVisibilityChange);
 		// Without IntersectionObserver (old browsers, test DOMs) the element counts as on screen.
 		this.observer =
@@ -50,11 +56,8 @@ export class AutoOrbitLoop {
 	}
 
 	dispose() {
-		this.element.removeEventListener("pointerdown", this.handlePointerDown);
-		this.element.removeEventListener("pointerup", this.handlePointerRelease);
-		this.element.removeEventListener("pointercancel", this.handlePointerRelease);
-		this.element.removeEventListener("wheel", this.handleDiscreteInput);
-		this.element.removeEventListener("keydown", this.handleDiscreteInput);
+		this.interactions.removeEventListener("start", this.handleInteractionStart);
+		this.interactions.removeEventListener("end", this.handleInteractionEnd);
 		this.element.ownerDocument.removeEventListener("visibilitychange", this.handleVisibilityChange);
 		this.observer?.disconnect();
 		this.clearResumeTimer();
@@ -82,7 +85,13 @@ export class AutoOrbitLoop {
 		this.frame = null;
 		const deltaSeconds = autoOrbitDeltaSeconds(this.lastFrameMs, nowMs);
 		this.lastFrameMs = nowMs;
-		this.step(deltaSeconds);
+		try {
+			this.step(deltaSeconds);
+		} catch (error) {
+			// Never leave the status "active" without a scheduled frame.
+			this.dispose();
+			throw error;
+		}
 		if (this.frame === null && this.status === "active") this.frame = requestAnimationFrame(this.tick);
 	};
 
@@ -100,19 +109,14 @@ export class AutoOrbitLoop {
 		this.resumeTimer = null;
 	}
 
-	/** A press pauses until it is released; the idle countdown starts on release. */
-	private readonly handlePointerDown = () => {
+	/** A drag, pinch or wheel step pauses until the controls report its end; then the idle countdown starts. */
+	private readonly handleInteractionStart = () => {
 		this.clearResumeTimer();
 		this.dispatch({ type: "interaction" });
 	};
 
-	private readonly handlePointerRelease = () => {
+	private readonly handleInteractionEnd = () => {
 		if (this.state.interacting) this.armResumeTimer();
-	};
-
-	private readonly handleDiscreteInput = () => {
-		this.dispatch({ type: "interaction" });
-		this.armResumeTimer();
 	};
 
 	private readonly handleVisibilityChange = () => {

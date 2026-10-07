@@ -95,6 +95,21 @@ function setup(mode: "2d" | "3d" = "3d") {
 	return { graph, renderer, canvas: renderer.domElement, document: renderer.domElement.ownerDocument };
 }
 
+interface ControlsHandle {
+	autoRotate: boolean;
+	autoRotateSpeed: number;
+	dispatchEvent(event: { type: "end" | "start" }): void;
+	update(deltaSeconds?: number): boolean;
+}
+
+function controlsOf(graph: Graphraum) {
+	return Reflect.get(graph, "controls") as ControlsHandle;
+}
+
+function wheelEvent() {
+	return Object.assign(new Event("wheel"), { clientX: 0, clientY: 0, ctrlKey: false, deltaMode: 0, deltaY: 100 });
+}
+
 function cameraAzimuth(graph: Graphraum) {
 	const camera = Reflect.get(graph, "camera") as { position: Vector3 };
 	return new Spherical().setFromVector3(new Vector3().copy(camera.position)).theta;
@@ -168,25 +183,123 @@ describe("Graphraum auto-orbit", () => {
 		expect(frames.size).toBe(1);
 	});
 
-	test("pauses on interaction and resumes after the idle delay", () => {
+	test("pauses on wheel input and resumes after the idle delay", () => {
 		const { graph, canvas } = setup();
 		graph.setAutoOrbit({ resumeAfterMs: 500 });
 
-		canvas.dispatchEvent(new Event("keydown"));
+		canvas.dispatchEvent(wheelEvent());
 		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
+		expect(frames.size).toBe(1); // the zoom's own render request, not an orbit frame
+		runFrame(16);
 		expect(frames.size).toBe(0);
 		vi.advanceTimersByTime(499);
 		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
 		vi.advanceTimersByTime(1);
 		expect(graph.getDiagnostics().autoOrbit).toBe("active");
 		expect(frames.size).toBe(1);
+	});
 
-		canvas.dispatchEvent(new Event("pointerdown"));
+	test("a drag pauses from controls start until controls end, then waits for idle", () => {
+		const { graph } = setup();
+		graph.setAutoOrbit({ resumeAfterMs: 500 });
+		const controls = controlsOf(graph);
+
+		controls.dispatchEvent({ type: "start" });
 		vi.advanceTimersByTime(5000);
 		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
-		canvas.dispatchEvent(new Event("pointerup"));
+		expect(frames.size).toBe(0);
+		controls.dispatchEvent({ type: "end" });
+		vi.advanceTimersByTime(499);
+		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
+		controls.dispatchEvent({ type: "start" });
+		vi.advanceTimersByTime(1000);
+		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
+		controls.dispatchEvent({ type: "end" });
 		vi.advanceTimersByTime(500);
 		expect(graph.getDiagnostics().autoOrbit).toBe("active");
+	});
+
+	test("orbit frames do not rematerialize the viewport, but user view changes do", () => {
+		const materialize = vi.spyOn(
+			Graphraum.prototype as unknown as { materializeViewport: () => void },
+			"materializeViewport",
+		);
+		const listener = vi.fn();
+		const { graph, canvas, renderer } = setup();
+		graph.onViewChange(listener);
+		graph.setAutoOrbit({ speed: 1 });
+		runFrame(1000);
+		materialize.mockClear();
+		renderer.render.mockClear();
+		listener.mockClear();
+
+		for (let frame = 1; frame <= 10; frame += 1) runFrame(1000 + frame * 16);
+		expect(renderer.render).toHaveBeenCalledTimes(10);
+		expect(listener).toHaveBeenCalledTimes(10);
+		expect(materialize).not.toHaveBeenCalled();
+
+		canvas.dispatchEvent(wheelEvent());
+		expect(materialize).toHaveBeenCalledTimes(1);
+		materialize.mockRestore();
+	});
+
+	test("autoRotate is only on during the orbit step, so a plain update adds no rotation", () => {
+		const { graph } = setup();
+		graph.setAutoOrbit({ speed: 1 });
+		runFrame(1000);
+		runFrame(1050);
+		const controls = controlsOf(graph);
+		expect(controls.autoRotate).toBe(false);
+		const azimuth = cameraAzimuth(graph);
+		controls.update();
+		expect(cameraAzimuth(graph)).toBeCloseTo(azimuth, 10);
+	});
+
+	test("setAutoOrbit again updates speed and resume delay", () => {
+		const { graph, canvas } = setup();
+		graph.setAutoOrbit({ speed: 1, resumeAfterMs: 500 });
+		graph.setAutoOrbit({ speed: 2, resumeAfterMs: 100 });
+		expect(controlsOf(graph).autoRotateSpeed).toBeCloseTo(120 / (2 * Math.PI));
+		const start = cameraAzimuth(graph);
+		runFrame(1000);
+		runFrame(1050);
+		expect(Math.abs(cameraAzimuth(graph) - start)).toBeCloseTo(0.1);
+
+		canvas.dispatchEvent(wheelEvent());
+		vi.advanceTimersByTime(100);
+		expect(graph.getDiagnostics().autoOrbit).toBe("active");
+	});
+
+	test("fitView and setData during an orbit keep it running", () => {
+		const { graph } = setup();
+		graph.setAutoOrbit({});
+		graph.fitView();
+		graph.setData({ nodes: [{ id: "c", position: { x: 0, y: 0, z: 10 } }], edges: [] });
+		runFrame(1000);
+		expect(graph.getDiagnostics().autoOrbit).toBe("active");
+		expect(frames.size).toBe(1);
+	});
+
+	test("a throwing orbit step stops the orbit instead of leaving it active without a loop", () => {
+		const { graph } = setup();
+		graph.setAutoOrbit({});
+		const controls = controlsOf(graph);
+		vi.spyOn(controls, "update").mockImplementation(() => {
+			throw new Error("boom");
+		});
+		expect(() => runFrame(1000)).toThrow("boom");
+		expect(controls.autoRotate).toBe(false);
+		expect(graph.getDiagnostics().autoOrbit).toBe("off");
+		expect(frames.size).toBe(0);
+	});
+
+	test("setAutoOrbit after destroy does nothing", () => {
+		const { graph } = setup();
+		graph.destroy();
+		requestAnimationFrame.mockClear();
+		expect(() => graph.setAutoOrbit({})).not.toThrow();
+		expect(requestAnimationFrame).not.toHaveBeenCalled();
+		expect(vi.getTimerCount()).toBe(0);
 	});
 
 	test("stops while the document is hidden or the canvas is off screen", () => {
@@ -224,8 +337,7 @@ describe("Graphraum auto-orbit", () => {
 		vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
 		const { graph, canvas, document } = setup();
 		graph.setAutoOrbit({});
-		canvas.dispatchEvent(new Event("pointerdown"));
-		canvas.dispatchEvent(new Event("pointerup"));
+		canvas.dispatchEvent(wheelEvent());
 		expect(vi.getTimerCount()).toBe(1);
 
 		graph.destroy();
@@ -235,7 +347,6 @@ describe("Graphraum auto-orbit", () => {
 
 		requestAnimationFrame.mockClear();
 		document.dispatchEvent(new Event("visibilitychange"));
-		canvas.dispatchEvent(new Event("keydown"));
 		vi.runAllTimers();
 		expect(requestAnimationFrame).not.toHaveBeenCalled();
 	});

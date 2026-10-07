@@ -173,6 +173,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private mode: GraphraumMode;
 	private frameRequest: number | null = null;
 	private autoOrbit: AutoOrbitLoop | null = null;
+	/** True only during the orbit's own `controls.update(dt)`; see `handleViewChange`. */
+	private orbitUpdating = false;
+	private destroyed = false;
 	private cpuFrameMilliseconds = 0;
 	private gpuFrameMilliseconds: number | null = null;
 	private gpuTimer: GpuTimer | null = null;
@@ -658,13 +661,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	/**
-	 * Slowly orbits the 3D camera around its target until called with `false`. The orbit pauses on
-	 * pointer, wheel or key input and resumes after `resumeAfterMs` of idle; it also stops while the
-	 * document is hidden or the canvas is off screen. While it is active a frame loop runs, so check
-	 * `prefers-reduced-motion` before enabling it. Throws in 2D mode; `setMode("2d")` turns it off.
+	 * Slowly orbits the 3D camera around its target until called with `false`. The orbit pauses while
+	 * the camera controls handle a drag, pinch or wheel step and resumes after `resumeAfterMs` of idle;
+	 * it also stops while the document is hidden or the canvas is off screen. While it is active a
+	 * frame loop renders every frame (no viewport rematerialization), so check `prefers-reduced-motion`
+	 * before enabling it. Throws in 2D mode; `setMode("2d")` turns it off. Does nothing after `destroy()`.
 	 */
 	setAutoOrbit(options: GraphraumAutoOrbitOptions | false) {
-		if (options === false) {
+		if (options === false || this.destroyed) {
 			this.stopAutoOrbit();
 			return;
 		}
@@ -674,7 +678,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const { resumeAfterMs, speed } = resolveAutoOrbitOptions(options);
 		this.controls.autoRotateSpeed = autoRotateSpeedFor(speed);
 		if (this.autoOrbit) this.autoOrbit.setResumeAfterMs(resumeAfterMs);
-		else this.autoOrbit = new AutoOrbitLoop(this.renderer.domElement, resumeAfterMs, this.stepAutoOrbit);
+		else this.autoOrbit = new AutoOrbitLoop(this.renderer.domElement, this.controls, resumeAfterMs, this.stepAutoOrbit);
 	}
 
 	getNodePresentation(nodeId: string): CompiledGraphraumPresentation | null {
@@ -896,6 +900,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	destroy() {
+		this.destroyed = true;
 		this.stopAutoOrbit();
 		this.resizeObserver.disconnect();
 		this.renderer.domElement.removeEventListener("pointermove", this.handlePointerMove);
@@ -951,13 +956,22 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	/**
 	 * One orbit frame. `autoRotate` is on only for this `update(dt)` call: OrbitControls also calls
 	 * `update()` without a delta from wheel and key handlers and `fitView`, which would otherwise add
-	 * a fixed per-call rotation. A moved camera emits `change` (viewport materialization and a
-	 * render request); flushing that request renders this frame instead of the next one.
+	 * a fixed per-call rotation. A moved camera emits `change` (a render request only, see
+	 * `handleViewChange`); flushing that request renders this frame instead of the next one. A
+	 * throwing update turns the orbit off rather than leaving it enabled without a loop.
 	 */
 	private readonly stepAutoOrbit = (deltaSeconds: number) => {
 		this.controls.autoRotate = true;
-		this.controls.update(deltaSeconds);
-		this.controls.autoRotate = false;
+		this.orbitUpdating = true;
+		try {
+			this.controls.update(deltaSeconds);
+		} catch (error) {
+			this.stopAutoOrbit();
+			throw error;
+		} finally {
+			this.controls.autoRotate = false;
+			this.orbitUpdating = false;
+		}
 		this.flushRender();
 	};
 
@@ -975,8 +989,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 	}
 
+	/**
+	 * Orbit frames skip materialization. In 3D the packed instances do not depend on camera
+	 * orientation: there is no viewport culling, density LOD and edge tiers follow counts only,
+	 * and the one orientation-dependent value (`worldUnitsPerPixel`, for edge hit slop) is used
+	 * only by 2D picking. 3D picking raycasts the instances and screen positions are projected per
+	 * call, so an orbit frame needs only a render, whose view listeners still run every frame.
+	 */
 	private readonly handleViewChange = () => {
-		this.materializeViewport();
+		if (!this.orbitUpdating) this.materializeViewport();
 		this.requestRender();
 	};
 
