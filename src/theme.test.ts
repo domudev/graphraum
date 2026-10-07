@@ -67,7 +67,7 @@ describe("graphraum themes", () => {
 	it("rejects a dimmed edge opacity outside 0..1", () => {
 		expect(resolveGraphraumTheme({ dimmedEdgeOpacity: 0 }).dimmedEdgeOpacity).toBe(0);
 		expect(resolveGraphraumTheme({ dimmedEdgeOpacity: 1 }).dimmedEdgeOpacity).toBe(1);
-		for (const dimmedEdgeOpacity of [-0.1, 1.2, Number.NaN, Number.POSITIVE_INFINITY]) {
+		for (const dimmedEdgeOpacity of [-0.1, 1.2, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
 			expect(() => resolveGraphraumTheme({ dimmedEdgeOpacity })).toThrow(
 				/dimmedEdgeOpacity must be a finite number between 0 and 1/,
 			);
