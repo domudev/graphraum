@@ -3,6 +3,7 @@ import { type BufferGeometry, Color, InstancedBufferAttribute, PlaneGeometry, Sh
 import type { EdgeMarkerInstance, EdgeSegmentInstance } from "./edge-materialize";
 import type { EdgePaint } from "./edge-state";
 import { encodeEdgeStyle } from "./edge-styles";
+import { OUTPUT_COLOR_SPACE_FRAGMENT } from "./shader-output";
 
 const vertexShader = `
 attribute float instanceKind;
@@ -80,6 +81,7 @@ void main() {
 	}
 	if (edgeColor.a <= 0.0) discard;
 	gl_FragColor = edgeColor;
+	${OUTPUT_COLOR_SPACE_FRAGMENT}
 }
 `;
 

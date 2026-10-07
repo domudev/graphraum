@@ -19,6 +19,8 @@ graphraum ships with an opinionated visual baseline so a first render is legible
 
 Two immutable presets ship as `graphraumThemes.dark` and `graphraumThemes.light`. `graphraumTheme` remains the dark alias.
 
+Every color, in a theme or on a node or edge, is an sRGB value like a CSS color and is drawn exactly as specified, so `#226F54` on the canvas matches `#226F54` in your stylesheet. Translucent edges and halos blend over the background the way overlapping CSS colors do.
+
 ```ts
 import { graphraumTheme, graphraumThemes } from "@domudev/graphraum";
 
