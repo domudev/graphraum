@@ -4,6 +4,7 @@ import {
 	InstancedBufferAttribute,
 	InstancedMesh,
 	Matrix4,
+	NormalBlending,
 	PlaneGeometry,
 	type Scene,
 	ShaderMaterial,
@@ -12,9 +13,11 @@ import {
 import {
 	createGlowSelection,
 	GLOW_MAX_INSTANCES,
+	type GlowBlendMode,
 	glowBufferCapacity,
 	glowHaloOpacity,
 	glowHaloRadius,
+	glowOpacityScale,
 	selectGlowNodes,
 } from "./node-glow";
 
@@ -39,6 +42,7 @@ void main() {
 `;
 
 const fragmentShader = `
+uniform float opacityScale;
 varying vec3 glowColor;
 varying vec2 glowPoint;
 varying float glowOpacity;
@@ -47,7 +51,7 @@ void main() {
 	float distanceFromCenter = length(glowPoint);
 	if (distanceFromCenter >= 1.0) discard;
 	float falloff = 1.0 - distanceFromCenter;
-	gl_FragColor = vec4(glowColor, falloff * falloff * glowOpacity);
+	gl_FragColor = vec4(glowColor, falloff * falloff * glowOpacity * opacityScale);
 }
 `;
 
@@ -66,17 +70,25 @@ export type DescribeGlowNode = (nodeIndex: number, target: GlowNodeTarget) => bo
 
 type GlowMesh = InstancedMesh<PlaneGeometry, ShaderMaterial>;
 
-function createGlowMesh(capacity: number): GlowMesh {
+function applyBlendMode(material: ShaderMaterial, mode: GlowBlendMode) {
+	material.blending = mode === "normal" ? NormalBlending : AdditiveBlending;
+	const opacityScale = material.uniforms.opacityScale;
+	if (opacityScale) opacityScale.value = glowOpacityScale(mode);
+	material.needsUpdate = true;
+}
+
+function createGlowMesh(capacity: number, mode: GlowBlendMode): GlowMesh {
 	const geometry = new PlaneGeometry(2, 2);
 	geometry.setAttribute("instanceGlowOpacity", new InstancedBufferAttribute(new Float32Array(capacity), 1));
 	const material = new ShaderMaterial({
-		blending: AdditiveBlending,
 		depthTest: false,
 		depthWrite: false,
 		fragmentShader,
 		transparent: true,
+		uniforms: { opacityScale: { value: 1 } },
 		vertexShader,
 	});
+	applyBlendMode(material, mode);
 	const mesh: GlowMesh = new InstancedMesh(geometry, material, capacity);
 	mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
 	mesh.name = "graphraum-node-glow";
@@ -95,9 +107,17 @@ export class NodeGlowLayer {
 	private readonly target: GlowNodeTarget = { color: new Color(), extent: 0, glow: 0, x: 0, y: 0, z: 0 };
 	private readonly matrix = new Matrix4();
 	private mesh: GlowMesh | null = null;
+	private blendMode: GlowBlendMode = "additive";
 
 	constructor(scene: Scene) {
 		this.scene = scene;
+	}
+
+	/** Additive on dark or unknown backgrounds, normal on light solid ones; see `glowBlendModeFor`. */
+	setBlending(mode: GlowBlendMode) {
+		if (mode === this.blendMode) return;
+		this.blendMode = mode;
+		if (this.mesh) applyBlendMode(this.mesh.material, mode);
 	}
 
 	/** Halo instances in the current frame. */
@@ -152,6 +172,7 @@ export class NodeGlowLayer {
 		this.scene.remove(this.mesh);
 		this.mesh.geometry.dispose();
 		this.mesh.material.dispose();
+		this.mesh.dispose();
 		this.mesh = null;
 	}
 
@@ -160,7 +181,7 @@ export class NodeGlowLayer {
 		const capacity = glowBufferCapacity(required, current, GLOW_MAX_INSTANCES);
 		if (this.mesh && capacity === current) return;
 		this.releaseMesh();
-		this.mesh = createGlowMesh(capacity);
+		this.mesh = createGlowMesh(capacity, this.blendMode);
 		this.scene.add(this.mesh);
 	}
 }

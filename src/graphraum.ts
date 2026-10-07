@@ -41,6 +41,7 @@ import { buildVisibleEdgeLayouts, patchVisibleEdgeInstances, type VisibleEdgeLay
 import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
+import { glowBlendModeFor } from "./node-glow";
 import { type GlowNodeTarget, NodeGlowLayer } from "./node-glow-rendering";
 import {
 	allocateNodeInstanceColors,
@@ -523,6 +524,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (this.densityLodActive && prepared.some((update) => update.positionChanged || update.sizeChanged)) {
 			visibilityChanged = true;
 		}
+		const glowChanged = prepared.some((update) => update.glowChanged);
+		// Before any early return: materializeViewport below reads it through syncGlow.
+		if (glowChanged) this.hasGlowNodes = nodes.some(hasNodeGlow);
 
 		this.data = { ...this.data, nodes };
 		if (visibilityChanged) {
@@ -542,10 +546,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			nodeMesh.instanceColor.needsUpdate = true;
 		}
 		if (prepared.some((update) => update.shapeChanged)) nodeShape.needsUpdate = true;
-		if (prepared.some((update) => update.glowChanged)) {
-			this.hasGlowNodes = nodes.some(hasNodeGlow);
-			this.syncGlow();
-		} else if (prepared.some((update) => update.positionChanged || update.sizeChanged || update.colorChanged)) {
+		if (glowChanged) this.syncGlow();
+		else if (prepared.some((update) => update.positionChanged || update.sizeChanged || update.colorChanged)) {
 			this.glowLayer.rewrite(this.describeGlowNode);
 		}
 		if (prepared.some((update) => update.strokeChanged)) {
@@ -1149,6 +1151,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.glowLayer.dispose();
 			return;
 		}
+		this.glowLayer.setBlending(glowBlendModeFor(this.theme.background));
 		this.glowLayer.sync(this.visibleNodeIndices, this.glowAt, this.densityLodActive, this.describeGlowNode);
 	}
 

@@ -1,8 +1,21 @@
+import { Color } from "three";
+
+import { normalizeGraphraumBackground } from "./theme";
+import type { GraphraumBackground } from "./types";
+
 /** Hard cap on halo instances per frame; the highest glow wins, ties go to the lower node index. */
 export const GLOW_MAX_INSTANCES = 256;
 
 /** Halo radius as a multiple of the node's half-extent at `glow: 1`. */
 export const GLOW_RADIUS_SCALE = 3.4;
+
+/** Solid backgrounds at or above this relative luminance switch halos from additive to normal blending. */
+export const GLOW_LIGHT_BACKGROUND_LUMINANCE = 0.5;
+
+/** Halo opacity multiplier under normal blending, so a light background shows a soft tint. */
+export const GLOW_NORMAL_OPACITY_SCALE = 0.6;
+
+export type GlowBlendMode = "additive" | "normal";
 
 /** Reusable selection buffer: `indices[0..count)` holds node indices ordered by glow. */
 export interface GlowSelection {
@@ -69,4 +82,21 @@ export function selectGlowNodes(
 	selection.indices.subarray(0, candidates).sort((a, b) => glowAt(b) - glowAt(a) || a - b);
 	selection.count = Math.min(candidates, GLOW_MAX_INSTANCES);
 	return selection;
+}
+
+/**
+ * Additive light reads on dark backgrounds but saturates to nothing on light ones. A solid
+ * background whose relative luminance (linear sRGB, 0.2126 R + 0.7152 G + 0.0722 B) reaches
+ * {@link GLOW_LIGHT_BACKGROUND_LUMINANCE} uses normal blending; transparent and pattern
+ * backgrounds keep additive blending because their brightness is unknown.
+ */
+export function glowBlendModeFor(background: GraphraumBackground): GlowBlendMode {
+	const normalized = normalizeGraphraumBackground(background);
+	if (normalized === null || typeof normalized === "object") return "additive";
+	const { b, g, r } = new Color(normalized);
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b >= GLOW_LIGHT_BACKGROUND_LUMINANCE ? "normal" : "additive";
+}
+
+export function glowOpacityScale(mode: GlowBlendMode): number {
+	return mode === "normal" ? GLOW_NORMAL_OPACITY_SCALE : 1;
 }

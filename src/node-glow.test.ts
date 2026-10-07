@@ -1,15 +1,19 @@
 import { describe, expect, test } from "vitest";
-
 import {
 	assertNodeGlow,
 	createGlowSelection,
+	GLOW_LIGHT_BACKGROUND_LUMINANCE,
 	GLOW_MAX_INSTANCES,
+	GLOW_NORMAL_OPACITY_SCALE,
 	GLOW_RADIUS_SCALE,
+	glowBlendModeFor,
 	glowBufferCapacity,
 	glowHaloOpacity,
 	glowHaloRadius,
+	glowOpacityScale,
 	selectGlowNodes,
 } from "./node-glow";
+import { graphraumThemeDark, graphraumThemeLight } from "./theme";
 
 function selected(selection: { count: number; indices: Uint32Array }) {
 	return [...selection.indices.subarray(0, selection.count)];
@@ -111,5 +115,32 @@ describe("selectGlowNodes", () => {
 
 		selectGlowNodes([0], (index) => glow[index] ?? 0, false, scratch);
 		expect(scratch.count).toBe(0);
+	});
+});
+
+describe("glowBlendModeFor", () => {
+	test("keeps additive blending on the dark preset and switches to normal on the light preset", () => {
+		expect(glowBlendModeFor(graphraumThemeDark.background)).toBe("additive");
+		expect(glowBlendModeFor(graphraumThemeLight.background)).toBe("normal");
+	});
+
+	test("switches at relative luminance 0.5", () => {
+		expect(GLOW_LIGHT_BACKGROUND_LUMINANCE).toBe(0.5);
+		expect(glowBlendModeFor("#808080")).toBe("additive");
+		expect(glowBlendModeFor(0xffffff)).toBe("normal");
+		expect(glowBlendModeFor("#cccccc")).toBe("normal");
+	});
+
+	test("keeps additive blending for non-solid backgrounds", () => {
+		expect(glowBlendModeFor("transparent")).toBe("additive");
+		expect(glowBlendModeFor(null)).toBe("additive");
+		const source = {} as CanvasImageSource;
+		expect(glowBlendModeFor({ source, type: "pattern" })).toBe("additive");
+	});
+
+	test("scales halo opacity down to a soft tint in normal mode", () => {
+		expect(glowOpacityScale("additive")).toBe(1);
+		expect(glowOpacityScale("normal")).toBe(GLOW_NORMAL_OPACITY_SCALE);
+		expect(GLOW_NORMAL_OPACITY_SCALE).toBe(0.6);
 	});
 });
