@@ -213,6 +213,7 @@ Missing coordinates default to zero so layout does not block the first render. M
   <div><code>pick(clientX, clientY)</code><p>Returns the nearest node ID or <code>null</code>. Uses the spatial grid in 2D and instance raycasting in 3D.</p></div>
   <div><code>setMode(mode)</code><p>Switches between orthographic 2D and perspective 3D, replaces controls, and fits the current graph.</p></div>
   <div><code>getMode()</code><p>Returns the active <code>"2d"</code> or <code>"3d"</code> mode.</p></div>
+  <div><code>setAutoOrbit(options | false)</code><p>Slowly orbits the 3D camera around the graph. Off by default; pass <code>false</code> to stop. Throws in 2D, and switching to 2D turns it off.</p></div>
   <div><code>setTheme(theme)</code><p>Applies a named preset (<code>"dark"</code> / <code>"light"</code>) or merges a partial palette, then rematerializes colors.</p></div>
   <div><code>setBackground(background)</code><p>Sets a solid color, <code>"transparent"</code> / <code>null</code> for host CSS, or a <code>{'{ type: "pattern", source }'}</code> texture.</p></div>
   <div><code>fitView()</code><p>Fits the active camera to the complete graph bounds and rematerializes the viewport.</p></div>
@@ -220,6 +221,21 @@ Missing coordinates default to zero so layout does not block the first render. M
   <div><code>destroy()</code><p>Disconnects observation and controls, cancels pending rendering, disposes GPU resources, and removes the canvas.</p></div>
   <div><code>createOverlay(options)</code><p>Adds a bounded DOM layer for labels, a toolbar, and optional rich HTML focus cards. See Node and edge presentation.</p></div>
 </div>
+
+### Auto-orbit
+
+```ts
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  graph.setMode("3d");
+  graph.setAutoOrbit({ speed: 0.07, resumeAfterMs: 3000 });
+}
+
+graph.setAutoOrbit(false);
+```
+
+`speed` is in radians per second (default `0.07`, about 90 seconds per turn; above 0 and at most 2) and holds at any frame rate. Pointer and wheel input on the canvas pause the orbit; it resumes after `resumeAfterMs` (default `3000`) without new input. A drag in progress keeps the camera still even if that delay passes. Pointer input on DOM overlays above the canvas, such as a toolbar or focus cards, does not pause it. The orbit also stops while the tab is hidden or the canvas is scrolled off screen, and resumes when visible again.
+
+While the orbit is active graphraum runs a frame loop instead of rendering only on change. Each active frame rotates the camera, renders once, and calls `onViewChange` listeners so overlays can follow. It does not repack node or edge instances: in 3D they do not depend on the camera angle, so there is no per-frame CPU repacking or buffer re-upload that grows with graph size. The GPU draw still scales with what is drawn. Paused and disabled orbits run no loop. graphraum does not read `prefers-reduced-motion`; check it before enabling the orbit, as above. `getDiagnostics().autoOrbit` reports `"off"`, `"active"` or `"paused"`.
 
 ## Theme
 
@@ -248,6 +264,7 @@ const diagnostics: GraphraumDiagnostics = graph.getDiagnostics();
 ```ts
 interface GraphraumDiagnostics {
   aggregatedNodeClusters: number;
+  autoOrbit: "active" | "off" | "paused";
   cpuFrameMilliseconds: number;
   gpuFrameMilliseconds: number | null;
   gpuDrawCalls: number;
@@ -266,4 +283,4 @@ interface GraphraumDiagnostics {
 }
 ```
 
-Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them. `visibleEdgeSegments` counts rendered edge lines and `visibleEdges` is an alias for it; `visibleEdgeMarkers` counts rendered direction triangles, which the overview LOD tier drops first.
+Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them. `visibleEdgeSegments` counts rendered edge lines and `visibleEdges` is an alias for it; `visibleEdgeMarkers` counts rendered direction triangles, which the overview LOD tier drops first. `autoOrbit` is `"paused"` when the orbit is enabled but stopped by input, a hidden tab or an off-screen canvas.

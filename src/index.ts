@@ -38,6 +38,8 @@ export {
 } from "./theme";
 export type {
 	CompiledGraphraumPresentation,
+	GraphraumAutoOrbitOptions,
+	GraphraumAutoOrbitStatus,
 	GraphraumBackground,
 	GraphraumColor,
 	GraphraumData,

@@ -251,8 +251,20 @@ export interface GraphraumOptions<NodeAttributes = undefined, EdgeAttributes = u
 	visuals?: GraphraumVisualMapper<NodeAttributes, EdgeAttributes>;
 }
 
+/** Options for `Graphraum.setAutoOrbit`. */
+export interface GraphraumAutoOrbitOptions {
+	/** Orbit speed in radians per second. Must be above 0 and at most 2. Defaults to 0.07 (about 90 seconds per turn). */
+	speed?: number;
+	/** Idle time in milliseconds after a pointer, wheel or key interaction before the orbit resumes. Defaults to 3000. */
+	resumeAfterMs?: number;
+}
+
+/** `off`: not enabled. `active`: orbiting with a running frame loop. `paused`: enabled but stopped by interaction, a hidden tab or an off-screen canvas. */
+export type GraphraumAutoOrbitStatus = "active" | "off" | "paused";
+
 export interface GraphraumDiagnostics {
 	aggregatedNodeClusters: number;
+	autoOrbit: GraphraumAutoOrbitStatus;
 	cpuFrameMilliseconds: number;
 	gpuFrameMilliseconds: number | null;
 	gpuDrawCalls: number;
