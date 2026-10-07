@@ -97,6 +97,7 @@ export function renderControls(form: HTMLFormElement) {
 			Slider("Aspect (width / height)", "nodeAspect", 1, 0.5, 2, 0.1),
 			Slider("Stroke width", "nodeStrokeWidth", 0, 0, 2, 0.1),
 			Color("Stroke color", "nodeStrokeColor", graphraumTheme.nodeStroke),
+			NumberField("Glowing nodes", "glowNodes", 0, 0, 1_000, 1),
 			VisualField("Concept", "conceptShape", "diamond", "conceptColor", "#e4a853"),
 			VisualField("Document", "documentShape", "square", "documentColor", "#73c7a5"),
 			VisualField("Person", "personShape", "circle", "personColor", "#fcfffc"),

@@ -122,6 +122,7 @@ function readState(): LabState {
 		maxVisibleEdges: 100_000,
 		maxVisibleNodes: scaleMode === "million-density" ? 50_000 : scaleMode === "million-literal" ? 1_000_000 : 100_000,
 		mode: formValue(values, "mode") as GraphraumMode,
+		glowNodes: formNumber(values, "glowNodes"),
 		nodeAspect: formNumber(values, "nodeAspect"),
 		nodeColors: {
 			concept: formValue(values, "conceptColor"),
@@ -173,6 +174,7 @@ const visuals = defineVisuals<NodeAttributes, EdgeAttributes>({
 									strokeColor: state.nodeStrokeColor,
 									strokeWidth: state.nodeStrokeWidth,
 								}),
+						...(node.attributes.glow > 0 ? { glow: node.attributes.glow } : {}),
 						height: state.nodeSize + node.attributes.score * state.scoreSize,
 						shape: state.nodeShapes[node.attributes.kind],
 						width: (state.nodeSize + node.attributes.score * state.scoreSize) * state.nodeAspect,
@@ -212,6 +214,7 @@ function renderDiagnostics() {
 		["LOD", values.lodLevel],
 		["Picking", values.pickingStrategy],
 		["Visible nodes", `${values.visibleNodes.toLocaleString()} / ${values.totalNodes.toLocaleString()}`],
+		["Glow halos", values.visibleGlowNodes.toLocaleString()],
 		["Edge candidates", values.visibleEdgeCandidates.toLocaleString()],
 		["Visible edges", `${values.visibleEdges.toLocaleString()} / ${values.totalEdges.toLocaleString()}`],
 		["Visible edge markers", values.visibleEdgeMarkers.toLocaleString()],

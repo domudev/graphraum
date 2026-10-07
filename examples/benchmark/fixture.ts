@@ -7,6 +7,8 @@ export type EdgeDistribution = "clustered" | "linear" | "random";
 
 export type NodeAttributes = {
 	cluster: number;
+	/** 1 for the first `glowNodes` nodes, else 0. */
+	glow: number;
 	kind: NodeKind;
 	score: number;
 	useTheme: boolean;
@@ -22,6 +24,8 @@ export interface FixtureOptions {
 	edgeColors: Record<EdgeKind, string>;
 	edgeMultiplier: number;
 	encoding: Encoding;
+	/** Number of leading nodes rendered with `glow: 1` (exercises the halo pass). */
+	glowNodes: number;
 	nodeAspect: number;
 	nodeColors: Record<NodeKind, string>;
 	nodeCount: number;
@@ -66,10 +70,12 @@ export function createFixture(options: FixtureOptions): GraphraumData<NodeAttrib
 		const score = (index % 5) / 5;
 		const useTheme = index % 10 === 0;
 		const height = options.nodeSize + score * options.scoreSize;
+		const glow = index < options.glowNodes ? 1 : 0;
 		return {
-			attributes: { cluster, kind, score, useTheme },
+			attributes: { cluster, glow, kind, score, useTheme },
 			...(options.encoding === "snapshot"
 				? {
+						...(glow > 0 ? { glow } : {}),
 						...(useTheme
 							? {}
 							: {
