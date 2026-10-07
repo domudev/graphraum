@@ -8,6 +8,7 @@ vi.mock("three", async (importOriginal) => {
 });
 
 import { Graphraum } from "./graphraum";
+import { glowHaloRadius } from "./node-glow";
 import { FakeElement, installFakeBrowserGlobals } from "./test-support/fake-webgl";
 import type { GraphraumData } from "./types";
 
@@ -38,7 +39,7 @@ function wideSheet(): GraphraumData {
 	return { nodes, edges: [] };
 }
 
-/** Largest NDC extent of any node billboard on each axis. */
+/** Largest NDC extent of any node or glow halo billboard on each axis. */
 function projectedExtent(camera: PerspectiveCamera, data: GraphraumData) {
 	camera.updateMatrixWorld();
 	const point = new Vector3();
@@ -47,7 +48,8 @@ function projectedExtent(camera: PerspectiveCamera, data: GraphraumData) {
 	let nearest = Number.POSITIVE_INFINITY;
 	let farthest = 0;
 	for (const node of data.nodes) {
-		const radius = node.size ?? 4;
+		const size = node.size ?? 4;
+		const radius = (node.glow ?? 0) > 0 ? glowHaloRadius(size, node.glow ?? 0) : size;
 		point.set(node.position.x, node.position.y, node.position.z ?? 0).applyMatrix4(camera.matrixWorldInverse);
 		const depth = -point.z;
 		nearest = Math.min(nearest, depth);
@@ -66,10 +68,25 @@ describe("fitView", () => {
 		graph.setData(data);
 		const camera = cameraOf(graph) as PerspectiveCamera;
 		const extent = projectedExtent(camera, data);
-		expect(Math.max(extent.x, extent.y)).toBeLessThanOrEqual(0.94 + 1e-9);
-		expect(Math.max(extent.x, extent.y)).toBeGreaterThan(0.94 - 1e-6);
+		expect(Math.max(extent.x, extent.y)).toBeLessThanOrEqual(0.92 + 1e-9);
+		expect(Math.max(extent.x, extent.y)).toBeGreaterThan(0.92 - 1e-6);
 		expect(extent.nearest).toBeGreaterThan(camera.near);
 		expect(extent.farthest).toBeLessThan(camera.far);
+	});
+
+	test("3D keeps the glow halo of an edge node on the canvas", () => {
+		const graph = createGraph(1792, 1150, "3d");
+		const sheet = wideSheet();
+		const data = { ...sheet, nodes: sheet.nodes.map((node, index) => (index === 0 ? { ...node, glow: 1 } : node)) };
+		graph.setData(data);
+		const camera = cameraOf(graph) as PerspectiveCamera;
+		const glowing = data.nodes.slice(0, 1);
+		const halo = projectedExtent(camera, { nodes: glowing, edges: [] });
+		const core = projectedExtent(camera, { nodes: glowing.map(({ glow: _, ...node }) => node), edges: [] });
+		const all = projectedExtent(camera, data);
+		expect(Math.max(all.x, all.y)).toBeLessThanOrEqual(0.92 + 1e-9);
+		expect(halo.x).toBeCloseTo(0.92, 6);
+		expect(core.x).toBeLessThan(0.92 - 1e-3);
 	});
 
 	test("3D fits the height of a tall canvas without clipping the width", () => {
@@ -77,7 +94,7 @@ describe("fitView", () => {
 		const data = wideSheet();
 		graph.setData(data);
 		const extent = projectedExtent(cameraOf(graph) as PerspectiveCamera, data);
-		expect(extent.x).toBeCloseTo(0.94, 6);
+		expect(extent.x).toBeCloseTo(0.92, 6);
 		expect(extent.y).toBeLessThan(extent.x);
 	});
 
@@ -109,7 +126,7 @@ describe("fitView", () => {
 		graph.fitView();
 		expect(cameraOf(graph).position.toArray()).toEqual(fromMode.toArray());
 		const extent = projectedExtent(cameraOf(graph) as PerspectiveCamera, data);
-		expect(Math.max(extent.x, extent.y)).toBeCloseTo(0.94, 6);
+		expect(Math.max(extent.x, extent.y)).toBeCloseTo(0.92, 6);
 	});
 
 	test("2D framing is unchanged", () => {

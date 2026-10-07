@@ -41,12 +41,19 @@ export interface PerspectiveFit {
 	target: { x: number; y: number; z: number };
 }
 
-/** Newton steps on a piecewise-linear function; real graphs settle in two to four. */
+/** Newton steps on a piecewise-linear function before falling back to the plane-space centre. */
 const MAX_CENTERING_STEPS = 32;
 
-/** The closest front-view camera that frames every node, or `null` without nodes. */
-export function fitPerspective(frame: PerspectiveFitFrame, nodes: FitNodes): PerspectiveFit | null {
-	if (nodes.count === 0) return null;
+/**
+ * The closest front-view camera that frames every node. Throws without nodes. `maxCenteringSteps`
+ * exists so tests can exercise the fallback.
+ */
+export function fitPerspective(
+	frame: PerspectiveFitFrame,
+	nodes: FitNodes,
+	maxCenteringSteps = MAX_CENTERING_STEPS,
+): PerspectiveFit {
+	if (nodes.count === 0) throw new Error("fitPerspective needs at least one node");
 	const tanY = Math.tan((frame.fovDegrees * Math.PI) / 360) * frame.fill;
 	const tanX = tanY * frame.aspect;
 	const node: FitNode = { halfHeight: 0, halfWidth: 0, x: 0, y: 0, z: 0 };
@@ -72,8 +79,8 @@ export function fitPerspective(frame: PerspectiveFitFrame, nodes: FitNodes): Per
 	// Both sides of the tighter axis touch the margin at `cameraZ`, so its centre is unique.
 	let x = (right - left) / 2;
 	let y = (top - bottom) / 2;
-	if (cameraZX < cameraZY) x = centerOnScreen(nodes, node, "x", cameraZ, x);
-	else if (cameraZY < cameraZX) y = centerOnScreen(nodes, node, "y", cameraZ, y);
+	if (cameraZX < cameraZY) x = centerOnScreen(nodes, node, "x", cameraZ, x, maxCenteringSteps);
+	else if (cameraZY < cameraZX) y = centerOnScreen(nodes, node, "y", cameraZ, y, maxCenteringSteps);
 
 	const target = { x, y, z: (minZ + maxZ) / 2 };
 	const distance = cameraZ - target.z;
@@ -96,9 +103,16 @@ export function fitPerspective(frame: PerspectiveFitFrame, nodes: FitNodes): Per
  * decreasing in `r`, so Newton steps from `r = 0` rise monotonically to the smallest feasible
  * reach. `planeCenter` already fits, so it is the answer if the steps do not settle.
  */
-function centerOnScreen(nodes: FitNodes, node: FitNode, axis: "x" | "y", cameraZ: number, planeCenter: number): number {
+function centerOnScreen(
+	nodes: FitNodes,
+	node: FitNode,
+	axis: "x" | "y",
+	cameraZ: number,
+	planeCenter: number,
+	maxSteps: number,
+): number {
 	let reach = 0;
-	for (let step = 0; step < MAX_CENTERING_STEPS; step += 1) {
+	for (let step = 0; step < maxSteps; step += 1) {
 		let low = Number.NEGATIVE_INFINITY;
 		let high = Number.POSITIVE_INFINITY;
 		let lowValue = 0;

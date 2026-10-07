@@ -2,12 +2,13 @@ import { describe, expect, test } from "vitest";
 
 import { type FitNode, fitPerspective, type PerspectiveFit } from "./fit-3d";
 
-const FILL = 0.94;
+const FILL = 0.92;
 
-function fitNodes(nodes: readonly FitNode[], aspect: number): PerspectiveFit | null {
+function fitNodes(nodes: readonly FitNode[], aspect: number, maxCenteringSteps?: number): PerspectiveFit {
 	return fitPerspective(
 		{ aspect, fill: FILL, fovDegrees: 45 },
 		{ count: nodes.length, read: (index, out) => Object.assign(out, nodes[index]) },
+		maxCenteringSteps,
 	);
 }
 
@@ -35,7 +36,6 @@ function reach(fit: PerspectiveFit, nodes: readonly FitNode[], aspect: number) {
 /** Every node fits, the tighter axis touches the margin, and both axes are centred on screen. */
 function expectTightFit(nodes: readonly FitNode[], aspect: number) {
 	const fit = fitNodes(nodes, aspect);
-	if (!fit) throw new Error("expected a fit");
 	const { bottom, farthest, left, nearest, right, top } = reach(fit, nodes, aspect);
 	const x = Math.max(left, right);
 	const y = Math.max(top, bottom);
@@ -67,8 +67,8 @@ function sheet(width: number, height: number, step: number): FitNode[] {
 }
 
 describe("PerspectiveFitBounds", () => {
-	test("returns null without nodes", () => {
-		expect(fitNodes([], 1.5)).toBeNull();
+	test("throws without nodes", () => {
+		expect(() => fitNodes([], 1.5)).toThrow("at least one node");
 	});
 
 	test("frames a single node by its radius", () => {
@@ -107,6 +107,18 @@ describe("PerspectiveFitBounds", () => {
 		expect(x).toBeCloseTo(FILL, 9);
 		expect(y).toBeLessThan(x);
 		expect(fit.target.y).toBeGreaterThan(0);
+	});
+
+	test("falls back to the plane-space centre when centring steps run out", () => {
+		const nodes = [node(-400, 0, 0, 2), node(400, 0, 0, 2), node(0, 100, 300, 2), node(0, -100, -300, 2)];
+		const fallback = fitNodes(nodes, 1.6, 0);
+		const centred = fitNodes(nodes, 1.6);
+		expect(fallback.target.y).toBeCloseTo(100, 9);
+		expect(centred.target.y).not.toBeCloseTo(100, 3);
+		expect(fallback.cameraZ).toBe(centred.cameraZ);
+		const { bottom, top } = reach(fallback, nodes, 1.6);
+		expect(Math.max(top, bottom)).toBeLessThanOrEqual(FILL + 1e-9);
+		expect(top).not.toBeCloseTo(bottom, 3);
 	});
 
 	test("frames collinear nodes along the view axis", () => {

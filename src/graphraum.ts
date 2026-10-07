@@ -48,7 +48,7 @@ import { fitPerspective } from "./fit-3d";
 import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
-import { glowBlendModeFor } from "./node-glow";
+import { glowBlendModeFor, glowHaloRadius } from "./node-glow";
 import { type GlowNodeTarget, NodeGlowLayer } from "./node-glow-rendering";
 import {
 	allocateNodeInstanceColors,
@@ -88,8 +88,8 @@ import { applyEdgeBudget, collectIncidentEdges, resolveLodLevel, shouldUseDensit
 
 /** Importance boost so selected nodes stay labeled when autoLabels budgets the overlay. */
 const SELECTED_LABEL_IMPORTANCE_BOOST = 1000;
-/** The 3D fit leaves 3% of the tighter canvas axis free on each side. */
-const PERSPECTIVE_FIT_FILL = 0.94;
+/** The 3D fit leaves 4% of the tighter canvas axis free on each side, e.g. for edge labels. */
+const PERSPECTIVE_FIT_FILL = 0.92;
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
 type GraphraumGraphObjects = {
@@ -933,7 +933,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const width = Math.max(this.container.clientWidth, 1);
 		const height = Math.max(this.container.clientHeight, 1);
 		if (this.camera instanceof OrthographicCamera) this.fitOrthographic(this.camera, width / height);
-		else this.fitPerspective(this.camera, width, height);
+		else this.fitPerspectiveCamera(this.camera, width, height);
 
 		this.camera.updateProjectionMatrix();
 		this.controls.update();
@@ -970,7 +970,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	/** Resets to the front view at the closest distance that frames every node (issue #124). */
-	private fitPerspective(camera: PerspectiveCamera, width: number, height: number) {
+	private fitPerspectiveCamera(camera: PerspectiveCamera, width: number, height: number) {
 		applyPerspectiveContainerAspect(camera, width, height);
 		const nodes = this.data.nodes;
 		const fit = fitPerspective(
@@ -983,12 +983,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 					out.x = node.position.x;
 					out.y = node.position.y;
 					out.z = node.position.z ?? 0;
-					out.halfWidth = axes.width;
-					out.halfHeight = axes.height;
+					const extent = Math.max(axes.width, axes.height);
+					// A glowing node's halo is a square billboard of the halo radius; keep it on screen.
+					const glow = node.glow ?? 0;
+					const halo = glow > 0 ? glowHaloRadius(extent, glow) : 0;
+					out.halfWidth = Math.max(axes.width, halo);
+					out.halfHeight = Math.max(axes.height, halo);
 				},
 			},
 		);
-		if (!fit) return;
 		camera.near = fit.near;
 		camera.far = fit.far;
 		camera.position.set(fit.target.x, fit.target.y, fit.cameraZ);
