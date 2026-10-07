@@ -44,6 +44,7 @@ import {
 	patchVisibleEdgePaint,
 	type VisibleEdgeLayout,
 } from "./edge-viewport-patch";
+import { fitPerspective } from "./fit-3d";
 import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
@@ -87,6 +88,8 @@ import { applyEdgeBudget, collectIncidentEdges, resolveLodLevel, shouldUseDensit
 
 /** Importance boost so selected nodes stay labeled when autoLabels budgets the overlay. */
 const SELECTED_LABEL_IMPORTANCE_BOOST = 1000;
+/** The 3D fit leaves 3% of the tighter canvas axis free on each side. */
+const PERSPECTIVE_FIT_FILL = 0.94;
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
 type GraphraumGraphObjects = {
@@ -927,6 +930,18 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			return;
 		}
 
+		const width = Math.max(this.container.clientWidth, 1);
+		const height = Math.max(this.container.clientHeight, 1);
+		if (this.camera instanceof OrthographicCamera) this.fitOrthographic(this.camera, width / height);
+		else this.fitPerspective(this.camera, width, height);
+
+		this.camera.updateProjectionMatrix();
+		this.controls.update();
+		this.materializeViewport();
+		this.requestRender();
+	}
+
+	private fitOrthographic(camera: OrthographicCamera, aspect: number) {
 		const bounds = new Box3();
 		const minimum = new Vector3();
 		const maximum = new Vector3();
@@ -944,32 +959,41 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 		const center = bounds.getCenter(new Vector3());
 		const size = bounds.getSize(new Vector3());
-		const width = Math.max(this.container.clientWidth, 1);
-		const height = Math.max(this.container.clientHeight, 1);
-		const aspect = width / height;
-
-		if (this.camera instanceof OrthographicCamera) {
-			const visibleHeight = Math.max(size.y, size.x / aspect, 1) * 1.15;
-			this.camera.left = (-visibleHeight * aspect) / 2;
-			this.camera.right = (visibleHeight * aspect) / 2;
-			this.camera.top = visibleHeight / 2;
-			this.camera.bottom = -visibleHeight / 2;
-			this.camera.position.set(center.x, center.y, center.z + Math.max(size.z, 1000));
-		} else {
-			applyPerspectiveContainerAspect(this.camera, width, height);
-			const radius = Math.max(size.length() / 2, 1);
-			const distance = radius / Math.sin((this.camera.fov * Math.PI) / 360);
-			this.camera.position.set(center.x, center.y, center.z + distance * 1.15);
-			this.camera.near = Math.max(distance / 10_000, 0.1);
-			this.camera.far = distance * 10;
-		}
-
-		this.camera.lookAt(center);
-		this.camera.updateProjectionMatrix();
+		const visibleHeight = Math.max(size.y, size.x / aspect, 1) * 1.15;
+		camera.left = (-visibleHeight * aspect) / 2;
+		camera.right = (visibleHeight * aspect) / 2;
+		camera.top = visibleHeight / 2;
+		camera.bottom = -visibleHeight / 2;
+		camera.position.set(center.x, center.y, center.z + Math.max(size.z, 1000));
+		camera.lookAt(center);
 		this.controls.target.copy(center);
-		this.controls.update();
-		this.materializeViewport();
-		this.requestRender();
+	}
+
+	/** Resets to the front view at the closest distance that frames every node (issue #124). */
+	private fitPerspective(camera: PerspectiveCamera, width: number, height: number) {
+		applyPerspectiveContainerAspect(camera, width, height);
+		const nodes = this.data.nodes;
+		const fit = fitPerspective(
+			{ aspect: camera.aspect, fill: PERSPECTIVE_FIT_FILL, fovDegrees: camera.fov },
+			{
+				count: nodes.length,
+				read(index, out) {
+					const node = nodes[index];
+					const axes = resolveNodeAxes({ height: node.height, nodeId: node.id, size: node.size, width: node.width });
+					out.x = node.position.x;
+					out.y = node.position.y;
+					out.z = node.position.z ?? 0;
+					out.halfWidth = axes.width;
+					out.halfHeight = axes.height;
+				},
+			},
+		);
+		if (!fit) return;
+		camera.near = fit.near;
+		camera.far = fit.far;
+		camera.position.set(fit.target.x, fit.target.y, fit.cameraZ);
+		this.controls.target.set(fit.target.x, fit.target.y, fit.target.z);
+		camera.lookAt(this.controls.target);
 	}
 
 	setTheme(theme: Partial<GraphraumTheme> | GraphraumThemeName) {
