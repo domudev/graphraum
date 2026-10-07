@@ -98,7 +98,7 @@ graph.setData({
 });
 ```
 
-The mapper result overrides direct `color`, `shape`, `size`, `width`, `height`, `strokeWidth`, and `strokeColor` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API. All seven built-in shapes—`circle`, `square`, `diamond`, `hexagon`, `triangle`, `pill`, and `rounded`—share one instanced billboard geometry and one node draw call in both 2D and 3D.
+The mapper result overrides direct `color`, `shape`, `size`, `width`, `height`, `strokeWidth`, `strokeColor`, and `glow` snapshot fields when it supplies a `visual`. Without a mapper, those direct fields remain the smallest valid API. All seven built-in shapes—`circle`, `square`, `diamond`, `hexagon`, `triangle`, `pill`, and `rounded`—share one instanced billboard geometry and one node draw call in both 2D and 3D.
 
 `size` is shorthand for a square node: `width` and `height` default to `size` (or `4` world units) when omitted, so most nodes only ever set `size`. Set `width` and `height` independently for non-square footprints such as the `pill`-shaped place node above. `strokeWidth` (world units, `0` by default) draws an SDF ring around the shape's outer edge; `strokeColor` falls back to `theme.nodeStroke` when the node sets a `strokeWidth` but no color. Picking and the spatial grid already account for the outer boundary, so a stroked node is exactly as clickable as its rendered outline.
 

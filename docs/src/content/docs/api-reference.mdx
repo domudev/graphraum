@@ -72,6 +72,7 @@ interface GraphraumNode {
   height?: number;
   strokeWidth?: number;         // world units; 0 by default (no stroke)
   strokeColor?: string | number; // defaults to theme.nodeStroke when strokeWidth > 0
+  glow?: number;                // 0..1, opt-in halo; 0 by default (no halo)
 }
 
 type GraphraumNodeShape =
@@ -99,9 +100,9 @@ interface GraphraumEdge {
 }
 ```
 
-Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node `size`, `width`, and `height` must be positive when present. `strokeWidth` must be finite and non-negative. An unknown `shape` fails with the node ID in the error. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
+Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node `size`, `width`, and `height` must be positive when present. `strokeWidth` must be finite and non-negative. `glow` must be a finite number between 0 and 1. An unknown `shape` fails with the node ID in the error. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
 
-Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, size (or independent width/height), stroke, edge color, width, opacity, style, markers, and path, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, size (or independent width/height), stroke, glow, edge color, width, opacity, style, markers, and path, and immutable presentation metadata. See [Node & edge presentation](../node-edge-presentation/) for the complete contract.
 
 ## Edge visuals
 
@@ -278,9 +279,10 @@ interface GraphraumDiagnostics {
   visibleEdgeMarkers: number;
   visibleEdgeSegments: number;
   visibleEdges: number;
+  visibleGlowNodes: number;
   visibleNodes: number;
   visibleNodeCandidates: number;
 }
 ```
 
-Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them. `visibleEdgeSegments` counts rendered edge lines and `visibleEdges` is an alias for it; `visibleEdgeMarkers` counts rendered direction triangles, which the overview LOD tier drops first. `autoOrbit` is `"paused"` when the orbit is enabled but stopped by input, a hidden tab or an off-screen canvas.
+Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them. `visibleEdgeSegments` counts rendered edge lines and `visibleEdges` is an alias for it; `visibleEdgeMarkers` counts rendered direction triangles, which the overview LOD tier drops first. `autoOrbit` is `"paused"` when the orbit is enabled but stopped by input, a hidden tab or an off-screen canvas. `visibleGlowNodes` counts rendered glow halos (at most 256, and 0 in the density LOD tier). `gpuDrawCalls` is 2 without halos and 3 while at least one halo is visible; see [Glow](../visual-language/#glow).
