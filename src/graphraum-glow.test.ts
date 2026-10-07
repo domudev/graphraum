@@ -1,7 +1,16 @@
-import { AdditiveBlending, InstancedMesh, NormalBlending, type Object3D, type Scene, type ShaderMaterial } from "three";
+import {
+	AdditiveBlending,
+	InstancedMesh,
+	Mesh,
+	NormalBlending,
+	type Object3D,
+	type Scene,
+	ShaderMaterial,
+} from "three";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { Graphraum } from "./graphraum";
+import { OUTPUT_COLOR_SPACE_FRAGMENT } from "./shader-output";
 import type { GraphraumData, GraphraumMode, GraphraumOptions } from "./types";
 
 interface FakeRenderer {
@@ -300,6 +309,25 @@ describe("Graphraum node glow", () => {
 		graph.setData(graphData([1]));
 		flushFrames();
 		expect((glowMesh()?.material as ShaderMaterial | undefined)?.blending).toBe(NormalBlending);
+		graph.destroy();
+	});
+
+	test.each(["2d", "3d"] as const)("encodes every drawn color to the output color space in %s", (mode) => {
+		const graph = createGraph(mode);
+		graph.setData(graphData([1, 0]));
+		flushFrames();
+		const drawn: Mesh[] = [];
+		renderer().scene?.traverse((object) => {
+			if (object instanceof Mesh) drawn.push(object);
+		});
+		// Nodes, edges, and halos. Node picking raycasts a mesh that is never added to the scene and
+		// edge picking runs on the CPU, so no id-as-color pass exists that encoding could corrupt.
+		expect(drawn).toHaveLength(3);
+		for (const mesh of drawn) {
+			expect(mesh.material).toBeInstanceOf(ShaderMaterial);
+			const material = mesh.material as ShaderMaterial;
+			expect(material.fragmentShader).toContain(OUTPUT_COLOR_SPACE_FRAGMENT);
+		}
 		graph.destroy();
 	});
 });

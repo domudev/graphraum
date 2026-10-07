@@ -20,6 +20,7 @@ import {
 	glowOpacityScale,
 	selectGlowNodes,
 } from "./node-glow";
+import { OUTPUT_COLOR_SPACE_FRAGMENT } from "./shader-output";
 
 /** Below the edge (-1 in 2D, 0 in 3D) and node meshes so halos never cover graph elements. */
 export const GLOW_RENDER_ORDER = -2;
@@ -52,6 +53,7 @@ void main() {
 	if (distanceFromCenter >= 1.0) discard;
 	float falloff = 1.0 - distanceFromCenter;
 	gl_FragColor = vec4(glowColor, falloff * falloff * glowOpacity * opacityScale);
+	${OUTPUT_COLOR_SPACE_FRAGMENT}
 }
 `;
 
@@ -77,9 +79,7 @@ function applyBlendMode(material: ShaderMaterial, mode: GlowBlendMode) {
 	material.needsUpdate = true;
 }
 
-function createGlowMesh(capacity: number, mode: GlowBlendMode): GlowMesh {
-	const geometry = new PlaneGeometry(2, 2);
-	geometry.setAttribute("instanceGlowOpacity", new InstancedBufferAttribute(new Float32Array(capacity), 1));
+export function createNodeGlowMaterial(mode: GlowBlendMode): ShaderMaterial {
 	const material = new ShaderMaterial({
 		depthTest: false,
 		depthWrite: false,
@@ -89,7 +89,13 @@ function createGlowMesh(capacity: number, mode: GlowBlendMode): GlowMesh {
 		vertexShader,
 	});
 	applyBlendMode(material, mode);
-	const mesh: GlowMesh = new InstancedMesh(geometry, material, capacity);
+	return material;
+}
+
+function createGlowMesh(capacity: number, mode: GlowBlendMode): GlowMesh {
+	const geometry = new PlaneGeometry(2, 2);
+	geometry.setAttribute("instanceGlowOpacity", new InstancedBufferAttribute(new Float32Array(capacity), 1));
+	const mesh: GlowMesh = new InstancedMesh(geometry, createNodeGlowMaterial(mode), capacity);
 	mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
 	mesh.name = "graphraum-node-glow";
 	mesh.frustumCulled = false;

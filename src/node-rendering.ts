@@ -1,6 +1,7 @@
 import { Color, InstancedBufferAttribute, type InstancedMesh, PlaneGeometry, ShaderMaterial } from "three";
 
 import { encodeNodeShape } from "./node-shapes";
+import { OUTPUT_COLOR_SPACE_FRAGMENT } from "./shader-output";
 import type { GraphraumColor, GraphraumNodeShape } from "./types";
 
 // Do not declare `attribute vec3 instanceColor` here. Three.js injects it when
@@ -117,6 +118,7 @@ void main() {
 		fillColor = mix(nodeStrokeColor, nodeColor, strokeToFill);
 	}
 	gl_FragColor = vec4(fillColor, outerAlpha);
+	${OUTPUT_COLOR_SPACE_FRAGMENT}
 }
 `;
 
