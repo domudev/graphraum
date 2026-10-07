@@ -175,7 +175,7 @@ The simulation recalculates and recenters its centroid after every step, so a li
 
 ### Clusters in a live simulation
 
-Pass `clusters` (one `Uint32Array` entry per node) to `createForceSimulation()` to keep data-defined communities together while the layout runs. The simulation seeds nodes around cluster centres exactly like `computeClusteredForcePositions()`, then adds a weak pull of every node towards its cluster centroid on each step. `settings.clusterStrength` scales the pull (default `0.02`, range `0` to `0.1`); `0` disables it, and it is ignored without `clusters`. The array length must equal `nodeCount`, and the simulation keeps its own copy.
+Pass `clusters` (one `Uint32Array` entry per node) to `createForceSimulation()` to keep data-defined communities together while the layout runs. The simulation seeds nodes around cluster centres exactly like `computeClusteredForcePositions()`, then adds a weak pull of every node towards its cluster centroid on each step. `settings.clusterStrength` scales the pull (default `0.02`, range `0` to `0.1`); `0` disables it, and it is ignored without `clusters`. The array length must equal `nodeCount`, and the simulation keeps its own copy. Cluster ids must be dense: every id has to be smaller than the node count (`addNodes()` checks against the new total), otherwise the call throws before changing anything. `createForceSimulation()` honours `clusters`, and so does `computeForcePositions()`, which runs a simulation; `computeClusteredForcePositions()` keeps its one-shot seeding and accepts sparse ids.
 
 ```ts
 const simulation = createForceSimulation({

@@ -221,17 +221,48 @@ test("rejects a cluster array that does not match the node count", () => {
 	);
 });
 
-test("does not retain or mutate the caller's cluster array", () => {
+test("does not mutate the caller's cluster array", () => {
 	const request = clusteredFixture();
-	const clusters = new Uint32Array(request.clusters);
-	const simulation = createForceSimulation({ ...request, clusters });
-	clusters.fill(0);
+	const original = Array.from(request.clusters);
+	const simulation = createForceSimulation(request);
+	runSteps(simulation);
+	simulation.addNodes(1, undefined, new Uint32Array([0]));
+	runSteps(simulation, 2);
+
+	expect(Array.from(request.clusters)).toEqual(original);
+});
+
+test("stores a copy of the caller's cluster array", () => {
+	const request = clusteredFixture();
+	const input = new Uint32Array(request.clusters);
+	const simulation = createForceSimulation({ ...request, clusters: input });
+	input.fill(0);
 	runSteps(simulation);
 	const reference = createForceSimulation(request);
 	runSteps(reference);
 
 	expect(Array.from(simulation.positions)).toEqual(Array.from(reference.positions));
-	expect(Array.from(clusters).every((value) => value === 0)).toBe(true);
+});
+
+test("rejects sparse cluster ids in a live simulation but not in the one-shot layout", () => {
+	const request = clusteredFixture();
+	const sparse = new Uint32Array(request.clusters);
+	sparse[0] = request.nodeCount;
+	const lastValid = new Uint32Array(request.clusters);
+	lastValid[0] = request.nodeCount - 1;
+
+	expect(() => createForceSimulation({ ...request, clusters: sparse })).toThrow(
+		/Cluster index 36 exceeds the node count 36; use dense ids starting at 0/,
+	);
+	expect(() => createForceSimulation({ ...request, clusters: lastValid })).not.toThrow();
+	expect(() =>
+		computeClusteredForcePositions({
+			clusters: new Uint32Array([0, 5]),
+			dimensions: 2,
+			edges: new Uint32Array([0, 1]),
+			nodeCount: 2,
+		}),
+	).not.toThrow();
 });
 
 test("seeds a clustered simulation exactly like the one-shot clustered layout", () => {
@@ -267,6 +298,22 @@ test("pulls clustered nodes together while the simulation runs", () => {
 	}
 });
 
+test("scales the cluster pull by the step alpha", () => {
+	const request = clusteredFixture();
+	const pulled = () =>
+		createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0.1 } });
+	const unpulled = () =>
+		createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0 } });
+	const [settledPulled, settledUnpulled, activePulled, activeUnpulled] = [pulled(), unpulled(), pulled(), unpulled()];
+	settledPulled.step(0);
+	settledUnpulled.step(0);
+	activePulled.step(1);
+	activeUnpulled.step(1);
+
+	expect(Array.from(settledPulled.positions)).toEqual(Array.from(settledUnpulled.positions));
+	expect(Array.from(activePulled.positions)).not.toEqual(Array.from(activeUnpulled.positions));
+});
+
 test("a zero cluster strength only changes the seeding", () => {
 	const request = clusteredFixture();
 	const clustered = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0 } });
@@ -278,7 +325,7 @@ test("a zero cluster strength only changes the seeding", () => {
 	expect(Array.from(clustered.positions)).toEqual(Array.from(unclustered.positions));
 });
 
-test("adds clustered nodes, including a new cluster id", () => {
+test("adds clustered nodes while preserving existing layout state", () => {
 	const request = clusteredFixture();
 	const simulation = createForceSimulation(request);
 	runSteps(simulation, 5);
@@ -291,10 +338,36 @@ test("adds clustered nodes, including a new cluster id", () => {
 	expect(Array.from(simulation.positions.slice(0, before.length))).toEqual(before);
 	runSteps(simulation, 5);
 	expect(simulation.positions.every(Number.isFinite)).toBe(true);
+});
 
-	const explicit = simulation.addNodes(1, new Float32Array([4, 5, 0]), new Uint32Array([7]));
-	expect(explicit).toBe(request.nodeCount + 3);
+test("a node that introduces a new cluster id is its own centroid and feels no pull", () => {
+	const request = { dimensions: 2 as const, edges: new Uint32Array(), nodeCount: 1 };
+	const pulled = createForceSimulation({ ...request, clusters: new Uint32Array([0]) });
+	const unpulled = createForceSimulation({
+		...request,
+		clusters: new Uint32Array([0]),
+		settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0 },
+	});
+	for (const simulation of [pulled, unpulled]) {
+		simulation.addNodes(1, new Float32Array([50, 20, 0]), new Uint32Array([1]));
+		runSteps(simulation, 5);
+	}
+
+	expect(Array.from(pulled.positions)).toEqual(Array.from(unpulled.positions));
+});
+
+test("leaves the simulation usable when addNodes rejects a cluster id", () => {
+	const simulation = createForceSimulation(clusteredFixture());
 	runSteps(simulation, 3);
+
+	expect(() => simulation.addNodes(1, undefined, new Uint32Array([4_294_967_295]))).toThrow(/dense ids/);
+	expect(simulation.nodeCount).toBe(36);
+	expect(simulation.positions.length).toBe(36 * 3);
+	runSteps(simulation, 3);
+	expect(simulation.positions.every(Number.isFinite)).toBe(true);
+	expect(simulation.addNodes(2, undefined, new Uint32Array([0, 3]))).toBe(36);
+	runSteps(simulation, 3);
+	expect(simulation.nodeCount).toBe(38);
 	expect(simulation.positions.every(Number.isFinite)).toBe(true);
 });
 
@@ -324,4 +397,15 @@ test("clamps clusterStrength into its supported range", () => {
 
 	expect(Array.from(clamped.positions)).toEqual(Array.from(maximum.positions));
 	expect(Array.from(negative.positions)).toEqual(Array.from(zero.positions));
+});
+
+test("computeForcePositions honours clusters through the live simulation", () => {
+	const request = clusteredFixture();
+	const { clusters: _clusters, ...unclustered } = request;
+	const clustered = computeForcePositions({ ...request, iterations: 16 });
+
+	expect(Array.from(clustered)).not.toEqual(Array.from(computeForcePositions({ ...unclustered, iterations: 16 })));
+	expect(meanIntraClusterDistance(clustered, request.clusters)).toBeLessThan(
+		meanIntraClusterDistance(computeForcePositions({ ...unclustered, iterations: 16 }), request.clusters),
+	);
 });
