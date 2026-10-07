@@ -109,10 +109,14 @@ export class AutoOrbitLoop {
 		this.resumeTimer = null;
 	}
 
-	/** A drag, pinch or wheel step pauses until the controls report its end; then the idle countdown starts. */
+	/**
+	 * A drag, pinch or wheel step pauses the orbit; `end` restarts the idle countdown. `start` arms
+	 * it too, so a swallowed pointerup cannot pause the orbit forever. Resuming mid-drag is harmless:
+	 * OrbitControls (r185) applies autoRotate in `update()` only while its state is NONE.
+	 */
 	private readonly handleInteractionStart = () => {
-		this.clearResumeTimer();
 		this.dispatch({ type: "interaction" });
+		this.armResumeTimer();
 	};
 
 	private readonly handleInteractionEnd = () => {

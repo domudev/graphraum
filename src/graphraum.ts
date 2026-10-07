@@ -677,7 +677,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 		const { resumeAfterMs, speed } = resolveAutoOrbitOptions(options);
 		this.controls.autoRotateSpeed = autoRotateSpeedFor(speed);
-		if (this.autoOrbit) this.autoOrbit.setResumeAfterMs(resumeAfterMs);
+		if (this.autoOrbit && this.autoOrbit.status !== "off") this.autoOrbit.setResumeAfterMs(resumeAfterMs);
 		else this.autoOrbit = new AutoOrbitLoop(this.renderer.domElement, this.controls, resumeAfterMs, this.stepAutoOrbit);
 	}
 
@@ -958,21 +958,24 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	 * `update()` without a delta from wheel and key handlers and `fitView`, which would otherwise add
 	 * a fixed per-call rotation. A moved camera emits `change` (a render request only, see
 	 * `handleViewChange`); flushing that request renders this frame instead of the next one. A
-	 * throwing update turns the orbit off rather than leaving it enabled without a loop.
+	 * throwing update, render or view listener turns the orbit off rather than leaving it enabled
+	 * without a loop.
 	 */
 	private readonly stepAutoOrbit = (deltaSeconds: number) => {
-		this.controls.autoRotate = true;
-		this.orbitUpdating = true;
 		try {
-			this.controls.update(deltaSeconds);
+			this.controls.autoRotate = true;
+			this.orbitUpdating = true;
+			try {
+				this.controls.update(deltaSeconds);
+			} finally {
+				this.controls.autoRotate = false;
+				this.orbitUpdating = false;
+			}
+			this.flushRender();
 		} catch (error) {
 			this.stopAutoOrbit();
 			throw error;
-		} finally {
-			this.controls.autoRotate = false;
-			this.orbitUpdating = false;
 		}
-		this.flushRender();
 	};
 
 	private readGpuTimers() {

@@ -205,18 +205,53 @@ describe("Graphraum auto-orbit", () => {
 		const controls = controlsOf(graph);
 
 		controls.dispatchEvent({ type: "start" });
-		vi.advanceTimersByTime(5000);
+		vi.advanceTimersByTime(499);
 		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
 		expect(frames.size).toBe(0);
 		controls.dispatchEvent({ type: "end" });
 		vi.advanceTimersByTime(499);
 		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
 		controls.dispatchEvent({ type: "start" });
-		vi.advanceTimersByTime(1000);
+		vi.advanceTimersByTime(499);
 		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
 		controls.dispatchEvent({ type: "end" });
 		vi.advanceTimersByTime(500);
 		expect(graph.getDiagnostics().autoOrbit).toBe("active");
+	});
+
+	test("a start without an end still resumes after the idle delay", () => {
+		const { graph } = setup();
+		graph.setAutoOrbit({ resumeAfterMs: 500 });
+		controlsOf(graph).dispatchEvent({ type: "start" });
+		expect(graph.getDiagnostics().autoOrbit).toBe("paused");
+		vi.advanceTimersByTime(500);
+		expect(graph.getDiagnostics().autoOrbit).toBe("active");
+		expect(frames.size).toBe(1);
+	});
+
+	test("a throwing view listener turns the orbit off and a new setAutoOrbit restarts it", () => {
+		const { graph, renderer } = setup();
+		let shouldThrow = false;
+		graph.onViewChange(() => {
+			if (shouldThrow) throw new Error("listener failed");
+		});
+		shouldThrow = true;
+		graph.setAutoOrbit({ speed: 1 });
+		expect(() => {
+			runFrame(1000);
+			runFrame(1050);
+		}).toThrow("listener failed");
+		expect(graph.getDiagnostics().autoOrbit).toBe("off");
+		expect(frames.size).toBe(0);
+
+		shouldThrow = false;
+		graph.setAutoOrbit({ speed: 1 });
+		expect(graph.getDiagnostics().autoOrbit).toBe("active");
+		renderer.render.mockClear();
+		runFrame(2000);
+		runFrame(2050);
+		expect(renderer.render).toHaveBeenCalled();
+		expect(frames.size).toBe(1);
 	});
 
 	test("orbit frames do not rematerialize the viewport, but user view changes do", () => {

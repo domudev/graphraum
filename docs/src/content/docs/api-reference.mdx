@@ -233,9 +233,9 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
 graph.setAutoOrbit(false);
 ```
 
-`speed` is in radians per second (default `0.07`, about 90 seconds per turn; above 0 and at most 2) and holds at any frame rate. Pointer and wheel input on the canvas pause the orbit; it resumes once the last pointer lifts and `resumeAfterMs` (default `3000`) of idle pass. Pointer input on DOM overlays above the canvas, such as a toolbar or focus cards, does not pause it. The orbit also stops while the tab is hidden or the canvas is scrolled off screen, and resumes when visible again.
+`speed` is in radians per second (default `0.07`, about 90 seconds per turn; above 0 and at most 2) and holds at any frame rate. Pointer and wheel input on the canvas pause the orbit; it resumes after `resumeAfterMs` (default `3000`) without new input. A drag in progress keeps the camera still even if that delay passes. Pointer input on DOM overlays above the canvas, such as a toolbar or focus cards, does not pause it. The orbit also stops while the tab is hidden or the canvas is scrolled off screen, and resumes when visible again.
 
-While the orbit is active graphraum runs a frame loop instead of rendering only on change. Each active frame rotates the camera, renders once, and calls `onViewChange` listeners so overlays can follow. It does not repack node or edge instances: in 3D they do not depend on the camera angle, so the frame cost is the GPU draw plus your listeners, not the graph size. Paused and disabled orbits run no loop. graphraum does not read `prefers-reduced-motion`; check it before enabling the orbit, as above. `getDiagnostics().autoOrbit` reports `"off"`, `"active"` or `"paused"`.
+While the orbit is active graphraum runs a frame loop instead of rendering only on change. Each active frame rotates the camera, renders once, and calls `onViewChange` listeners so overlays can follow. It does not repack node or edge instances: in 3D they do not depend on the camera angle, so there is no per-frame CPU repacking or buffer re-upload that grows with graph size. The GPU draw still scales with what is drawn. Paused and disabled orbits run no loop. graphraum does not read `prefers-reduced-motion`; check it before enabling the orbit, as above. `getDiagnostics().autoOrbit` reports `"off"`, `"active"` or `"paused"`.
 
 ## Theme
 
