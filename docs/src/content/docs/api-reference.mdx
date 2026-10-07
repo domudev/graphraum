@@ -173,6 +173,26 @@ simulation.step(0.35);
 
 The simulation recalculates and recenters its centroid after every step, so a live renderer can keep orbit controls focused without refitting the camera. In 2D every Z coordinate remains zero.
 
+### Clusters in a live simulation
+
+Pass `clusters` (one `Uint32Array` entry per node) to `createForceSimulation()` to keep data-defined communities together while the layout runs. The simulation seeds nodes around cluster centres exactly like `computeClusteredForcePositions()`, then adds a weak pull of every node towards its cluster centroid on each step. `settings.clusterStrength` scales the pull (default `0.02`, range `0` to `0.1`); `0` disables it, and it is ignored without `clusters`. The array length must equal `nodeCount`, and the simulation keeps its own copy. Cluster ids must be dense: every id has to be smaller than the node count (`addNodes()` checks against the new total), otherwise the call throws before changing anything. `createForceSimulation()` honours `clusters`, and so does `computeForcePositions()`, which runs a simulation; `computeClusteredForcePositions()` keeps its one-shot seeding and accepts sparse ids.
+
+```ts
+const simulation = createForceSimulation({
+  clusters: new Uint32Array([0, 0, 0, 1, 1, 1]),
+  dimensions: 2,
+  edges: new Uint32Array([0, 1, 1, 2, 3, 4, 4, 5, 2, 3]),
+  nodeCount: 6,
+  settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0.04 },
+});
+
+// A clustered simulation requires one cluster index per added node.
+// A new index starts a new cluster.
+simulation.addNodes(2, undefined, new Uint32Array([1, 2]));
+```
+
+`addNodes(count, initial?, clusters?)` requires `clusters` (length `count`) when the simulation was created with clusters, and throws when it was created without them. Nodes added without `initial` positions start at the default seed and are drawn into their cluster by the pull.
+
 ## Graphology binding
 
 Use `bindGraphology()` when Graphology owns the mutable graph. The adapter renders the current graph immediately, maps node visual attributes (`x`, `y`, `z`, `color`, `shape`, and `size`), preserves all attributes for `defineVisuals()`, and subscribes to later mutations.
