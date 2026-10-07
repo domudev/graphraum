@@ -139,3 +139,189 @@ test("rejects per-edge spring arrays whose length does not match the edge count"
 		/springStrengths/,
 	);
 });
+
+const SIMULATION_STEPS = 40;
+
+function runSteps(simulation: ReturnType<typeof createForceSimulation>, steps = SIMULATION_STEPS) {
+	for (let step = 0; step < steps; step += 1) simulation.step(1 - step / steps);
+}
+
+/** Three 12-node rings joined by two sparse inter-cluster edges. */
+function clusteredFixture(dimensions: 2 | 3 = 2) {
+	const clusterSize = 12;
+	const clusterCount = 3;
+	const nodeCount = clusterSize * clusterCount;
+	const clusters = new Uint32Array(nodeCount);
+	const edges: number[] = [];
+	for (let cluster = 0; cluster < clusterCount; cluster += 1) {
+		for (let member = 0; member < clusterSize; member += 1) {
+			const node = cluster * clusterSize + member;
+			clusters[node] = cluster;
+			edges.push(node, cluster * clusterSize + ((member + 1) % clusterSize));
+		}
+	}
+	edges.push(0, clusterSize, clusterSize, clusterSize * 2);
+	return { clusters, dimensions, edges: new Uint32Array(edges), nodeCount };
+}
+
+function meanIntraClusterDistance(positions: Float32Array, clusters: Uint32Array) {
+	let total = 0;
+	let pairs = 0;
+	for (let left = 0; left < clusters.length; left += 1) {
+		for (let right = left + 1; right < clusters.length; right += 1) {
+			if (clusters[left] !== clusters[right]) continue;
+			total += Math.hypot(
+				(positions[left * 3] ?? 0) - (positions[right * 3] ?? 0),
+				(positions[left * 3 + 1] ?? 0) - (positions[right * 3 + 1] ?? 0),
+				(positions[left * 3 + 2] ?? 0) - (positions[right * 3 + 2] ?? 0),
+			);
+			pairs += 1;
+		}
+	}
+	return total / pairs;
+}
+
+test("keeps the unclustered simulation output unchanged", () => {
+	const edges = new Uint32Array([0, 1, 1, 2, 2, 3, 3, 4, 4, 0, 5, 6]);
+	const spatial = createForceSimulation({ dimensions: 3, edges, nodeCount: 8 });
+	runSteps(spatial, 20);
+	const grown = createForceSimulation({ dimensions: 2, edges, nodeCount: 8 });
+	grown.addNodes(2);
+	runSteps(grown, 20);
+
+	expect(Array.from(spatial.positions)).toEqual([
+		25.800647735595703, 12.869406700134277, -54.71083450317383, 10.229402542114258, 36.294097900390625,
+		43.187782287597656, 70.74805450439453, 10.596172332763672, -2.0452959537506104, 5.167520523071289,
+		63.36275863647461, -1.8073502779006958, -29.628725051879883, -31.693632125854492, -52.944313049316406,
+		-44.96399688720703, 1.0935823917388916, -22.190250396728516, -32.45338439941406, -66.55451202392578,
+		14.691564559936523, -4.8995184898376465, -25.96787452697754, 75.81869506835938,
+	]);
+	expect(Array.from(grown.positions)).toEqual([
+		54.128936767578125, -46.57068634033203, 0, -16.574390411376953, -24.014610290527344, 0, 72.40190887451172,
+		6.6032209396362305, 0, -34.54827880859375, 65.60559844970703, 0, 2.770887613296509, -47.10395431518555, 0,
+		3.0792860984802246, 54.561920166015625, 0, 8.261571884155273, -85.74687194824219, 0, -77.30206298828125,
+		-10.281672477722168, 0, 52.00041198730469, 47.41092300415039, 0, -64.21827697753906, 39.53612518310547, 0,
+	]);
+});
+
+test("ignores clusterStrength when no clusters are given", () => {
+	const { clusters: _clusters, ...request } = clusteredFixture();
+	const baseline = createForceSimulation(request);
+	const strong = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0.1 } });
+	runSteps(baseline);
+	runSteps(strong);
+
+	expect(Array.from(strong.positions)).toEqual(Array.from(baseline.positions));
+});
+
+test("rejects a cluster array that does not match the node count", () => {
+	const request = clusteredFixture();
+	expect(() => createForceSimulation({ ...request, clusters: new Uint32Array(request.nodeCount - 1) })).toThrow(
+		/Cluster index count/,
+	);
+});
+
+test("does not retain or mutate the caller's cluster array", () => {
+	const request = clusteredFixture();
+	const clusters = new Uint32Array(request.clusters);
+	const simulation = createForceSimulation({ ...request, clusters });
+	clusters.fill(0);
+	runSteps(simulation);
+	const reference = createForceSimulation(request);
+	runSteps(reference);
+
+	expect(Array.from(simulation.positions)).toEqual(Array.from(reference.positions));
+	expect(Array.from(clusters).every((value) => value === 0)).toBe(true);
+});
+
+test("seeds a clustered simulation exactly like the one-shot clustered layout", () => {
+	for (const dimensions of [2, 3] as const) {
+		const request = clusteredFixture(dimensions);
+		const simulation = createForceSimulation(request);
+
+		expect(Array.from(simulation.positions)).toEqual(Array.from(computeClusteredForcePositions(request)));
+	}
+});
+
+test("pulls clustered nodes together while the simulation runs", () => {
+	for (const dimensions of [2, 3] as const) {
+		const request = clusteredFixture(dimensions);
+		const unclustered = createForceSimulation({ ...request, clusters: undefined });
+		const withoutPull = createForceSimulation({
+			...request,
+			settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0 },
+		});
+		const pulled = createForceSimulation({
+			...request,
+			settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0.05 },
+		});
+		runSteps(unclustered);
+		runSteps(withoutPull);
+		runSteps(pulled);
+		const cohesion = (simulation: ReturnType<typeof createForceSimulation>) =>
+			meanIntraClusterDistance(simulation.positions, request.clusters);
+
+		expect(cohesion(pulled)).toBeLessThan(cohesion(unclustered));
+		expect(cohesion(pulled)).toBeLessThan(cohesion(withoutPull));
+		expect(pulled.positions.every(Number.isFinite)).toBe(true);
+	}
+});
+
+test("a zero cluster strength only changes the seeding", () => {
+	const request = clusteredFixture();
+	const clustered = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0 } });
+	const unclustered = createForceSimulation({ ...request, clusters: undefined });
+	unclustered.positions.set(clustered.positions);
+	runSteps(clustered);
+	runSteps(unclustered);
+
+	expect(Array.from(clustered.positions)).toEqual(Array.from(unclustered.positions));
+});
+
+test("adds clustered nodes, including a new cluster id", () => {
+	const request = clusteredFixture();
+	const simulation = createForceSimulation(request);
+	runSteps(simulation, 5);
+	const before = Array.from(simulation.positions);
+
+	const start = simulation.addNodes(3, undefined, new Uint32Array([0, 1, 3]));
+	simulation.addEdges(new Uint32Array([start, 0, start + 2, start + 1]));
+
+	expect(start).toBe(request.nodeCount);
+	expect(Array.from(simulation.positions.slice(0, before.length))).toEqual(before);
+	runSteps(simulation, 5);
+	expect(simulation.positions.every(Number.isFinite)).toBe(true);
+
+	const explicit = simulation.addNodes(1, new Float32Array([4, 5, 0]), new Uint32Array([7]));
+	expect(explicit).toBe(request.nodeCount + 3);
+	runSteps(simulation, 3);
+	expect(simulation.positions.every(Number.isFinite)).toBe(true);
+});
+
+test("requires cluster indices when adding nodes to a clustered simulation", () => {
+	const simulation = createForceSimulation(clusteredFixture());
+
+	expect(() => simulation.addNodes(2)).toThrow(/clusters/);
+	expect(() => simulation.addNodes(2, undefined, new Uint32Array([0]))).toThrow(/Cluster index count/);
+	expect(simulation.nodeCount).toBe(36);
+});
+
+test("rejects cluster indices when adding nodes to an unclustered simulation", () => {
+	const { clusters: _clusters, ...request } = clusteredFixture();
+	const simulation = createForceSimulation(request);
+
+	expect(() => simulation.addNodes(1, undefined, new Uint32Array([0]))).toThrow(/without clusters/);
+	expect(simulation.nodeCount).toBe(36);
+});
+
+test("clamps clusterStrength into its supported range", () => {
+	const request = clusteredFixture();
+	const clamped = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 5 } });
+	const maximum = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0.1 } });
+	const negative = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: -1 } });
+	const zero = createForceSimulation({ ...request, settings: { ...DEFAULT_FORCE_SETTINGS, clusterStrength: 0 } });
+	for (const simulation of [clamped, maximum, negative, zero]) runSteps(simulation, 10);
+
+	expect(Array.from(clamped.positions)).toEqual(Array.from(maximum.positions));
+	expect(Array.from(negative.positions)).toEqual(Array.from(zero.positions));
+});

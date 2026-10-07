@@ -10,6 +10,12 @@ export interface ForceLayoutRequest {
 	 */
 	linkDistances?: Float32Array;
 	nodeCount: number;
+	/**
+	 * Optional cluster index per node (`nodeCount` values). `createForceSimulation()` seeds nodes
+	 * around cluster centres and pulls each node towards its cluster centroid
+	 * (`settings.clusterStrength`). A copy is stored; the array is never mutated.
+	 */
+	clusters?: Uint32Array;
 	settings?: ForceSettings;
 	/**
 	 * Optional spring strength per edge (`edges.length / 2` values).
@@ -20,23 +26,31 @@ export interface ForceLayoutRequest {
 
 export interface ForceSettings {
 	centerAttraction: number;
+	/**
+	 * Pull of every node towards its cluster centroid, scaled by the step alpha.
+	 * `0` disables the pull. Ignored without `clusters`.
+	 * Omitted → `DEFAULT_FORCE_SETTINGS.clusterStrength`.
+	 */
+	clusterStrength?: number;
 	damping: number;
 	linkDistance: number;
 	repulsion: number;
 	springStrength: number;
 }
 
-export const DEFAULT_FORCE_SETTINGS: ForceSettings = {
+export const DEFAULT_FORCE_SETTINGS: Required<ForceSettings> = {
 	centerAttraction: 0.002,
+	clusterStrength: 0.02,
 	damping: 0.82,
 	linkDistance: 24,
 	repulsion: 400,
 	springStrength: 0.005,
 };
 
-function normalizeForceSettings(settings = DEFAULT_FORCE_SETTINGS): ForceSettings {
+function normalizeForceSettings(settings: ForceSettings = DEFAULT_FORCE_SETTINGS): Required<ForceSettings> {
 	return {
 		centerAttraction: Math.max(0, Math.min(0.05, settings.centerAttraction)),
+		clusterStrength: Math.max(0, Math.min(0.1, settings.clusterStrength ?? DEFAULT_FORCE_SETTINGS.clusterStrength)),
 		damping: Math.max(0.1, Math.min(0.99, settings.damping)),
 		linkDistance: Math.max(1, Math.min(500, settings.linkDistance)),
 		repulsion: Math.max(0, Math.min(5_000, settings.repulsion)),
@@ -109,6 +123,59 @@ function random(seed: number) {
 	return ((value ^ (value >>> 16)) >>> 0) / 0x1_0000_0000;
 }
 
+function assertClusterCount(clusters: Uint32Array, expected: number, subject: string) {
+	if (clusters.length !== expected) {
+		throw new Error(`Cluster index count (${clusters.length}) must match ${subject} (${expected}).`);
+	}
+}
+
+function clusterCountOf(clusters: Uint32Array) {
+	let clusterCount = 0;
+	for (const cluster of clusters) clusterCount = Math.max(clusterCount, cluster + 1);
+	return clusterCount;
+}
+
+/**
+ * Seeds nodes around cluster centres: centres come from a force layout of the inter-cluster graph
+ * and each node is scattered around its centre. Shared by the one-shot and live clustered layouts.
+ */
+function clusteredInitialPositions(request: ForceLayoutRequest & { clusters: Uint32Array }) {
+	assertClusterCount(request.clusters, request.nodeCount, "node count");
+	const clusterCount = clusterCountOf(request.clusters);
+	const clusterEdges = new Uint32Array(request.edges.length);
+	let edgeCursor = 0;
+	for (let index = 0; index < request.edges.length; index += 2) {
+		const source = request.clusters[request.edges[index] ?? 0];
+		const target = request.clusters[request.edges[index + 1] ?? 0];
+		if (source === undefined || target === undefined || source === target) continue;
+		clusterEdges[edgeCursor++] = source;
+		clusterEdges[edgeCursor++] = target;
+	}
+	const centers = computeForcePositions({
+		dimensions: request.dimensions,
+		edges: clusterEdges.subarray(0, edgeCursor),
+		nodeCount: clusterCount,
+		settings: request.settings,
+	});
+	const clusterSizes = new Uint32Array(clusterCount);
+	for (const cluster of request.clusters) clusterSizes[cluster] += 1;
+	const positions = new Float32Array(request.nodeCount * 3);
+	for (let index = 0; index < request.nodeCount; index += 1) {
+		const offset = index * 3;
+		const cluster = request.clusters[index] ?? 0;
+		const center = cluster * 3;
+		const radius = Math.sqrt(clusterSizes[cluster] ?? 1) * Math.sqrt(random(index * 4 + 2)) * 2;
+		const angle = random(index * 4 + 1) * Math.PI * 2;
+		positions[offset] = (centers[center] ?? 0) * 12 + Math.cos(angle) * radius;
+		positions[offset + 1] = (centers[center + 1] ?? 0) * 12 + Math.sin(angle) * radius;
+		if (request.dimensions === 3) {
+			const zDirection = random(index * 4 + 3) * 2 - 1;
+			positions[offset + 2] = (centers[center + 2] ?? 0) * 12 + zDirection * radius;
+		}
+	}
+	return positions;
+}
+
 export function createForceSimulation(request: ForceLayoutRequest) {
 	const settings = normalizeForceSettings(request.settings);
 	let nodeCount = request.nodeCount;
@@ -122,10 +189,39 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 		edgeCount,
 		clampSpringStrength,
 	);
-	let positions = initialPositions(request);
+	let clusters: Uint32Array | null = null;
+	if (request.clusters) {
+		assertClusterCount(request.clusters, request.nodeCount, "node count");
+		clusters = new Uint32Array(request.clusters);
+	}
+	let positions = clusters ? clusteredInitialPositions({ ...request, clusters }) : initialPositions(request);
 	let velocities = new Float32Array(positions.length);
 	let forces = new Float32Array(positions.length);
 	let iteration = 0;
+	// Per-step scratch for cluster centroids; reallocated only when a new cluster id appears.
+	let clusterCount = clusters ? clusterCountOf(clusters) : 0;
+	let clusterCentroids = new Float64Array(clusterCount * 3);
+	let clusterSizes = new Uint32Array(clusterCount);
+
+	/** Mean position per cluster in O(N): no per-node allocation. */
+	function updateClusterCentroids(activeClusters: Uint32Array) {
+		clusterCentroids.fill(0);
+		clusterSizes.fill(0);
+		for (let index = 0; index < nodeCount; index += 1) {
+			const cluster = activeClusters[index] ?? 0;
+			const offset = index * 3;
+			const centroid = cluster * 3;
+			clusterSizes[cluster] += 1;
+			clusterCentroids[centroid] += positions[offset] ?? 0;
+			clusterCentroids[centroid + 1] += positions[offset + 1] ?? 0;
+			if (request.dimensions === 3) clusterCentroids[centroid + 2] += positions[offset + 2] ?? 0;
+		}
+		for (let cluster = 0; cluster < clusterCount; cluster += 1) {
+			const size = clusterSizes[cluster] ?? 0;
+			if (size === 0) continue;
+			for (let axis = 0; axis < request.dimensions; axis += 1) clusterCentroids[cluster * 3 + axis] /= size;
+		}
+	}
 	return {
 		get nodeCount() {
 			return nodeCount;
@@ -136,12 +232,23 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 		get positions() {
 			return positions;
 		},
-		/** Add nodes while preserving every existing position and velocity. */
-		addNodes(count: number, initial?: Float32Array) {
+		/**
+		 * Add nodes while preserving every existing position and velocity. A simulation created with
+		 * `clusters` requires one cluster index per added node (a new id starts a new cluster); a
+		 * simulation created without clusters rejects them.
+		 */
+		addNodes(count: number, initial?: Float32Array, addedClusters?: Uint32Array) {
 			if (!Number.isSafeInteger(count) || count < 1) throw new Error("Node count must be a positive integer.");
 			if (initial && initial.length !== count * 3) {
 				throw new Error("Initial positions must contain one XYZ triplet per added node.");
 			}
+			if (clusters && !addedClusters) {
+				throw new Error("This simulation was created with clusters: addNodes() requires a clusters array.");
+			}
+			if (!clusters && addedClusters) {
+				throw new Error("This simulation was created without clusters: addNodes() cannot take a clusters array.");
+			}
+			if (addedClusters) assertClusterCount(addedClusters, count, "added node count");
 			const start = nodeCount;
 			const nextPositions = new Float32Array((nodeCount + count) * 3);
 			nextPositions.set(positions);
@@ -153,6 +260,18 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 			else {
 				const added = initialPositions({ dimensions: request.dimensions, nodeCount: count });
 				nextPositions.set(added, positions.length);
+			}
+			if (clusters && addedClusters) {
+				const nextClusters = new Uint32Array(nodeCount + count);
+				nextClusters.set(clusters);
+				nextClusters.set(addedClusters, nodeCount);
+				clusters = nextClusters;
+				const nextClusterCount = clusterCountOf(nextClusters);
+				if (nextClusterCount !== clusterCount) {
+					clusterCount = nextClusterCount;
+					clusterCentroids = new Float64Array(clusterCount * 3);
+					clusterSizes = new Uint32Array(clusterCount);
+				}
 			}
 			positions = nextPositions;
 			velocities = nextVelocities;
@@ -187,12 +306,22 @@ export function createForceSimulation(request: ForceLayoutRequest) {
 		step(alpha: number) {
 			if (nodeCount === 0) return;
 			forces.fill(0);
+			const pullClusters = clusters && settings.clusterStrength > 0 ? clusters : null;
+			const clusterPull = settings.clusterStrength * alpha;
+			if (pullClusters) updateClusterCentroids(pullClusters);
 			for (let index = 0; index < nodeCount; index += 1) {
 				const offset = index * 3;
 				forces[offset] = -(positions[offset] ?? 0) * settings.centerAttraction * alpha;
 				forces[offset + 1] = -(positions[offset + 1] ?? 0) * settings.centerAttraction * alpha;
 				forces[offset + 2] =
 					request.dimensions === 3 ? -(positions[offset + 2] ?? 0) * settings.centerAttraction * alpha : 0;
+				if (pullClusters) {
+					const centroid = (pullClusters[index] ?? 0) * 3;
+					for (let axis = 0; axis < request.dimensions; axis += 1) {
+						forces[offset + axis] +=
+							((clusterCentroids[centroid + axis] ?? 0) - (positions[offset + axis] ?? 0)) * clusterPull;
+					}
+				}
 				for (let sample = 0; sample < 8; sample += 1) {
 					const targetIndex = Math.floor(random(index * 97 + sample * 17 + iteration * 13) * nodeCount);
 					if (targetIndex === index) continue;
@@ -273,39 +402,5 @@ export function computeForcePositions(request: ForceLayoutRequest) {
 }
 
 export function computeClusteredForcePositions(request: ForceLayoutRequest & { clusters: Uint32Array }) {
-	if (request.clusters.length !== request.nodeCount) throw new Error("Cluster index count must match node count.");
-	let clusterCount = 0;
-	for (const cluster of request.clusters) clusterCount = Math.max(clusterCount, cluster + 1);
-	const clusterEdges = new Uint32Array(request.edges.length);
-	let edgeCursor = 0;
-	for (let index = 0; index < request.edges.length; index += 2) {
-		const source = request.clusters[request.edges[index] ?? 0];
-		const target = request.clusters[request.edges[index + 1] ?? 0];
-		if (source === undefined || target === undefined || source === target) continue;
-		clusterEdges[edgeCursor++] = source;
-		clusterEdges[edgeCursor++] = target;
-	}
-	const centers = computeForcePositions({
-		dimensions: request.dimensions,
-		edges: clusterEdges.subarray(0, edgeCursor),
-		nodeCount: clusterCount,
-		settings: request.settings,
-	});
-	const clusterSizes = new Uint32Array(clusterCount);
-	for (const cluster of request.clusters) clusterSizes[cluster] += 1;
-	const positions = new Float32Array(request.nodeCount * 3);
-	for (let index = 0; index < request.nodeCount; index += 1) {
-		const offset = index * 3;
-		const cluster = request.clusters[index] ?? 0;
-		const center = cluster * 3;
-		const radius = Math.sqrt(clusterSizes[cluster] ?? 1) * Math.sqrt(random(index * 4 + 2)) * 2;
-		const angle = random(index * 4 + 1) * Math.PI * 2;
-		positions[offset] = (centers[center] ?? 0) * 12 + Math.cos(angle) * radius;
-		positions[offset + 1] = (centers[center + 1] ?? 0) * 12 + Math.sin(angle) * radius;
-		if (request.dimensions === 3) {
-			const zDirection = random(index * 4 + 3) * 2 - 1;
-			positions[offset + 2] = (centers[center + 2] ?? 0) * 12 + zDirection * radius;
-		}
-	}
-	return positions;
+	return clusteredInitialPositions(request);
 }
