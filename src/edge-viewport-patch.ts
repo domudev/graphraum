@@ -139,7 +139,7 @@ export function patchVisibleEdgeInstances(
 
 	for (const name of EDGE_INSTANCE_ATTRIBUTES) {
 		const attribute = geometry.getAttribute(name) as InstancedBufferAttribute;
-		attribute.clearUpdateRanges();
+		// Keep earlier ranges that have not been uploaded yet; three.js merges and clears them on upload.
 		attribute.addUpdateRange(
 			dirtySlotStart * attribute.itemSize,
 			(dirtySlotEnd - dirtySlotStart + 1) * attribute.itemSize,

@@ -1,3 +1,4 @@
+import type { InstancedBufferAttribute } from "three";
 import { describe, expect, test } from "vitest";
 
 import { packEdgeInstances } from "./edge-materialize";
@@ -112,5 +113,32 @@ describe("patchVisibleEdgeInstances", () => {
 		);
 
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe("patchVisibleEdgeInstances update ranges", () => {
+	test("keeps update ranges that are still waiting for upload", () => {
+		const geometry = createEdgeGeometry(32);
+		const endpointPositions = new Float32Array([0, 0, 0, 10, 0, 0]);
+		const input = {
+			defaults: { color: "#226f54", opacity: 0.85, width: 1.5 },
+			edgeIndices: [0],
+			edgeVisuals: [{ path: "straight" as const }],
+			endpointPositions,
+			tier: "detail" as const,
+		};
+		const packed = packEdgeInstances(input);
+		const layouts = buildVisibleEdgeLayouts(packed.segments, packed.markers, packed.segments.length);
+		const color = geometry.getAttribute("instanceColor") as InstancedBufferAttribute;
+		color.addUpdateRange(40, 8);
+
+		patchVisibleEdgeInstances(
+			geometry,
+			{ ...input, changedEdgeIndices: [0], layouts, minHitSlop: 2, worldPerPixel: 1 },
+			[],
+		);
+
+		expect(color.updateRanges).toContainEqual({ start: 40, count: 8 });
+		expect(color.updateRanges).toContainEqual({ start: 0, count: 4 });
 	});
 });
