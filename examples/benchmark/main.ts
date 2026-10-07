@@ -117,12 +117,12 @@ function readState(): LabState {
 			repulsion: formNumber(values, "forceRepulsion"),
 			springStrength: formNumber(values, "forceSpringStrength"),
 		},
+		glowNodes: formNumber(values, "glowNodes"),
 		layout: formValue(values, "layout") as LayoutName,
 		maxPixelRatio: formNumber(values, "maxPixelRatio"),
 		maxVisibleEdges: 100_000,
 		maxVisibleNodes: scaleMode === "million-density" ? 50_000 : scaleMode === "million-literal" ? 1_000_000 : 100_000,
 		mode: formValue(values, "mode") as GraphraumMode,
-		glowNodes: formNumber(values, "glowNodes"),
 		nodeAspect: formNumber(values, "nodeAspect"),
 		nodeColors: {
 			concept: formValue(values, "conceptColor"),
