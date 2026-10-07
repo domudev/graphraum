@@ -20,6 +20,11 @@ export interface GraphraumNodeGeometry {
 	id: string;
 	position: GraphraumPosition;
 	color?: GraphraumColor;
+	/**
+	 * Opt-in soft halo in 0..1 (default 0, none). Glowing nodes add one batched draw call;
+	 * see the visual-language docs for the radius and opacity mapping.
+	 */
+	glow?: number;
 	height?: number;
 	shape?: GraphraumNodeShape;
 	size?: number;
@@ -32,6 +37,7 @@ export type GraphraumNode<NodeAttributes = undefined> = GraphraumNodeGeometry & 
 
 export interface GraphraumNodeUpdate {
 	color?: GraphraumColor | undefined;
+	glow?: number | undefined;
 	height?: number | undefined;
 	id: string;
 	position?: GraphraumPosition;
@@ -82,6 +88,11 @@ export interface GraphraumDataPatch<NodeAttributes = undefined, EdgeAttributes =
 
 export interface GraphraumNodeVisual {
 	color?: GraphraumColor;
+	/**
+	 * Opt-in soft halo in 0..1 (default 0, none). Glowing nodes add one batched draw call;
+	 * see the visual-language docs for the radius and opacity mapping.
+	 */
+	glow?: number;
 	height?: number;
 	shape?: GraphraumNodeShape;
 	size?: number;
@@ -280,6 +291,8 @@ export interface GraphraumDiagnostics {
 	visibleEdgeMarkers: number;
 	visibleEdgeSegments: number;
 	visibleEdges: number;
+	/** Glow halo instances in the final frame (at most 256; 0 in the density LOD tier). */
+	visibleGlowNodes: number;
 	visibleNodes: number;
 	visibleNodeCandidates: number;
 }
