@@ -29,6 +29,7 @@ export function prepareLayoutPositions<NodeAttributes = undefined>(
 		}
 		return {
 			colorChanged: false,
+			glowChanged: false,
 			index: nodeIndex,
 			next: { ...current, position },
 			positionChanged: true,

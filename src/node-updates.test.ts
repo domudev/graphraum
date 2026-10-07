@@ -19,6 +19,7 @@ describe("prepareNodeUpdates", () => {
 		expect(prepared).toEqual([
 			{
 				colorChanged: true,
+				glowChanged: false,
 				index: 0,
 				next: { id: "a", position: { x: 8, y: 9 }, color: undefined, shape: "diamond", size: 4 },
 				positionChanged: true,
@@ -37,6 +38,7 @@ describe("prepareNodeUpdates", () => {
 		expect(prepared).toEqual([
 			{
 				colorChanged: false,
+				glowChanged: false,
 				index: 1,
 				next: {
 					id: "b",
@@ -70,6 +72,21 @@ describe("prepareNodeUpdates", () => {
 			sizeChanged: false,
 			strokeChanged: true,
 		});
+	});
+
+	test("merges glow and marks glowChanged, including removal", () => {
+		const [set] = prepareNodeUpdates(nodes, indices, [{ id: "a", glow: 0.8 }]);
+		expect(set).toMatchObject({ colorChanged: false, glowChanged: true, next: { glow: 0.8 } });
+		const [cleared] = prepareNodeUpdates([{ ...nodes[0], glow: 0.8 }], indices, [{ id: "a", glow: undefined }]);
+		expect(cleared).toMatchObject({ glowChanged: true });
+		expect(cleared?.next.glow).toBeUndefined();
+		expect(prepareNodeUpdates(nodes, indices, [{ id: "a", size: 6 }])[0]?.glowChanged).toBe(false);
+	});
+
+	test("rejects glow outside 0..1 before renderer mutation", () => {
+		expect(() => prepareNodeUpdates(nodes, indices, [{ id: "a", glow: 2 }])).toThrow(
+			'Node "a" glow must be a finite number between 0 and 1',
+		);
 	});
 
 	test("rejects an invalid batch before renderer mutation", () => {

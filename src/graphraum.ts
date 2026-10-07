@@ -41,6 +41,8 @@ import { buildVisibleEdgeLayouts, patchVisibleEdgeInstances, type VisibleEdgeLay
 import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
+import { glowBlendModeFor } from "./node-glow";
+import { type GlowNodeTarget, NodeGlowLayer } from "./node-glow-rendering";
 import {
 	allocateNodeInstanceColors,
 	createNodeGeometry,
@@ -146,6 +148,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private nodeMesh: InstancedMesh | null = null;
 	private nodePickMesh: InstancedMesh | null = null;
 	private edgeMesh: InstancedMesh | null = null;
+	private readonly glowLayer = new NodeGlowLayer(this.scene);
+	private hasGlowNodes = false;
 	private nodeCapacity = 0;
 	private edgeCapacity = 0;
 	private markerCapacity = 0;
@@ -275,6 +279,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			})),
 		};
 		this.nodeIds = compiled.nodeIds;
+		this.hasGlowNodes = this.data.nodes.some(hasNodeGlow);
 		this.nodeIndices = new Map(compiled.nodeIndices);
 		this.edgeNodeIndices = compiled.edgeNodeIndices;
 		this.canonicalEdgePositions = compiled.edgePositions;
@@ -352,6 +357,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		}
 		this.data = { nodes: nextNodes, edges: nextEdges };
 		this.nodeIds = nextNodes.map((node) => node.id);
+		this.hasGlowNodes = nextNodes.some(hasNodeGlow);
 		this.nodeIndices = nextNodeIndices;
 		this.edgeNodeIndices = nextEdgeIndices;
 		this.canonicalEdgePositions = nextEdgePositions;
@@ -379,6 +385,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			})),
 		};
 		this.nodeIds = compiled.nodeIds;
+		this.hasGlowNodes = this.data.nodes.some(hasNodeGlow);
 		this.nodeIndices = new Map(compiled.nodeIndices);
 		this.edgeNodeIndices = compiled.edgeNodeIndices;
 		this.canonicalEdgePositions = compiled.edgePositions;
@@ -517,6 +524,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (this.densityLodActive && prepared.some((update) => update.positionChanged || update.sizeChanged)) {
 			visibilityChanged = true;
 		}
+		const glowChanged = prepared.some((update) => update.glowChanged);
+		// Before any early return: materializeViewport below reads it through syncGlow.
+		if (glowChanged) this.hasGlowNodes = nodes.some(hasNodeGlow);
 
 		this.data = { ...this.data, nodes };
 		if (visibilityChanged) {
@@ -536,6 +546,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			nodeMesh.instanceColor.needsUpdate = true;
 		}
 		if (prepared.some((update) => update.shapeChanged)) nodeShape.needsUpdate = true;
+		if (glowChanged) this.syncGlow();
+		else if (prepared.some((update) => update.positionChanged || update.sizeChanged || update.colorChanged)) {
+			this.glowLayer.rewrite(this.describeGlowNode);
+		}
 		if (prepared.some((update) => update.strokeChanged)) {
 			nodeStrokeWidth.needsUpdate = true;
 			nodeStrokeColor.needsUpdate = true;
@@ -798,6 +812,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			visibleEdgeMarkers: this.visibleEdgeMarkerCount,
 			visibleEdgeSegments: this.visibleEdgeSegmentCount,
 			visibleEdges: this.visibleEdgeCount,
+			visibleGlowNodes: this.glowLayer.count,
 			visibleNodes: this.visibleNodeCount,
 			visibleNodeCandidates: this.visibleNodeCandidateCount,
 		};
@@ -1127,7 +1142,38 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			slots.push(slot);
 		}
 		markInstanceColorSlots(this.nodeMesh.instanceColor, slots);
+		this.glowLayer.rewrite(this.describeGlowNode);
 	}
+
+	/** Rebuilds the opt-in halo pass; graphs without glow release it and skip the visible scan. */
+	private syncGlow() {
+		if (!this.hasGlowNodes) {
+			this.glowLayer.dispose();
+			return;
+		}
+		this.glowLayer.setBlending(glowBlendModeFor(this.theme.background));
+		this.glowLayer.sync(this.visibleNodeIndices, this.glowAt, this.densityLodActive, this.describeGlowNode);
+	}
+
+	private readonly glowAt = (nodeIndex: number) => this.data.nodes[nodeIndex]?.glow ?? 0;
+
+	private readonly describeGlowNode = (nodeIndex: number, target: GlowNodeTarget) => {
+		const node = this.data.nodes[nodeIndex];
+		if (!node) return false;
+		const { height, width } = resolveNodeAxes({
+			height: node.height,
+			nodeId: node.id,
+			size: node.size,
+			width: node.width,
+		});
+		target.color.copy(this.getNodeColor(node));
+		target.extent = Math.max(width, height);
+		target.glow = node.glow ?? 0;
+		target.x = node.position.x;
+		target.y = node.position.y;
+		target.z = node.position.z ?? 0;
+		return true;
+	};
 
 	private getNodeStateIds(state: GraphraumNodeState) {
 		switch (state) {
@@ -1365,6 +1411,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.visibleEdgeSegmentCount = segmentCount;
 		this.visibleEdgeCount = distinctEdges.size;
 		this.visibleEdgeMarkerCount = packed.markers.length;
+		this.syncGlow();
 	}
 
 	private materializeNodes(indices: readonly number[], bounds: Bounds2D | null): readonly MaterializedNode[] {
@@ -1422,6 +1469,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	private disposeGraphObjects() {
+		this.glowLayer.dispose();
 		this.pickableEdgeSegments = [];
 		this.visibleEdgeSegmentEdgeIndices = [];
 		this.visibleEdgeLayouts = new Map();
@@ -1443,6 +1491,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.edgeMesh = null;
 		}
 	}
+}
+
+function hasNodeGlow(node: { glow?: number }): boolean {
+	return (node.glow ?? 0) > 0;
 }
 
 function nextCapacity(length: number): number {
