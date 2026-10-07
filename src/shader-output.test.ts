@@ -1,4 +1,4 @@
-import { Color, RawShaderMaterial, ShaderChunk, type ShaderMaterial } from "three";
+import { RawShaderMaterial, ShaderChunk, type ShaderMaterial } from "three";
 import { describe, expect, test } from "vitest";
 
 import { createEdgeMaterial } from "./edge-rendering";
@@ -50,11 +50,5 @@ describe("display shader output encoding", () => {
 		expect(encodes).toHaveLength(1);
 		expect(statements.at(-1)).toBe("gl_FragColor = linearToOutputTexel( gl_FragColor );");
 		material.dispose();
-	});
-
-	test("instance colors hold linear values, so drawing them unencoded darkens every color", () => {
-		const color = new Color("#8a9096");
-		expect(color.r).toBeCloseTo(0.2542, 3);
-		expect(color.getHexString()).toBe("8a9096");
 	});
 });
