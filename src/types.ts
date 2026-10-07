@@ -4,6 +4,9 @@ export type GraphraumMode = "2d" | "3d";
 
 export type GraphraumNodeState = "dimmed" | "focused" | "hovered" | "selected";
 
+/** Application-owned edge state applied with `setEdgeState`. Edge selection uses `setEdgeSelection`. */
+export type GraphraumEdgeState = "dimmed";
+
 export type GraphraumNodeShape = "circle" | "diamond" | "hexagon" | "pill" | "rounded" | "square" | "triangle";
 
 export interface GraphraumPosition {
@@ -232,6 +235,10 @@ export type GraphraumThemeName = "dark" | "light";
 
 export interface GraphraumTheme {
 	background: GraphraumBackground;
+	/** Color of edges dimmed with `setEdgeState("dimmed", ids)`. Selected edges stay selected. */
+	dimmedEdge: GraphraumColor;
+	/** Opacity cap (0..1) for dimmed edges; an edge that is already fainter keeps its own opacity. */
+	dimmedEdgeOpacity: number;
 	dimmedNode: GraphraumColor;
 	edge: GraphraumColor;
 	edgeOpacity: number;
@@ -283,6 +290,7 @@ export interface GraphraumDiagnostics {
 	gpuTextures: number;
 	lodLevel: "density" | "detail" | "overview";
 	pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+	dimmedEdges: number;
 	selectedEdges: number;
 	selectedNodes: number;
 	totalEdges: number;

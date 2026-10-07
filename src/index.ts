@@ -50,6 +50,7 @@ export type {
 	GraphraumEdgeMarker,
 	GraphraumEdgeMarkerEnd,
 	GraphraumEdgePath,
+	GraphraumEdgeState,
 	GraphraumEdgeStyle,
 	GraphraumEdgeVisual,
 	GraphraumLabelCandidate,

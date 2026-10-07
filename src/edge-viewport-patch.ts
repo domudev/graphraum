@@ -4,7 +4,13 @@ import type { EndpointAttach, EndpointOutline } from "./edge-endpoint-attach";
 import { type EdgeMarkerInstance, type EdgeSegmentInstance, packEdgeInstances } from "./edge-materialize";
 import type { EdgeLodTier } from "./edge-paths";
 import type { PickableEdgeSegment } from "./edge-picking";
-import { writeEdgeMarkerInstance, writeEdgeSegmentInstance } from "./edge-rendering";
+import {
+	getInstancedAttribute,
+	writeEdgeColorSlots,
+	writeEdgeMarkerInstance,
+	writeEdgeSegmentInstance,
+} from "./edge-rendering";
+import { type EdgePaint, type EdgeStateStyling, resolveEdgePaint } from "./edge-state";
 import type { GraphraumColor, GraphraumEdgeVisual } from "./types";
 
 export interface VisibleEdgeLayout {
@@ -60,6 +66,7 @@ export interface PatchVisibleEdgesInput {
 	changedEdgeIndices: readonly number[];
 	defaults: { color: GraphraumColor; opacity: number; width: number };
 	edgeNodeIndices?: Uint32Array;
+	edgeStates?: EdgeStateStyling;
 	edgeVisuals: readonly Readonly<GraphraumEdgeVisual>[];
 	endpointAttach?: EndpointAttach;
 	endpointPositions: Float32Array;
@@ -105,6 +112,7 @@ export function patchVisibleEdgeInstances(
 			tier: input.tier,
 			endpointAttach: input.endpointAttach,
 			edgeNodeIndices: input.edgeNodeIndices,
+			edgeStates: input.edgeStates,
 			nodeOutlines: input.nodeOutlines,
 		});
 		if (packed.segments.length !== layout.segmentCount || packed.markers.length !== layout.markerCount) {
@@ -139,7 +147,7 @@ export function patchVisibleEdgeInstances(
 
 	for (const name of EDGE_INSTANCE_ATTRIBUTES) {
 		const attribute = geometry.getAttribute(name) as InstancedBufferAttribute;
-		attribute.clearUpdateRanges();
+		// Keep earlier ranges that have not been uploaded yet; three.js merges and clears them on upload.
 		attribute.addUpdateRange(
 			dirtySlotStart * attribute.itemSize,
 			(dirtySlotEnd - dirtySlotStart + 1) * attribute.itemSize,
@@ -153,4 +161,65 @@ export function patchVisibleEdgeInstances(
 		ok: true,
 		pickableSegments: nextPickable,
 	};
+}
+
+export interface PatchVisibleEdgePaintInput {
+	changedEdgeIndices: Iterable<number>;
+	defaults: EdgePaint;
+	edgeStates: EdgeStateStyling;
+	edgeVisuals: readonly Readonly<GraphraumEdgeVisual>[];
+	/** Instances currently drawn (`edgeMesh.count`); every repainted slot must lie below it. */
+	instanceCount: number;
+	layouts: ReadonlyMap<number, VisibleEdgeLayout>;
+	tier: EdgeLodTier;
+}
+
+export interface PatchVisibleEdgePaintResult {
+	/** False when a layout no longer fits the drawn instances; nothing was written and callers must rematerialize. */
+	ok: boolean;
+	patchedSlots: number;
+}
+
+/**
+ * Repaints the color and opacity of visible edges whose host state changed. Slot layout,
+ * geometry, and picking stay untouched, so only the changed `instanceColor` ranges upload.
+ * Edges without visible slots are skipped; the next materialize paints them from the same state.
+ */
+export function patchVisibleEdgePaint(
+	geometry: BufferGeometry,
+	input: PatchVisibleEdgePaintInput,
+): PatchVisibleEdgePaintResult {
+	const visible = [...input.changedEdgeIndices].flatMap((edgeIndex) => {
+		const layout = input.layouts.get(edgeIndex);
+		return layout ? [{ edgeIndex, layout }] : [];
+	});
+	const fits = visible.every(
+		({ layout }) =>
+			layout.segmentStart + layout.segmentCount <= input.instanceCount &&
+			layout.markerStart + layout.markerCount <= input.instanceCount,
+	);
+	if (!fits) return { ok: false, patchedSlots: 0 };
+
+	const color = getInstancedAttribute(geometry, "instanceColor");
+	let patchedSlots = 0;
+	for (const { edgeIndex, layout } of visible) {
+		const paint = resolveEdgePaint(
+			edgeIndex,
+			input.edgeVisuals[edgeIndex] ?? {},
+			input.defaults,
+			input.tier,
+			input.edgeStates,
+		);
+		for (const [start, count] of [
+			[layout.segmentStart, layout.segmentCount],
+			[layout.markerStart, layout.markerCount],
+		] as const) {
+			if (count === 0) continue;
+			writeEdgeColorSlots(color, start, count, paint);
+			color.addUpdateRange(start * color.itemSize, count * color.itemSize);
+			patchedSlots += count;
+		}
+	}
+	if (patchedSlots > 0) color.needsUpdate = true;
+	return { ok: true, patchedSlots };
 }

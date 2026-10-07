@@ -1,6 +1,7 @@
 import { type BufferGeometry, Color, InstancedBufferAttribute, PlaneGeometry, ShaderMaterial } from "three";
 
 import type { EdgeMarkerInstance, EdgeSegmentInstance } from "./edge-materialize";
+import type { EdgePaint } from "./edge-state";
 import { encodeEdgeStyle } from "./edge-styles";
 
 const vertexShader = `
@@ -103,7 +104,7 @@ export function createEdgeMaterial(depthTest: boolean): ShaderMaterial {
 	});
 }
 
-function getInstancedAttribute(geometry: BufferGeometry, name: string): InstancedBufferAttribute {
+export function getInstancedAttribute(geometry: BufferGeometry, name: string): InstancedBufferAttribute {
 	const attribute = geometry.getAttribute(name);
 	if (!(attribute instanceof InstancedBufferAttribute)) {
 		throw new Error(`edge geometry is missing the "${name}" instanced attribute`);
@@ -122,8 +123,7 @@ export function writeEdgeSegmentInstance(geometry: BufferGeometry, slot: number,
 	kind.setX(slot, 0);
 	endA.setXYZ(slot, segment.x1, segment.y1, segment.z1);
 	endB.setXYZ(slot, segment.x2, segment.y2, segment.z2);
-	const rgb = new Color(segment.color);
-	color.setXYZW(slot, rgb.r, rgb.g, rgb.b, segment.opacity);
+	writeEdgeColorSlots(color, slot, 1, segment);
 	width.setX(slot, segment.width);
 	style.setX(slot, encodeEdgeStyle(segment.style));
 }
@@ -139,8 +139,13 @@ export function writeEdgeMarkerInstance(geometry: BufferGeometry, slot: number, 
 	kind.setX(slot, 1);
 	endA.setXYZ(slot, marker.x, marker.y, marker.z);
 	endB.setXYZ(slot, marker.x + marker.dx, marker.y + marker.dy, marker.z + marker.dz);
-	const rgb = new Color(marker.color);
-	color.setXYZW(slot, rgb.r, rgb.g, rgb.b, marker.opacity);
+	writeEdgeColorSlots(color, slot, 1, marker);
 	width.setX(slot, marker.size);
 	style.setX(slot, 0);
+}
+
+/** Writes one color and opacity into `count` consecutive instance slots starting at `start`. */
+export function writeEdgeColorSlots(color: InstancedBufferAttribute, start: number, count: number, paint: EdgePaint) {
+	const rgb = new Color(paint.color);
+	for (let slot = start; slot < start + count; slot += 1) color.setXYZW(slot, rgb.r, rgb.g, rgb.b, paint.opacity);
 }

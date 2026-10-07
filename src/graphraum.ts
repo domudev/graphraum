@@ -37,7 +37,13 @@ import {
 	writeEdgeMarkerInstance,
 	writeEdgeSegmentInstance,
 } from "./edge-rendering";
-import { buildVisibleEdgeLayouts, patchVisibleEdgeInstances, type VisibleEdgeLayout } from "./edge-viewport-patch";
+import { changedIds, type EdgeStateStyling } from "./edge-state";
+import {
+	buildVisibleEdgeLayouts,
+	patchVisibleEdgeInstances,
+	patchVisibleEdgePaint,
+	type VisibleEdgeLayout,
+} from "./edge-viewport-patch";
 import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
@@ -63,6 +69,7 @@ import type {
 	GraphraumData,
 	GraphraumDataPatch,
 	GraphraumDiagnostics,
+	GraphraumEdgeState,
 	GraphraumLabelCandidate,
 	GraphraumLayoutPositions,
 	GraphraumMode,
@@ -156,6 +163,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private edgeInstanceCapacity = 0;
 	private selectedNodeIds = new Set<string>();
 	private selectedEdgeIds = new Set<string>();
+	private dimmedEdgeIds = new Set<string>();
+	private edgeIndexCache: { edges: readonly unknown[]; indices: Map<string, number> } = {
+		edges: [],
+		indices: new Map(),
+	};
 	private hoveredNodeIds = new Set<string>();
 	private focusedNodeIds = new Set<string>();
 	private dimmedNodeIds = new Set<string>();
@@ -289,12 +301,11 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.spatialGrid2d = new SpatialGrid2D();
 		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
 		const liveNodeIds = new Set(this.nodeIds);
-		const liveEdgeIds = new Set(this.data.edges.map((edge) => edge.id));
 		this.selectedNodeIds = new Set([...this.selectedNodeIds].filter((id) => liveNodeIds.has(id)));
 		this.hoveredNodeIds = new Set([...this.hoveredNodeIds].filter((id) => liveNodeIds.has(id)));
 		this.focusedNodeIds = new Set([...this.focusedNodeIds].filter((id) => liveNodeIds.has(id)));
 		this.dimmedNodeIds = new Set([...this.dimmedNodeIds].filter((id) => liveNodeIds.has(id)));
-		this.selectedEdgeIds = new Set([...this.selectedEdgeIds].filter((id) => liveEdgeIds.has(id)));
+		this.pruneEdgeStates();
 		this.materializeViewport();
 		this.requestRender();
 	}
@@ -394,6 +405,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.edgePresentations = new Map(compiled.edgePresentations);
 		this.spatialGrid2d = new SpatialGrid2D();
 		for (const [index, node] of this.data.nodes.entries()) this.spatialGrid2d.set(index, node);
+		this.pruneEdgeStates();
 
 		this.nodeCapacity = Math.min(this.maxVisibleNodes, nextCapacity(data.nodes.length));
 		const nodeCapacity = this.nodeCapacity;
@@ -562,16 +574,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		if (!this.edgeMesh || changedEdgeIndices.length === 0) return true;
 		const worldPerPixel = this.worldUnitsPerPixel();
 		const minHitSlop = Math.max(4 * worldPerPixel, this.theme.edgeWidth * worldPerPixel);
-		const edgeVisuals = this.data.edges.map((edge) =>
-			this.selectedEdgeIds.has(edge.id) ? { ...edge, color: this.theme.selectedEdge } : edge,
-		);
 		const result = patchVisibleEdgeInstances(
 			this.edgeMesh.geometry,
 			{
 				changedEdgeIndices,
 				defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
 				edgeNodeIndices: this.edgeNodeIndices,
-				edgeVisuals,
+				edgeStates: this.edgeStateStyling(),
+				edgeVisuals: this.data.edges,
 				endpointAttach: this.theme.endpointAttach,
 				endpointPositions: this.canonicalEdgePositions,
 				layouts: this.visibleEdgeLayouts,
@@ -597,11 +607,85 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.setNodeState("selected", nodeIds);
 	}
 
-	/** Highlights edges without changing node selection or source graph data. */
+	/**
+	 * Highlights edges without changing node selection or source graph data. Unknown IDs are ignored.
+	 * Only the instance colors of edges whose selection changed are rewritten and uploaded.
+	 */
 	setEdgeSelection(edgeIds: Iterable<string>) {
-		this.selectedEdgeIds = new Set(edgeIds);
-		this.materializeViewport();
+		const next = this.knownEdgeIds(edgeIds);
+		const changed = changedIds(this.selectedEdgeIds, next);
+		this.selectedEdgeIds = next;
+		this.repaintEdgeStates(changed);
+	}
+
+	/**
+	 * Applies an application-owned edge state without changing source graph data. `dimmed` uses
+	 * `theme.dimmedEdge` / `theme.dimmedEdgeOpacity`; selected edges stay selected. Unknown IDs are ignored.
+	 */
+	setEdgeState(state: GraphraumEdgeState, edgeIds: Iterable<string>) {
+		if (state !== "dimmed") throw new Error(`Unknown edge state "${String(state)}". Use "dimmed".`);
+		const next = this.knownEdgeIds(edgeIds);
+		const changed = changedIds(this.dimmedEdgeIds, next);
+		this.dimmedEdgeIds = next;
+		this.repaintEdgeStates(changed);
+	}
+
+	private knownEdgeIds(edgeIds: Iterable<string>) {
+		const indices = this.edgeIndicesById();
+		return new Set([...edgeIds].filter((id) => indices.has(id)));
+	}
+
+	/**
+	 * Visible slots, LOD tier, and geometry only change through materialize or endpoint patches,
+	 * which keep `visibleEdgeLayouts` current, so a state change repaints in place. If a layout no
+	 * longer fits the drawn instances, that invariant broke: fall back to a full materialize.
+	 */
+	private repaintEdgeStates(changedEdgeIds: readonly string[]) {
+		if (!this.edgeMesh || changedEdgeIds.length === 0) return;
+		const indices = this.edgeIndicesById();
+		const result = patchVisibleEdgePaint(this.edgeMesh.geometry, {
+			changedEdgeIndices: changedEdgeIds.flatMap((id) => indices.get(id) ?? []),
+			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity },
+			edgeStates: this.edgeStateStyling(),
+			edgeVisuals: this.data.edges,
+			instanceCount: this.edgeMesh.count,
+			layouts: this.visibleEdgeLayouts,
+			tier: this.lastEdgeLodTier,
+		});
+		if (!result.ok) this.materializeViewport();
 		this.requestRender();
+	}
+
+	private edgeStateStyling(): EdgeStateStyling {
+		return {
+			dimmedColor: this.theme.dimmedEdge,
+			dimmedOpacity: this.theme.dimmedEdgeOpacity,
+			selectedColor: this.theme.selectedEdge,
+			stateOf: (edgeIndex) => {
+				const id = this.data.edges[edgeIndex]?.id;
+				if (id === undefined) return null;
+				if (this.selectedEdgeIds.has(id)) return "selected";
+				return this.dimmedEdgeIds.has(id) ? "dimmed" : null;
+			},
+		};
+	}
+
+	/** Edge ID to compiled index, rebuilt only when the edge list is replaced. */
+	private edgeIndicesById(): ReadonlyMap<string, number> {
+		if (this.edgeIndexCache.edges !== this.data.edges) {
+			this.edgeIndexCache = {
+				edges: this.data.edges,
+				indices: new Map(this.data.edges.map((edge, index) => [edge.id, index])),
+			};
+		}
+		return this.edgeIndexCache.indices;
+	}
+
+	/** Drops edge states whose edges left the graph. */
+	private pruneEdgeStates() {
+		const indices = this.edgeIndicesById();
+		this.selectedEdgeIds = new Set([...this.selectedEdgeIds].filter((id) => indices.has(id)));
+		this.dimmedEdgeIds = new Set([...this.dimmedEdgeIds].filter((id) => indices.has(id)));
 	}
 
 	/** Applies an application-owned visual state without changing source graph data. */
@@ -804,6 +888,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			gpuTextures: this.renderer.info.memory.textures,
 			lodLevel: resolveLodLevel(this.densityLodActive, this.visibleEdgeCandidateCount, this.visibleEdgeCount),
 			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
+			dimmedEdges: this.dimmedEdgeIds.size,
 			selectedEdges: this.selectedEdgeIds.size,
 			selectedNodes: this.selectedNodeIds.size,
 			totalEdges: this.data.edges.length,
@@ -1347,12 +1432,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const lodLevel = resolveLodLevel(this.densityLodActive, edgeCandidates.length, visibleEdgeIndices.length);
 		this.lastEdgeLodTier = edgeTierFromDiagnosticsLod(lodLevel);
 		const worldPerPixel = this.worldUnitsPerPixel();
-		const edgeVisuals = this.data.edges.map((edge) =>
-			this.selectedEdgeIds.has(edge.id) ? { ...edge, color: this.theme.selectedEdge } : edge,
-		);
 		const packed = packEdgeInstances({
 			edgeIndices: visibleEdgeIndices,
-			edgeVisuals,
+			edgeStates: this.edgeStateStyling(),
+			edgeVisuals: this.data.edges,
 			endpointPositions: this.canonicalEdgePositions,
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity, width: this.theme.edgeWidth },
 			tier: this.lastEdgeLodTier,

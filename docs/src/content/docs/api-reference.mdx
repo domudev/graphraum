@@ -130,6 +130,8 @@ interface GraphraumEdgeVisual {
   <div><code>updateNodes(updates)</code><p>Changes position, size, shape, or color for existing nodes and updates only the affected instance data and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
   <div><code>applyLayout(layout)</code><p>Applies a transferable XYZ position batch for existing nodes. Call it repeatedly as a worker produces progressive positions.</p></div>
   <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
+  <div><code>setEdgeSelection(edgeIds)</code><p>Highlights edges with <code>theme.selectedEdge</code>. Only the edges whose selection changed are repainted, so per-hover calls stay cheap on large graphs. Unknown IDs are ignored.</p></div>
+  <div><code>setEdgeState("dimmed", edgeIds)</code><p>Recedes edges with <code>theme.dimmedEdge</code> and <code>theme.dimmedEdgeOpacity</code>, mirroring <code>setNodeState("dimmed", ids)</code>. A selected edge stays selected. Unknown IDs are ignored and removed edges drop out of the state.</p></div>
   <div><code>getNodePresentation(id)</code><p>Returns the compiled title, subtitle, properties, and action descriptors for a node, or <code>null</code>.</p></div>
   <div><code>getEdgePresentation(id)</code><p>Returns the compiled presentation for an edge, or <code>null</code>.</p></div>
   <div><code>render()</code><p>Schedules one render on the next animation frame. Repeated calls in the same frame are coalesced.</p></div>
@@ -274,7 +276,7 @@ graph.setBackground({ type: "pattern", source: image, repeat: [2, 2] });
 
 `background` accepts a CSS color, `"transparent"` / `null` (clear canvas for host CSS), or a pattern object as shown in the example above.
 
-`edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. `nodeStroke` is the fallback stroke color for a node that sets `strokeWidth` but no `strokeColor`. See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
+`edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. `dimmedEdge` and `dimmedEdgeOpacity` style edges passed to `setEdgeState("dimmed", ids)`; the opacity is a cap between 0 and 1 (an edge that is already fainter keeps its own opacity), and values outside that range fail with an actionable error. The presets keep dimmed edges faintly visible: `#315a51` at 0.25 on dark, `#9bb5ac` at 0.35 on light. `nodeStroke` is the fallback stroke color for a node that sets `strokeWidth` but no `strokeColor`. See [Visual language](../visual-language/) for the canonical palette and application-owned semantic colors.
 
 ## Diagnostics
 
@@ -293,6 +295,9 @@ interface GraphraumDiagnostics {
   gpuTextures: number;
   lodLevel: "density" | "detail" | "overview";
   pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+  dimmedEdges: number;
+  selectedEdges: number;
+  selectedNodes: number;
   totalEdges: number;
   totalNodes: number;
   visibleEdgeCandidates: number;

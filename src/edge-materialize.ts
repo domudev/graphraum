@@ -6,6 +6,7 @@ import {
 	trimEdgeEndpoints,
 } from "./edge-endpoint-attach";
 import { type EdgeLodTier, sampleEdgePath } from "./edge-paths";
+import { type EdgeStateStyling, resolveEdgePaint } from "./edge-state";
 import type { GraphraumColor, GraphraumEdgeMarkerEnd, GraphraumEdgeStyle, GraphraumEdgeVisual } from "./types";
 
 export type { EdgeLodTier };
@@ -54,6 +55,8 @@ export function packEdgeInstances(input: {
 	nodeOutlines?: readonly EndpointOutline[];
 	/** Two node indices per edge (source, target), same order as compile-graph. */
 	edgeNodeIndices?: Uint32Array;
+	/** Host-owned edge states (selection) applied on top of the edge visual. */
+	edgeStates?: EdgeStateStyling;
 }): { segments: EdgeSegmentInstance[]; markers: EdgeMarkerInstance[]; truncated: boolean } {
 	const segments: EdgeSegmentInstance[] = [];
 	const markers: EdgeMarkerInstance[] = [];
@@ -89,9 +92,8 @@ export function packEdgeInstances(input: {
 			y2 = trimmed.target.y;
 			z2 = trimmed.target.z ?? 0;
 		}
-		const color = visual.color ?? input.defaults.color;
+		const { color, opacity } = resolveEdgePaint(edgeIndex, visual, input.defaults, input.tier, input.edgeStates);
 		const width = input.tier === "overview" ? input.defaults.width : (visual.width ?? input.defaults.width);
-		const opacity = input.tier === "overview" ? input.defaults.opacity : (visual.opacity ?? input.defaults.opacity);
 		const style = input.tier === "overview" ? "solid" : (visual.style ?? "solid");
 		const points = sampleEdgePath({
 			path: visual.path,
