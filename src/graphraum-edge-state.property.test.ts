@@ -152,6 +152,9 @@ interface PropertyConfig {
  * slots. The two culled 2D configurations (detail and density) therefore compare instance data
  * per edge; every other configuration compares the raw buffers byte for byte.
  */
+/** 300 seeded steps with a full twin rebuild each; a CI runner needs more than vitest's 5 s default. */
+const PROPERTY_TEST_TIMEOUT_MS = 60_000;
+
 const CONFIGS: readonly PropertyConfig[] = [
 	{ compare: "per-edge", moves: true, name: "2d culled", options: { mode: "2d" }, tier: "detail" },
 	{
@@ -180,44 +183,48 @@ const CONFIGS: readonly PropertyConfig[] = [
 ];
 
 describe("edge state equivalence under random interleavings", () => {
-	test.each(CONFIGS)("$name: incremental graph matches a fully materialized twin", (config) => {
-		const random = seededRandom(config.name.length * 7919);
-		const graph = createGraph(config.options);
-		const twin = createGraph(config.options);
-		const initial = mixedFixture(40, 120, 3);
-		graph.setData(initial);
-		twin.setData(initial);
-		const materialize = vi.spyOn(internals(graph), "materializeViewport");
-		const gpu = createShadowGpu();
-		const snapshot = config.compare === "bytes" ? edgeBuffers : edgeInstancesByEdge;
-		const state = { counter: 0, knownIds: new Set<string>() };
-		const tiers = new Set<string>();
-		const kinds = new Set<string>();
+	test.each(CONFIGS)(
+		"$name: incremental graph matches a fully materialized twin",
+		(config) => {
+			const random = seededRandom(config.name.length * 7919);
+			const graph = createGraph(config.options);
+			const twin = createGraph(config.options);
+			const initial = mixedFixture(40, 120, 3);
+			graph.setData(initial);
+			twin.setData(initial);
+			const materialize = vi.spyOn(internals(graph), "materializeViewport");
+			const gpu = createShadowGpu();
+			const snapshot = config.compare === "bytes" ? edgeBuffers : edgeInstancesByEdge;
+			const state = { counter: 0, knownIds: new Set<string>() };
+			const tiers = new Set<string>();
+			const kinds = new Set<string>();
 
-		for (let step = 0; step < 300; step += 1) {
-			let operation = nextOperation(random, graph, state);
-			while (!config.moves && operation.kind === "move") operation = nextOperation(random, graph, state);
-			kinds.add(operation.kind);
-			const before = materialize.mock.calls.length;
-			operation.apply(graph);
-			if (operation.kind === "state") expect(materialize.mock.calls.length, `step ${step}`).toBe(before);
-			operation.apply(twin);
-			internals(twin).materializeViewport();
+			for (let step = 0; step < 300; step += 1) {
+				let operation = nextOperation(random, graph, state);
+				while (!config.moves && operation.kind === "move") operation = nextOperation(random, graph, state);
+				kinds.add(operation.kind);
+				const before = materialize.mock.calls.length;
+				operation.apply(graph);
+				if (operation.kind === "state") expect(materialize.mock.calls.length, `step ${step}`).toBe(before);
+				operation.apply(twin);
+				internals(twin).materializeViewport();
 
-			expect(snapshot(graph), `step ${step} (${operation.kind})`).toEqual(snapshot(twin));
-			expect(stateCounts(graph.getDiagnostics())).toEqual(stateCounts(twin.getDiagnostics()));
-			tiers.add(graph.getDiagnostics().lodLevel);
-			if (random() < 0.5) {
-				gpu.upload(graph);
-				for (const { cpu, gpu: uploaded } of gpu.compare(graph)) expect(uploaded, `GPU step ${step}`).toEqual(cpu);
+				expect(snapshot(graph), `step ${step} (${operation.kind})`).toEqual(snapshot(twin));
+				expect(stateCounts(graph.getDiagnostics())).toEqual(stateCounts(twin.getDiagnostics()));
+				tiers.add(graph.getDiagnostics().lodLevel);
+				if (random() < 0.5) {
+					gpu.upload(graph);
+					for (const { cpu, gpu: uploaded } of gpu.compare(graph)) expect(uploaded, `GPU step ${step}`).toEqual(cpu);
+				}
 			}
-		}
 
-		expect(tiers).toContain(config.tier);
-		expect([...kinds].sort()).toEqual(
-			config.moves ? ["move", "state", "theme", "topology", "view"] : ["state", "theme", "topology", "view"],
-		);
-	});
+			expect(tiers).toContain(config.tier);
+			expect([...kinds].sort()).toEqual(
+				config.moves ? ["move", "state", "theme", "topology", "view"] : ["state", "theme", "topology", "view"],
+			);
+		},
+		PROPERTY_TEST_TIMEOUT_MS,
+	);
 
 	test("edges selected or dimmed while culled show their state once panned into view", () => {
 		const graph = createGraph({ mode: "2d" });
