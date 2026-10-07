@@ -1,11 +1,16 @@
 import { describe, expect, test } from "vitest";
 
-import { changedIds, type EdgeStateStyling, resolveEdgePaint } from "./edge-state";
+import { changedIds, type EdgePaintState, type EdgeStateStyling, resolveEdgePaint } from "./edge-state";
 
 const defaults = { color: "#226f54", opacity: 0.55 };
 
-function styling(states: Record<number, "selected">): EdgeStateStyling {
-	return { selectedColor: "#fcfffc", stateOf: (edgeIndex) => states[edgeIndex] ?? null };
+function styling(states: Record<number, EdgePaintState>): EdgeStateStyling {
+	return {
+		dimmedColor: "#315a51",
+		dimmedOpacity: 0.25,
+		selectedColor: "#fcfffc",
+		stateOf: (edgeIndex) => states[edgeIndex] ?? null,
+	};
 }
 
 describe("resolveEdgePaint", () => {
@@ -23,6 +28,23 @@ describe("resolveEdgePaint", () => {
 			opacity: 0.3,
 		});
 		expect(resolveEdgePaint(1, visual, defaults, "detail", styling({ 2: "selected" }))).toEqual(visual);
+	});
+});
+
+describe("resolveEdgePaint dimmed", () => {
+	test("dimming replaces the color and never raises opacity", () => {
+		expect(resolveEdgePaint(0, { color: "#6d5bd0" }, defaults, "detail", styling({ 0: "dimmed" }))).toEqual({
+			color: "#315a51",
+			opacity: 0.25,
+		});
+		expect(resolveEdgePaint(0, { opacity: 0.1 }, defaults, "detail", styling({ 0: "dimmed" }))).toEqual({
+			color: "#315a51",
+			opacity: 0.1,
+		});
+		expect(resolveEdgePaint(0, { opacity: 0.1 }, defaults, "overview", styling({ 0: "dimmed" }))).toEqual({
+			color: "#315a51",
+			opacity: 0.25,
+		});
 	});
 });
 

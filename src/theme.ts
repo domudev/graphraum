@@ -3,6 +3,8 @@ import type { GraphraumBackground, GraphraumTheme, GraphraumThemeName } from "./
 /** Dark canvas: Ink Black, Turf Green, Porcelain. */
 export const graphraumThemeDark = Object.freeze({
 	background: "#040f0f",
+	dimmedEdge: "#315a51",
+	dimmedEdgeOpacity: 0.25,
 	dimmedNode: "#315a51",
 	edge: "#226f54",
 	edgeOpacity: 0.55,
@@ -19,6 +21,8 @@ export const graphraumThemeDark = Object.freeze({
 /** Light canvas: Porcelain field with Turf marks and Ink selection. */
 export const graphraumThemeLight = Object.freeze({
 	background: "#fcfffc",
+	dimmedEdge: "#9bb5ac",
+	dimmedEdgeOpacity: 0.35,
 	dimmedNode: "#9bb5ac",
 	edge: "#226f54",
 	edgeOpacity: 0.65,
@@ -52,7 +56,15 @@ export function resolveGraphraumTheme(
 		}
 		return { ...preset };
 	}
-	return { ...base, ...input };
+	return assertGraphraumTheme({ ...base, ...input });
+}
+
+function assertGraphraumTheme(theme: GraphraumTheme): GraphraumTheme {
+	const opacity = theme.dimmedEdgeOpacity;
+	if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+		throw new Error(`Theme dimmedEdgeOpacity must be a finite number between 0 and 1, received ${opacity}.`);
+	}
+	return theme;
 }
 
 /** Collapse `"transparent"` onto `null` so callers have one transparent sentinel. */

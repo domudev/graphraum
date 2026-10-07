@@ -131,7 +131,27 @@ container.addEventListener("click", (event) => {
 
 `pick(clientX, clientY)` still returns a node id only (or `null`) for hosts that do not need edge hits. Prefer `pickHit` when edges must be selectable. Selected edges use `theme.selectedEdge` (Porcelain by default) without changing node selection.
 
-`getNodePresentation(id)` and `getEdgePresentation(id)` return `null` when no presentation was compiled. Returned properties and actions are detached from the mapper input and frozen. Diagnostics expose `selectedNodes` and `selectedEdges` counts.
+To focus a neighborhood, dim the other nodes and edges and highlight the incident edges. Selection wins over dimming, so an edge can stay in both sets:
+
+```ts
+// nodeIds and edgeIds are the host's own ID lists for the current graph.
+const focusNode = (nodeId: string, incidentEdgeIds: readonly string[]) => {
+  const neighborhood = new Set([nodeId, ...graph.getNeighborIds(nodeId)]);
+  graph.setNodeState("dimmed", nodeIds.filter((id) => !neighborhood.has(id)));
+  graph.setEdgeState("dimmed", edgeIds);
+  graph.setEdgeSelection(incidentEdgeIds);
+};
+
+const clearFocus = () => {
+  graph.setNodeState("dimmed", []);
+  graph.setEdgeState("dimmed", []);
+  graph.setEdgeSelection([]);
+};
+```
+
+Edge selection and dimming repaint only the edges whose state changed, so calling them on every hover does not rebuild the viewport.
+
+`getNodePresentation(id)` and `getEdgePresentation(id)` return `null` when no presentation was compiled. Returned properties and actions are detached from the mapper input and frozen. Diagnostics expose `selectedNodes`, `selectedEdges`, and `dimmedEdges` counts.
 
 ## Dispatch actions in the host
 

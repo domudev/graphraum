@@ -1,11 +1,14 @@
 import type { EdgeLodTier } from "./edge-paths";
 import type { GraphraumColor, GraphraumEdgeVisual } from "./types";
 
-/** Host-owned visual state of one edge after precedence is applied. */
-export type EdgePaintState = "selected" | null;
+/** Host-owned visual state of one edge after precedence (selection wins over dimming). */
+export type EdgePaintState = "dimmed" | "selected" | null;
 
 /** Resolves host edge states during packing and incremental repaint. */
 export interface EdgeStateStyling {
+	dimmedColor: GraphraumColor;
+	/** Opacity cap for dimmed edges: dimming never makes an edge more visible. */
+	dimmedOpacity: number;
 	selectedColor: GraphraumColor;
 	/** State for a compiled edge index. */
 	stateOf(edgeIndex: number): EdgePaintState;
@@ -28,7 +31,11 @@ export function resolveEdgePaint(
 	edgeStates: EdgeStateStyling | undefined,
 ): EdgePaint {
 	const opacity = tier === "overview" ? defaults.opacity : (visual.opacity ?? defaults.opacity);
-	if (edgeStates?.stateOf(edgeIndex) === "selected") return { color: edgeStates.selectedColor, opacity };
+	const state = edgeStates?.stateOf(edgeIndex) ?? null;
+	if (edgeStates && state === "selected") return { color: edgeStates.selectedColor, opacity };
+	if (edgeStates && state === "dimmed") {
+		return { color: edgeStates.dimmedColor, opacity: Math.min(opacity, edgeStates.dimmedOpacity) };
+	}
 	return { color: visual.color ?? defaults.color, opacity };
 }
 

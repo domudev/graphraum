@@ -67,6 +67,7 @@ import type {
 	GraphraumData,
 	GraphraumDataPatch,
 	GraphraumDiagnostics,
+	GraphraumEdgeState,
 	GraphraumLabelCandidate,
 	GraphraumLayoutPositions,
 	GraphraumMode,
@@ -158,6 +159,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private edgeInstanceCapacity = 0;
 	private selectedNodeIds = new Set<string>();
 	private selectedEdgeIds = new Set<string>();
+	private dimmedEdgeIds = new Set<string>();
 	private edgeIndexCache: { edges: readonly unknown[]; indices: Map<string, number> } = {
 		edges: [],
 		indices: new Map(),
@@ -596,20 +598,37 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	 * Only the instance colors of edges whose selection changed are rewritten and uploaded.
 	 */
 	setEdgeSelection(edgeIds: Iterable<string>) {
-		const indices = this.edgeIndicesById();
-		const next = new Set([...edgeIds].filter((id) => indices.has(id)));
+		const next = this.knownEdgeIds(edgeIds);
 		const changed = changedIds(this.selectedEdgeIds, next);
 		this.selectedEdgeIds = next;
-		if (changed.length === 0) return;
-		this.repaintEdgeStates(changed.flatMap((id) => indices.get(id) ?? []));
+		this.repaintEdgeStates(changed);
+	}
+
+	/**
+	 * Applies an application-owned edge state without changing source graph data. `dimmed` uses
+	 * `theme.dimmedEdge` / `theme.dimmedEdgeOpacity`; selected edges stay selected. Unknown IDs are ignored.
+	 */
+	setEdgeState(state: GraphraumEdgeState, edgeIds: Iterable<string>) {
+		if (state !== "dimmed") throw new Error(`Unknown edge state "${String(state)}". Use "dimmed".`);
+		const next = this.knownEdgeIds(edgeIds);
+		const changed = changedIds(this.dimmedEdgeIds, next);
+		this.dimmedEdgeIds = next;
+		this.repaintEdgeStates(changed);
+	}
+
+	private knownEdgeIds(edgeIds: Iterable<string>) {
+		const indices = this.edgeIndicesById();
+		return new Set([...edgeIds].filter((id) => indices.has(id)));
 	}
 
 	/**
 	 * Visible slots, LOD tier, and geometry only change through materialize or endpoint patches,
 	 * which keep `visibleEdgeLayouts` current, so a state change can always repaint in place.
 	 */
-	private repaintEdgeStates(edgeIndices: readonly number[]) {
-		if (!this.edgeMesh) return;
+	private repaintEdgeStates(changedEdgeIds: readonly string[]) {
+		if (!this.edgeMesh || changedEdgeIds.length === 0) return;
+		const indices = this.edgeIndicesById();
+		const edgeIndices = changedEdgeIds.flatMap((id) => indices.get(id) ?? []);
 		patchVisibleEdgePaint(this.edgeMesh.geometry, {
 			changedEdgeIndices: edgeIndices,
 			defaults: { color: this.theme.edge, opacity: this.theme.edgeOpacity },
@@ -623,10 +642,14 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	private edgeStateStyling(): EdgeStateStyling {
 		return {
+			dimmedColor: this.theme.dimmedEdge,
+			dimmedOpacity: this.theme.dimmedEdgeOpacity,
 			selectedColor: this.theme.selectedEdge,
 			stateOf: (edgeIndex) => {
 				const id = this.data.edges[edgeIndex]?.id;
-				return id !== undefined && this.selectedEdgeIds.has(id) ? "selected" : null;
+				if (id === undefined) return null;
+				if (this.selectedEdgeIds.has(id)) return "selected";
+				return this.dimmedEdgeIds.has(id) ? "dimmed" : null;
 			},
 		};
 	}
@@ -646,6 +669,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private pruneEdgeStates() {
 		const indices = this.edgeIndicesById();
 		this.selectedEdgeIds = new Set([...this.selectedEdgeIds].filter((id) => indices.has(id)));
+		this.dimmedEdgeIds = new Set([...this.dimmedEdgeIds].filter((id) => indices.has(id)));
 	}
 
 	/** Applies an application-owned visual state without changing source graph data. */
@@ -848,6 +872,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			gpuTextures: this.renderer.info.memory.textures,
 			lodLevel: resolveLodLevel(this.densityLodActive, this.visibleEdgeCandidateCount, this.visibleEdgeCount),
 			pickingStrategy: this.mode === "2d" ? "spatial-grid-2d" : "raycaster-3d",
+			dimmedEdges: this.dimmedEdgeIds.size,
 			selectedEdges: this.selectedEdgeIds.size,
 			selectedNodes: this.selectedNodeIds.size,
 			totalEdges: this.data.edges.length,

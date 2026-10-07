@@ -170,6 +170,8 @@ describe("patchVisibleEdgePaint", () => {
 
 	test("rewrites only the changed edge colors to match a full pack", () => {
 		const selected: EdgeStateStyling = {
+			dimmedColor: "#315a51",
+			dimmedOpacity: 0.25,
 			selectedColor: "#fcfffc",
 			stateOf: (edgeIndex) => (edgeIndex === 0 ? "selected" : null),
 		};
@@ -212,7 +214,7 @@ describe("patchVisibleEdgePaint", () => {
 			patchVisibleEdgePaint(geometry, {
 				changedEdgeIndices: [5],
 				defaults,
-				edgeStates: { selectedColor: "#fcfffc", stateOf: () => "selected" },
+				edgeStates: { dimmedColor: "#315a51", dimmedOpacity: 0.25, selectedColor: "#fcfffc", stateOf: () => "dimmed" },
 				edgeVisuals,
 				layouts,
 				tier: "detail",

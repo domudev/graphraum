@@ -37,6 +37,8 @@ console.log(graphraumThemes.light.background); // "#fcfffc"
 
 Selection is a color change inside the existing instanced node mesh. It deliberately does not add a halo mesh or another rendering pass, so the two-draw-call baseline remains true.
 
+Edges have two host states. `setEdgeSelection(ids)` paints `theme.selectedEdge`; `setEdgeState("dimmed", ids)` recedes edges to `theme.dimmedEdge` at `theme.dimmedEdgeOpacity` (Turf-tinted and faint, but still readable as structure). Selection wins when an edge is in both sets. Both are color changes inside the existing edge batch, so they add no draw calls either.
+
 ## Override without forking
 
 Pass a named preset, or override only the tokens your product owns. Switch at runtime with `setTheme` / `setBackground`.

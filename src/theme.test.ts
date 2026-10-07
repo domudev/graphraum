@@ -14,6 +14,8 @@ describe("graphraum themes", () => {
 		expect(graphraumTheme).toBe(graphraumThemeDark);
 		expect(graphraumTheme).toEqual({
 			background: "#040f0f",
+			dimmedEdge: "#315a51",
+			dimmedEdgeOpacity: 0.25,
 			dimmedNode: "#315a51",
 			edge: "#226f54",
 			edgeOpacity: 0.55,
@@ -32,6 +34,8 @@ describe("graphraum themes", () => {
 	it("exports a light preset with porcelain field and ink selection", () => {
 		expect(graphraumThemeLight).toEqual({
 			background: "#fcfffc",
+			dimmedEdge: "#9bb5ac",
+			dimmedEdgeOpacity: 0.35,
 			dimmedNode: "#9bb5ac",
 			edge: "#226f54",
 			edgeOpacity: 0.65,
@@ -58,6 +62,16 @@ describe("graphraum themes", () => {
 			...graphraumThemeLight,
 			node: "#6d5bd0",
 		});
+	});
+
+	it("rejects a dimmed edge opacity outside 0..1", () => {
+		expect(resolveGraphraumTheme({ dimmedEdgeOpacity: 0 }).dimmedEdgeOpacity).toBe(0);
+		expect(resolveGraphraumTheme({ dimmedEdgeOpacity: 1 }).dimmedEdgeOpacity).toBe(1);
+		for (const dimmedEdgeOpacity of [-0.1, 1.2, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(() => resolveGraphraumTheme({ dimmedEdgeOpacity })).toThrow(
+				/dimmedEdgeOpacity must be a finite number between 0 and 1/,
+			);
+		}
 	});
 
 	it("normalizes transparent backgrounds for host CSS patterns", () => {
