@@ -22,7 +22,7 @@ import {
 } from "./node-glow";
 import { OUTPUT_COLOR_SPACE_FRAGMENT } from "./shader-output";
 
-/** Below the edge (-1 in 2D, 0 in 3D) and node meshes so halos never cover graph elements. */
+/** Below the edge and node meshes so halos never cover graph elements. */
 export const GLOW_RENDER_ORDER = -2;
 
 // `instanceColor` is injected by Three.js when InstancedMesh.instanceColor is set.

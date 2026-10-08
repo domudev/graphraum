@@ -96,10 +96,17 @@ export function createEdgeGeometry(capacity: number): BufferGeometry {
 	return geometry;
 }
 
-export function createEdgeMaterial(depthTest: boolean): ShaderMaterial {
+/**
+ * Edges draw before nodes (see `NODE_RENDER_ORDER`) and neither test nor write depth, in 2D and 3D.
+ * Nodes therefore always cover edges: an edge never paints over a node face, even where it runs in
+ * front of that node in 3D. Nodes still depth-sort against each other.
+ */
+export const EDGE_RENDER_ORDER = -1;
+
+export function createEdgeMaterial(): ShaderMaterial {
 	return new ShaderMaterial({
-		depthTest,
-		depthWrite: depthTest,
+		depthTest: false,
+		depthWrite: false,
 		fragmentShader,
 		transparent: true,
 		vertexShader,
