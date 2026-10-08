@@ -140,4 +140,20 @@ describe("fitView", () => {
 		expect(camera.position.y).toBeCloseTo(0, 9);
 		expect(camera.position.z).toBeCloseTo(1000, 9);
 	});
+	test("2D fitView undoes a previous wheel zoom", () => {
+		const graph = createGraph(1792, 1150, "2d");
+		graph.setData(wideSheet());
+		const camera = cameraOf(graph) as OrthographicCamera;
+		const fitted = [camera.left, camera.right, camera.top, camera.bottom, camera.zoom];
+		// OrbitControls zooms an orthographic camera by scaling `camera.zoom`.
+		camera.zoom = 0.4;
+		camera.position.x += 120;
+		camera.updateProjectionMatrix();
+		graph.fitView();
+		expect([camera.left, camera.right, camera.top, camera.bottom, camera.zoom]).toEqual(fitted);
+		expect(camera.position.x).toBeCloseTo(0, 9);
+		const fittedProjection = camera.projectionMatrix.clone();
+		camera.updateProjectionMatrix();
+		expect(camera.projectionMatrix.equals(fittedProjection)).toBe(true);
+	});
 });

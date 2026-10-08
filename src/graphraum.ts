@@ -960,6 +960,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		camera.right = (visibleHeight * aspect) / 2;
 		camera.top = visibleHeight / 2;
 		camera.bottom = -visibleHeight / 2;
+		// Wheel zoom scales `camera.zoom`; the frustum above frames the graph only at zoom 1.
+		camera.zoom = 1;
 		camera.position.set(center.x, center.y, center.z + Math.max(size.z, 1000));
 		camera.lookAt(center);
 		this.controls.target.copy(center);
