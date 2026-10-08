@@ -135,6 +135,9 @@ export function allocateNodeInstanceColors(mesh: InstancedMesh, capacity: number
 	mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
 }
 
+/** After glow halos and edges, so node billboards always cover edges. */
+export const NODE_RENDER_ORDER = 1;
+
 export function createNodeMaterial(depthTest: boolean) {
 	return new ShaderMaterial({
 		depthTest,

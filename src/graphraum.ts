@@ -34,6 +34,7 @@ import { type PickableEdgeSegment, pickClosestEdgeIndex } from "./edge-picking";
 import {
 	createEdgeGeometry,
 	createEdgeMaterial,
+	EDGE_RENDER_ORDER,
 	writeEdgeMarkerInstance,
 	writeEdgeSegmentInstance,
 } from "./edge-rendering";
@@ -54,6 +55,7 @@ import {
 	allocateNodeInstanceColors,
 	createNodeGeometry,
 	createNodeMaterial,
+	NODE_RENDER_ORDER,
 	setNodeShapeAt,
 	setNodeStrokeAt,
 } from "./node-rendering";
@@ -416,7 +418,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		const nodeMaterial = createNodeMaterial(this.mode === "3d");
 		const nodeMesh = new InstancedMesh(nodeGeometry, nodeMaterial, nodeCapacity);
 		allocateNodeInstanceColors(nodeMesh, nodeCapacity);
-		nodeMesh.renderOrder = this.mode === "2d" ? 1 : 0;
+		nodeMesh.renderOrder = NODE_RENDER_ORDER;
 		this.nodeMesh = nodeMesh;
 		this.scene.add(nodeMesh);
 
@@ -429,10 +431,10 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.markerCapacity = capacities.markerCapacity;
 		this.edgeInstanceCapacity = capacities.edgeInstanceCapacity;
 		const edgeGeometry = createEdgeGeometry(this.edgeInstanceCapacity);
-		const edgeMaterial = createEdgeMaterial(this.mode === "3d");
+		const edgeMaterial = createEdgeMaterial();
 		const edgeMesh = new InstancedMesh(edgeGeometry, edgeMaterial, this.edgeInstanceCapacity);
 		edgeMesh.frustumCulled = false;
-		edgeMesh.renderOrder = this.mode === "2d" ? -1 : 0;
+		edgeMesh.renderOrder = EDGE_RENDER_ORDER;
 		this.edgeMesh = edgeMesh;
 		this.scene.add(edgeMesh);
 
@@ -589,6 +591,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				endpointPositions: this.canonicalEdgePositions,
 				layouts: this.visibleEdgeLayouts,
 				minHitSlop,
+				mode: this.mode,
 				nodeOutlines: this.data.nodes.map((node) => ({
 					height: node.height,
 					shape: node.shape,
@@ -746,13 +749,6 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.nodeMesh.material.depthTest = mode === "3d";
 			this.nodeMesh.material.depthWrite = mode === "3d";
 			this.nodeMesh.material.needsUpdate = true;
-			this.nodeMesh.renderOrder = mode === "2d" ? 1 : 0;
-		}
-		if (this.edgeMesh && !Array.isArray(this.edgeMesh.material)) {
-			this.edgeMesh.material.depthTest = mode === "3d";
-			this.edgeMesh.material.depthWrite = mode === "3d";
-			this.edgeMesh.material.needsUpdate = true;
-			this.edgeMesh.renderOrder = mode === "2d" ? -1 : 0;
 		}
 		this.fitView();
 	}
@@ -1469,6 +1465,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			maxSegments: this.edgeSegmentCapacity,
 			endpointAttach: this.theme.endpointAttach,
 			edgeNodeIndices: this.edgeNodeIndices,
+			mode: this.mode,
 			nodeOutlines: this.data.nodes.map((node) => ({
 				height: node.height,
 				shape: node.shape,

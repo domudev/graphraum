@@ -9,17 +9,13 @@ import {
 } from "./edge-rendering";
 
 describe("edge rendering buffers", () => {
-	test("configures edge depth for the active dimension", () => {
-		const overlay = createEdgeMaterial(false);
-		const spatial = createEdgeMaterial(true);
+	test("never tests or writes depth, so nodes drawn after it always cover it", () => {
+		const material = createEdgeMaterial();
 
-		expect(overlay.vertexShader).toContain("attribute vec3 instanceEndA;");
-		expect(overlay.depthTest).toBe(false);
-		expect(overlay.depthWrite).toBe(false);
-		expect(spatial.depthTest).toBe(true);
-		expect(spatial.depthWrite).toBe(true);
-		overlay.dispose();
-		spatial.dispose();
+		expect(material.vertexShader).toContain("attribute vec3 instanceEndA;");
+		expect(material.depthTest).toBe(false);
+		expect(material.depthWrite).toBe(false);
+		material.dispose();
 	});
 
 	test("creates all instanced attributes at the requested capacity", () => {

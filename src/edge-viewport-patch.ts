@@ -11,7 +11,7 @@ import {
 	writeEdgeSegmentInstance,
 } from "./edge-rendering";
 import { type EdgePaint, type EdgeStateStyling, resolveEdgePaint } from "./edge-state";
-import type { GraphraumColor, GraphraumEdgeVisual } from "./types";
+import type { GraphraumColor, GraphraumEdgeVisual, GraphraumMode } from "./types";
 
 export interface VisibleEdgeLayout {
 	markerCount: number;
@@ -72,6 +72,7 @@ export interface PatchVisibleEdgesInput {
 	endpointPositions: Float32Array;
 	layouts: ReadonlyMap<number, VisibleEdgeLayout>;
 	minHitSlop: number;
+	mode: GraphraumMode;
 	nodeOutlines?: readonly EndpointOutline[];
 	tier: EdgeLodTier;
 	worldPerPixel: number;
@@ -113,6 +114,7 @@ export function patchVisibleEdgeInstances(
 			endpointAttach: input.endpointAttach,
 			edgeNodeIndices: input.edgeNodeIndices,
 			edgeStates: input.edgeStates,
+			mode: input.mode,
 			nodeOutlines: input.nodeOutlines,
 		});
 		if (packed.segments.length !== layout.segmentCount || packed.markers.length !== layout.markerCount) {

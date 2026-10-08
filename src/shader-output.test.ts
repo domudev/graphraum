@@ -27,8 +27,7 @@ function mainStatements(source: string): string[] {
 const displayMaterials: readonly [string, () => ShaderMaterial][] = [
 	["node", () => createNodeMaterial(false)],
 	["node 3d", () => createNodeMaterial(true)],
-	["edge", () => createEdgeMaterial(false)],
-	["edge 3d", () => createEdgeMaterial(true)],
+	["edge", () => createEdgeMaterial()],
 	["node glow", () => createNodeGlowMaterial("additive")],
 	["node glow light", () => createNodeGlowMaterial("normal")],
 ];

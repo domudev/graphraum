@@ -13,6 +13,7 @@ describe("packEdgeInstances", () => {
 			edgeVisuals: [{ marker: "triangle", markerEnd: "both", style: "dashed", width: 3, opacity: 0.9, path: "cubic" }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			mode: "2d",
 			tier: "overview",
 		});
 		expect(packed.segments).toHaveLength(1);
@@ -28,6 +29,7 @@ describe("packEdgeInstances", () => {
 			edgeVisuals: [{ path: "quadratic", controlPoints: [{ x: 5, y: 4, z: 0 }] }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			mode: "2d",
 			tier: "detail",
 		});
 		expect(quadratic.segments).toHaveLength(16);
@@ -37,6 +39,7 @@ describe("packEdgeInstances", () => {
 			edgeVisuals: [{ path: "cubic" }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			mode: "2d",
 			tier: "detail",
 		});
 		expect(cubic.segments).toHaveLength(24);
@@ -56,6 +59,7 @@ describe("packEdgeInstances", () => {
 			],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			mode: "2d",
 			tier: "detail",
 		});
 		expect(packed.markers).toHaveLength(2);
@@ -70,6 +74,7 @@ describe("packEdgeInstances", () => {
 			edgeVisuals: [{ path: "cubic" }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			mode: "2d",
 			tier: "detail",
 			maxSegments: 4,
 		});
@@ -83,6 +88,7 @@ describe("packEdgeInstances", () => {
 			edgeVisuals: [{ path: "straight" }],
 			endpointPositions: endpoints.positions,
 			defaults: { color: "#226f54", opacity: 0.55, width: 1.5 },
+			mode: "2d",
 			tier: "detail",
 			endpointAttach: "boundary",
 			edgeNodeIndices: new Uint32Array([0, 1]),

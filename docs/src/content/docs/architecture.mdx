@@ -30,7 +30,7 @@ graphraum renders when data, selection, camera controls, mode, or container size
 
 In 2D, graphraum queries visible nodes from its spatial grid with an overscan margin, derives unique incident edges without scanning the full edge list, and compacts that subset into the existing node and edge GPU buffers. The renderer remains at two draw calls; the opt-in node [glow](../visual-language/#glow) adds one bounded halo draw call only while a visible node glows.
 
-When visible nodes exceed `maxVisibleNodes`, graphraum bins them into representative spatial density clusters. Density mode enters above 110% of the budget and exits below 85% so small camera changes do not flicker between tiers. Nodes overlay edges in 2D; 3D preserves normal depth ordering.
+When visible nodes exceed `maxVisibleNodes`, graphraum bins them into representative spatial density clusters. Density mode enters above 110% of the budget and exits below 85% so small camera changes do not flicker between tiers. Nodes always draw over edges, in 2D and 3D. In 3D nodes still hide each other by depth, but an edge never covers a node, even where it passes in front of one: a node behind an edge shows on top of it. Edges also no longer depth-sort among themselves in 3D: where they overlap, they draw in batch order. This keeps node faces readable at busy hubs at the cost of these depth cues.
 
 When incident edges exceed `maxVisibleEdges`, graphraum applies a deterministic overview budget and reports that decision through diagnostics. Application-specific clustering and semantic aggregation remain host concerns.
 
