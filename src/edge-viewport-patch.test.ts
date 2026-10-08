@@ -14,6 +14,7 @@ describe("buildVisibleEdgeLayouts", () => {
 			edgeIndices: [0, 1],
 			edgeVisuals: [{ path: "straight", marker: "triangle", markerEnd: "target" }, { path: "quadratic" }],
 			endpointPositions: new Float32Array([0, 0, 0, 10, 0, 0, 1, 1, 0, 11, 1, 0]),
+			mode: "2d",
 			tier: "detail",
 		});
 		const layouts = buildVisibleEdgeLayouts(packed.segments, packed.markers, packed.segments.length);
@@ -37,6 +38,7 @@ describe("patchVisibleEdgeInstances", () => {
 			edgeIndices: [0],
 			edgeVisuals: [{ path: "straight" }],
 			endpointPositions,
+			mode: "2d",
 			tier: "detail",
 		});
 		for (const [slot, segment] of packed.segments.entries()) {
@@ -62,6 +64,7 @@ describe("patchVisibleEdgeInstances", () => {
 				endpointPositions,
 				layouts,
 				minHitSlop: 2,
+				mode: "2d",
 				tier: "detail",
 				worldPerPixel: 1,
 			},
@@ -86,6 +89,7 @@ describe("patchVisibleEdgeInstances", () => {
 			edgeIndices: [0],
 			edgeVisuals: [{ path: "quadratic" }],
 			endpointPositions,
+			mode: "2d",
 			tier: "overview",
 		});
 		const layouts = buildVisibleEdgeLayouts(overview.segments, overview.markers, overview.segments.length);
@@ -107,6 +111,7 @@ describe("patchVisibleEdgeInstances", () => {
 				endpointPositions,
 				layouts,
 				minHitSlop: 2,
+				mode: "2d",
 				tier: "detail",
 				worldPerPixel: 1,
 			},
@@ -126,6 +131,7 @@ describe("patchVisibleEdgeInstances update ranges", () => {
 			edgeIndices: [0],
 			edgeVisuals: [{ path: "straight" as const }],
 			endpointPositions,
+			mode: "2d" as const,
 			tier: "detail" as const,
 		};
 		const packed = packEdgeInstances(input);
@@ -159,6 +165,7 @@ describe("patchVisibleEdgePaint", () => {
 			edgeStates,
 			edgeVisuals,
 			endpointPositions,
+			mode: "2d",
 			tier: "detail",
 		});
 		for (const [slot, segment] of packed.segments.entries()) writeEdgeSegmentInstance(geometry, slot, segment);

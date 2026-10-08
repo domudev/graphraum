@@ -7,7 +7,10 @@ vi.mock("three", async (importOriginal) => {
 	return { ...actual, WebGLRenderer: FakeWebGLRenderer };
 });
 
+import { EDGE_RENDER_ORDER } from "./edge-rendering";
 import type { Graphraum } from "./graphraum";
+import { GLOW_RENDER_ORDER } from "./node-glow-rendering";
+import { NODE_RENDER_ORDER } from "./node-rendering";
 import { createGraph, destroyGraphs, edgeBuffers, internals } from "./test-support/edge-harness";
 import { installFakeBrowserGlobals } from "./test-support/fake-webgl";
 import type { GraphraumMode } from "./types";
@@ -48,6 +51,11 @@ function expectEdgesUnderNodes(graph: Graphraum, mode: GraphraumMode) {
 }
 
 describe("edge and node draw order", () => {
+	test("layers glow halos under edges and edges under nodes", () => {
+		expect(GLOW_RENDER_ORDER).toBeLessThan(EDGE_RENDER_ORDER);
+		expect(EDGE_RENDER_ORDER).toBeLessThan(NODE_RENDER_ORDER);
+	});
+
 	test.each(["2d", "3d"] as const)("draws edges under nodes without touching depth in %s", (mode) => {
 		expectEdgesUnderNodes(hub(mode), mode);
 	});

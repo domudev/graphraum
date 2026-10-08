@@ -63,8 +63,8 @@ export function packEdgeInstances(input: {
 	edgeNodeIndices?: Uint32Array;
 	/** Host-owned edge states (selection) applied on top of the edge visual. */
 	edgeStates?: EdgeStateStyling;
-	/** Render mode; `3d` trims boundary ends along the 3D segment. Default `2d`. */
-	mode?: GraphraumMode;
+	/** Render mode; `3d` trims boundary ends along the 3D segment. */
+	mode: GraphraumMode;
 }): { segments: EdgeSegmentInstance[]; markers: EdgeMarkerInstance[]; truncated: boolean } {
 	const segments: EdgeSegmentInstance[] = [];
 	const markers: EdgeMarkerInstance[] = [];

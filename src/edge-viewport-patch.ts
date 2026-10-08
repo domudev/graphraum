@@ -72,7 +72,7 @@ export interface PatchVisibleEdgesInput {
 	endpointPositions: Float32Array;
 	layouts: ReadonlyMap<number, VisibleEdgeLayout>;
 	minHitSlop: number;
-	mode?: GraphraumMode;
+	mode: GraphraumMode;
 	nodeOutlines?: readonly EndpointOutline[];
 	tier: EdgeLodTier;
 	worldPerPixel: number;

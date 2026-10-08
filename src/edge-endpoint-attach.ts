@@ -18,7 +18,10 @@ export interface EndpointOutline {
 export interface TrimEdgeEndpointsInput {
 	attach?: EndpointAttach;
 	clearance?: number;
-	/** `3d` trims along the 3D segment so ends meet camera-facing outlines. Default `2d`. */
+	/**
+	 * `3d` trims along the 3D segment so ends meet camera-facing outlines; exact for circles,
+	 * approximate for other shapes. Default `2d`.
+	 */
 	mode?: GraphraumMode;
 	source: GraphraumPosition;
 	sourceOutline: EndpointOutline;
@@ -56,9 +59,11 @@ function outlineRadius(outline: EndpointOutline, headingX: number, headingY: num
  *
  * In `2d` the outline lies in the xy plane, so only the xy part of the chord counts. In `3d` the
  * billboard faces the camera, so the edge stops one outline radius from the center along the 3D
- * segment: projected, that point lies on the outline or inside it, where the node covers the edge.
- * The radius is measured along the chord's xy heading (or +x when the chord is parallel to z), so
- * circles are exact from every view.
+ * segment. The radius is measured along the chord's world xy heading (or +x when the chord is
+ * parallel to z), not along its on-screen heading. For circles the radius is the same in every
+ * direction, so the projected end lies on the outline or inside it (where the node covers the
+ * edge) from every view. Other shapes are approximate in 3D: an elongated or angular node can end
+ * inside its outline or short of it, depending on the camera.
  */
 export function attachPointOnOutline(
 	center: GraphraumPosition,

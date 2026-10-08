@@ -122,6 +122,27 @@ interface GraphraumEdgeVisual {
 
 `defineVisuals()` maps typed edge attributes to this contract; direct edge fields use the same shape without a mapper. `style` selects a dash pattern, `marker` draws a triangle at `markerEnd` (`target` by default), and `markerSize` scales the triangle relative to `width`. `path` selects a polyline sampling of a straight, quadratic, or cubic curve; omit `controlPoints` for auto handles, or supply 1 (quadratic) / 2 (cubic) world-space points. Overview LOD collapses curves to a single straight segment. Endpoints always come from the source and target node positions. See [Node & edge presentation](../node-edge-presentation/) for the full contract.
 
+### Edge endpoints
+
+`theme.endpointAttach` (`"boundary"` by default) stops each edge at its node's outline, stroke included, with a small clearance; `"center"` joins node centers. The same trim is exported for hosts that draw their own edge geometry, such as overlays or exported paths:
+
+```ts
+import { attachPointOnOutline, trimEdgeEndpoints } from "@domudev/graphraum";
+
+const { source, target } = trimEdgeEndpoints({
+  source: { x: 0, y: 0, z: 0 },
+  target: { x: 30, y: 0, z: 40 },
+  sourceOutline: { size: 4 },
+  targetOutline: { shape: "pill", width: 12, height: 3 },
+  clearance: 0.75, // world units, the default
+  mode: "3d", // "2d" by default
+});
+
+const end = attachPointOnOutline(center, farPoint, { size: 4 }, 0.75, "3d");
+```
+
+Pass the renderer's mode. `"2d"` measures the outline in the xy plane and ignores `z`. `"3d"` stops one outline radius from each center along the 3D segment, because node billboards face the camera. The radius is taken along the edge's xy heading, so circles meet their outline from every view; other shapes are approximate in 3D and can end slightly inside or short of the outline, depending on the camera.
+
 ## Data and updates
 
 <div class="api-grid not-content">
