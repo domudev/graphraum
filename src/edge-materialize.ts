@@ -7,7 +7,13 @@ import {
 } from "./edge-endpoint-attach";
 import { type EdgeLodTier, sampleEdgePath } from "./edge-paths";
 import { type EdgeStateStyling, resolveEdgePaint } from "./edge-state";
-import type { GraphraumColor, GraphraumEdgeMarkerEnd, GraphraumEdgeStyle, GraphraumEdgeVisual } from "./types";
+import type {
+	GraphraumColor,
+	GraphraumEdgeMarkerEnd,
+	GraphraumEdgeStyle,
+	GraphraumEdgeVisual,
+	GraphraumMode,
+} from "./types";
 
 export type { EdgeLodTier };
 
@@ -57,6 +63,8 @@ export function packEdgeInstances(input: {
 	edgeNodeIndices?: Uint32Array;
 	/** Host-owned edge states (selection) applied on top of the edge visual. */
 	edgeStates?: EdgeStateStyling;
+	/** Render mode; `3d` trims boundary ends along the 3D segment. Default `2d`. */
+	mode?: GraphraumMode;
 }): { segments: EdgeSegmentInstance[]; markers: EdgeMarkerInstance[]; truncated: boolean } {
 	const segments: EdgeSegmentInstance[] = [];
 	const markers: EdgeMarkerInstance[] = [];
@@ -80,6 +88,7 @@ export function packEdgeInstances(input: {
 			const trimmed = trimEdgeEndpoints({
 				attach,
 				clearance,
+				mode: input.mode,
 				source: { x: x1, y: y1, z: z1 },
 				target: { x: x2, y: y2, z: z2 },
 				sourceOutline,

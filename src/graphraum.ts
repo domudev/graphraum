@@ -591,6 +591,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				endpointPositions: this.canonicalEdgePositions,
 				layouts: this.visibleEdgeLayouts,
 				minHitSlop,
+				mode: this.mode,
 				nodeOutlines: this.data.nodes.map((node) => ({
 					height: node.height,
 					shape: node.shape,
@@ -1464,6 +1465,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			maxSegments: this.edgeSegmentCapacity,
 			endpointAttach: this.theme.endpointAttach,
 			edgeNodeIndices: this.edgeNodeIndices,
+			mode: this.mode,
 			nodeOutlines: this.data.nodes.map((node) => ({
 				height: node.height,
 				shape: node.shape,

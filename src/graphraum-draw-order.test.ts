@@ -8,7 +8,7 @@ vi.mock("three", async (importOriginal) => {
 });
 
 import type { Graphraum } from "./graphraum";
-import { createGraph, destroyGraphs, internals } from "./test-support/edge-harness";
+import { createGraph, destroyGraphs, edgeBuffers, internals } from "./test-support/edge-harness";
 import { installFakeBrowserGlobals } from "./test-support/fake-webgl";
 import type { GraphraumMode } from "./types";
 
@@ -59,5 +59,24 @@ describe("edge and node draw order", () => {
 		const graph = hub(from);
 		graph.setMode(to);
 		expectEdgesUnderNodes(graph, to);
+	});
+});
+
+describe("edge ends at node outlines", () => {
+	// Hub fixture: default size 4, default clearance 0.75, chord (20, 0, 40) of length √2000.
+	test("trims along the 3D segment in 3D and along xy in 2D", () => {
+		const graph = hub("3d");
+		const length = Math.hypot(20, 40);
+		const spatialT = (4 - 0.75) / length;
+		const [x, y, z] = edgeBuffers(graph).instanceEndA ?? [];
+		expect(x).toBeCloseTo(20 * spatialT, 4);
+		expect(y).toBeCloseTo(0, 4);
+		expect(z).toBeCloseTo(40 * spatialT, 4);
+
+		graph.setMode("2d");
+		const flatT = 4 / 20 - 0.75 / length;
+		const [flatX, , flatZ] = edgeBuffers(graph).instanceEndA ?? [];
+		expect(flatX).toBeCloseTo(20 * flatT, 4);
+		expect(flatZ).toBeCloseTo(40 * flatT, 4);
 	});
 });

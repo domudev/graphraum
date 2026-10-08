@@ -1,6 +1,6 @@
 import { resolveNodeAxes } from "./node-axes";
 import { containsNodePoint } from "./node-shapes";
-import type { GraphraumNodeShape, GraphraumPosition } from "./types";
+import type { GraphraumMode, GraphraumNodeShape, GraphraumPosition } from "./types";
 
 export type EndpointAttach = "boundary" | "center";
 
@@ -18,13 +18,20 @@ export interface EndpointOutline {
 export interface TrimEdgeEndpointsInput {
 	attach?: EndpointAttach;
 	clearance?: number;
+	/** `3d` trims along the 3D segment so ends meet camera-facing outlines. Default `2d`. */
+	mode?: GraphraumMode;
 	source: GraphraumPosition;
 	sourceOutline: EndpointOutline;
 	target: GraphraumPosition;
 	targetOutline: EndpointOutline;
 }
 
-function isInsideOutline(outline: EndpointOutline, worldX: number, worldY: number, center: GraphraumPosition): boolean {
+/**
+ * Distance from the node center to its outline (stroke included) along a unit heading in the
+ * billboard plane, in world units. Every shape fits its `[-1, 1]` box, so the box diagonal bounds
+ * the search.
+ */
+function outlineRadius(outline: EndpointOutline, headingX: number, headingY: number): number {
 	const { height, width } = resolveNodeAxes({
 		height: outline.height,
 		size: outline.size,
@@ -33,19 +40,32 @@ function isInsideOutline(outline: EndpointOutline, worldX: number, worldY: numbe
 	const stroke = Math.max(0, outline.strokeWidth ?? 0);
 	const halfWidth = width + stroke;
 	const halfHeight = height + stroke;
-	if (halfWidth <= 0 || halfHeight <= 0) return false;
-	return containsNodePoint(outline.shape, (worldX - center.x) / halfWidth, (worldY - center.y) / halfHeight);
+	let low = 0;
+	let high = Math.hypot(halfWidth, halfHeight);
+	for (let step = 0; step < 24; step += 1) {
+		const mid = (low + high) / 2;
+		if (containsNodePoint(outline.shape, (headingX * mid) / halfWidth, (headingY * mid) / halfHeight)) low = mid;
+		else high = mid;
+	}
+	return low;
 }
 
 /**
  * Walk from the node center toward the far point and stop on the outline,
  * then pull back by `clearance` so the stroke is not stabbed.
+ *
+ * In `2d` the outline lies in the xy plane, so only the xy part of the chord counts. In `3d` the
+ * billboard faces the camera, so the edge stops one outline radius from the center along the 3D
+ * segment: projected, that point lies on the outline or inside it, where the node covers the edge.
+ * The radius is measured along the chord's xy heading (or +x when the chord is parallel to z), so
+ * circles are exact from every view.
  */
 export function attachPointOnOutline(
 	center: GraphraumPosition,
 	far: GraphraumPosition,
 	outline: EndpointOutline,
 	clearance = DEFAULT_ENDPOINT_CLEARANCE,
+	mode: GraphraumMode = "2d",
 ): GraphraumPosition {
 	const dx = far.x - center.x;
 	const dy = far.y - center.y;
@@ -53,18 +73,13 @@ export function attachPointOnOutline(
 	const length = Math.hypot(dx, dy, dz);
 	if (length < 1e-6) return { x: center.x, y: center.y, z: center.z ?? 0 };
 
-	let low = 0;
-	let high = 1;
-	for (let step = 0; step < 24; step += 1) {
-		const mid = (low + high) / 2;
-		const x = center.x + dx * mid;
-		const y = center.y + dy * mid;
-		if (isInsideOutline(outline, x, y, center)) low = mid;
-		else high = mid;
-	}
+	const planar = Math.hypot(dx, dy);
+	const reach = mode === "3d" ? length : planar;
+	const radius = planar < 1e-6 ? outlineRadius(outline, 1, 0) : outlineRadius(outline, dx / planar, dy / planar);
+	const outlineT = reach < 1e-6 ? 1 : Math.min(1, radius / reach);
 
 	const clearanceT = Math.min(Math.max(clearance, 0) / length, 0.45);
-	const t = Math.max(0, low - clearanceT);
+	const t = Math.max(0, outlineT - clearanceT);
 	return {
 		x: center.x + dx * t,
 		y: center.y + dy * t,
@@ -84,8 +99,8 @@ export function trimEdgeEndpoints(input: TrimEdgeEndpointsInput): {
 		};
 	}
 	const clearance = input.clearance ?? DEFAULT_ENDPOINT_CLEARANCE;
-	const source = attachPointOnOutline(input.source, input.target, input.sourceOutline, clearance);
-	const target = attachPointOnOutline(input.target, input.source, input.targetOutline, clearance);
+	const source = attachPointOnOutline(input.source, input.target, input.sourceOutline, clearance, input.mode);
+	const target = attachPointOnOutline(input.target, input.source, input.targetOutline, clearance, input.mode);
 	const ox = input.target.x - input.source.x;
 	const oy = input.target.y - input.source.y;
 	const oz = (input.target.z ?? 0) - (input.source.z ?? 0);
