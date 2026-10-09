@@ -20,48 +20,32 @@ export default defineConfig({
 			customCss: ["./src/styles/custom.css"],
 			components: {
 				Head: "./src/components/Head.astro",
-				PageTitle: "./src/components/PageTitle.astro",
 				SiteTitle: "./src/components/SiteTitle.astro",
 			},
-			social: [{ icon: "github", label: "graphraum on GitHub", href: "https://github.com/domudev/graphraum" }],
 			sidebar: [
 				{
 					label: "Start",
 					items: [
-						{ label: "Overview", link: "/" },
-						{ label: "Why graphraum", link: "/why-graphraum/" },
 						{ label: "Get started", link: "/get-started/" },
+						{ label: "Why graphraum", link: "/why-graphraum/" },
 					],
 				},
 				{
-					label: "SDK",
+					label: "Guide",
 					items: [
-						{
-							label: "Interactive demos",
-							badge: "Live",
-							items: [
-								{ label: "Overview", link: "/demos/" },
-								{ label: "Knowledge graph", link: "/demos/knowledge/" },
-								{ label: "Software topology", link: "/demos/dependencies/" },
-								{ label: "Fraud investigation", link: "/demos/investigation/" },
-							],
-						},
-						{ label: "Node & edge presentation", link: "/node-edge-presentation/" },
-						{ label: "API reference", link: "/api-reference/" },
+						{ label: "Data and visuals", link: "/guide/data-and-visuals/" },
+						{ label: "Labels and focus", link: "/guide/labels-and-focus/" },
+						{ label: "Layout", link: "/guide/layout/" },
+						{ label: "Camera and 3D", link: "/guide/camera-and-3d/" },
+						{ label: "Theme", link: "/guide/theme/" },
 					],
 				},
 				{
-					label: "Engine",
+					label: "Reference",
 					items: [
-						{ label: "Visual language", link: "/visual-language/" },
-						{ label: "Architecture", link: "/architecture/" },
-					],
-				},
-				{
-					label: "Evidence",
-					items: [
-						{ label: "Explorer", link: "/explore/", badge: "Live" },
-						{ label: "Playground", link: "/benchmark/", badge: "Proof" },
+						{ label: "API", link: "/reference/api/" },
+						{ label: "Architecture", link: "/reference/architecture/" },
+						{ label: "Changelog", link: "/reference/changelog/" },
 					],
 				},
 			],

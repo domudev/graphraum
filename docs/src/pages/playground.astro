@@ -1,0 +1,309 @@
+---
+import SiteNav from "../components/SiteNav.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { playgroundNodeShapes } from "../lib/playground";
+import { playgroundScenes, stressSizes } from "../lib/playground-scenes";
+import { PROVE_REFERENCE_CONTEXT } from "../lib/prove-reference";
+import { sitePath } from "../lib/site-path";
+import "../styles/playground.css";
+
+const base = sitePath();
+const shapeLabel = (shape: string) => shape[0]?.toUpperCase() + shape.slice(1);
+const shapeFields = [
+	{ name: "personShape", label: "Person", value: "circle" },
+	{ name: "documentShape", label: "Document", value: "square" },
+	{ name: "conceptShape", label: "Concept", value: "diamond" },
+] as const;
+const selects = [
+	{
+		name: "layout",
+		label: "Layout",
+		options: [
+			["auto", "Auto"],
+			["grid", "Grid"],
+			["circle", "Circle"],
+			["force", "Force"],
+			["force-live", "Force, live"],
+		],
+		value: "auto",
+	},
+	{
+		name: "forceIterations",
+		label: "Iterations",
+		options: [
+			["auto", "Auto"],
+			["8", "8"],
+			["16", "16"],
+			["24", "24"],
+			["32", "32"],
+		],
+		value: "auto",
+	},
+	{
+		name: "forceRepulsion",
+		label: "Repulsion",
+		options: [
+			["100", "100"],
+			["400", "400"],
+			["1000", "1,000"],
+			["2000", "2,000"],
+		],
+		value: "2000",
+	},
+	{
+		name: "forceLinkDistance",
+		label: "Link distance",
+		options: [
+			["12", "12"],
+			["24", "24"],
+			["48", "48"],
+			["96", "96"],
+		],
+		value: "96",
+	},
+	{
+		name: "forceGravity",
+		label: "Gravity",
+		options: [
+			["0.0005", "0.0005"],
+			["0.002", "0.002"],
+			["0.01", "0.01"],
+			["0.02", "0.02"],
+		],
+		value: "0.002",
+	},
+	{
+		name: "forceBatchSize",
+		label: "Batch size",
+		options: [
+			["auto", "Auto"],
+			["250", "250"],
+			["1000", "1,000"],
+			["4000", "4,000"],
+		],
+		value: "auto",
+	},
+	{
+		name: "nodeAspect",
+		label: "Node aspect",
+		options: [
+			["0.7", "Tall"],
+			["1", "Square"],
+			["1.6", "Wide"],
+		],
+		value: "1",
+	},
+	{
+		name: "nodeStrokeWidth",
+		label: "Node stroke",
+		options: [
+			["0", "None"],
+			["0.5", "0.5"],
+			["1", "1"],
+			["1.5", "1.5"],
+		],
+		value: "0",
+	},
+	{
+		name: "edgePath",
+		label: "Edge path",
+		options: [
+			["straight", "Straight"],
+			["quadratic", "Quadratic"],
+			["cubic", "Cubic"],
+		],
+		value: "straight",
+	},
+	{
+		name: "edgeStyle",
+		label: "Edge style",
+		options: [
+			["solid", "Solid"],
+			["dashed", "Dashed"],
+			["dotted", "Dotted"],
+		],
+		value: "solid",
+	},
+	{
+		name: "edgeMarker",
+		label: "Marker",
+		options: [
+			["none", "None"],
+			["triangle", "Triangle"],
+		],
+		value: "none",
+	},
+	{
+		name: "edgeMarkerEnd",
+		label: "Marker end",
+		options: [
+			["target", "Target"],
+			["source", "Source"],
+			["both", "Both"],
+		],
+		value: "target",
+	},
+	{
+		name: "edgeWidth",
+		label: "Edge width",
+		options: [
+			["1", "1"],
+			["1.5", "1.5"],
+			["3", "3"],
+			["5", "5"],
+		],
+		value: "1.5",
+	},
+	{
+		name: "edgeOpacity",
+		label: "Edge opacity",
+		options: [
+			["0.4", "0.4"],
+			["0.85", "0.85"],
+			["1", "1"],
+		],
+		value: "0.85",
+	},
+] as const;
+---
+
+<SiteLayout
+	title="Playground · graphraum"
+	description="Run graphraum live: knowledge, software and fraud scenes, a 100,000 node stress test, and Prove on your own device."
+	bodyClass="playground"
+>
+	<main class="app" data-scene="knowledge">
+		<div id="stage" class="stage" role="application" aria-label="Interactive graph. Click a node to inspect it."></div>
+
+		<header class="bar">
+			<SiteNav compact />
+			<span class="vsep" aria-hidden="true"></span>
+			<div class="seg scenes" role="group" aria-label="Scene">
+				{playgroundScenes.map((scene) => <button type="button" data-scene-button={scene.id}>{scene.label}</button>)}
+			</div>
+			<label class="scene-select">
+				<span class="visually-hidden">Scene</span>
+				<select id="scene-select">
+					{playgroundScenes.map((scene) => <option value={scene.id}>{scene.label}</option>)}
+				</select>
+			</label>
+			<div class="seg sizes" role="group" aria-label="Stress size">
+				{stressSizes.map((size) => <button type="button" data-size-button={size}>{size >= 1000 ? `${size / 1000}k` : size}</button>)}
+			</div>
+			<div class="seg" role="group" aria-label="Dimension">
+				<button type="button" data-mode-button="2d">2D</button>
+				<button type="button" data-mode-button="3d">3D</button>
+			</div>
+			<div class="grow"></div>
+			<div class="bar-actions">
+				<button type="button" class="gbtn" data-fit>Fit</button>
+				<button type="button" class="gbtn" id="settings-button" aria-expanded="false" aria-controls="settings">Settings</button>
+				<button type="button" class="gbtn" id="code-button">View code</button>
+				<button type="button" class="gbtn primary" data-prove-open>Prove on this device</button>
+			</div>
+		</header>
+
+		<form id="settings" class="settings" hidden aria-label="Stress settings">
+			<p class="settings-note">Layout and appearance for the stress scene.</p>
+			<div class="settings-grid">
+				{
+					selects.map((field) => (
+						<label>
+							<span>{field.label}</span>
+							<select name={field.name}>
+								{field.options.map(([value, label]) => (
+									<option value={value} selected={value === field.value}>
+										{label}
+									</option>
+								))}
+							</select>
+						</label>
+					))
+				}
+				{
+					shapeFields.map((field) => (
+						<label>
+							<span>{field.label} shape</span>
+							<select name={field.name}>
+								{playgroundNodeShapes.map((shape) => (
+									<option value={shape} selected={shape === field.value}>
+										{shapeLabel(shape)}
+									</option>
+								))}
+							</select>
+						</label>
+					))
+				}
+			</div>
+			<label class="check"><input type="checkbox" name="overlay" checked /> <span>Focus labels and toolbar</span></label>
+		</form>
+
+		<aside id="inspector" class="inspector" aria-live="polite">
+			<div class="grabber" aria-hidden="true"></div>
+			<div class="insp-title"><span class="swatch" data-insp-swatch></span><h1 data-insp-title>Knowledge graph</h1></div>
+			<p class="insp-sub" data-insp-subtitle></p>
+			<div class="chips" data-insp-chips></div>
+			<div class="relations" data-insp-relations></div>
+			<div class="insp-actions" data-insp-actions></div>
+			<p class="insp-message" data-insp-message role="status"></p>
+			<label class="entity">
+				<span>Jump to</span>
+				<select data-insp-entities></select>
+			</label>
+			<p class="insp-note" data-insp-note>
+				This panel is app code, not graphraum. <a href={`${base}guide/data-and-visuals/#render-detail-only-when-needed`}>See how</a>
+			</p>
+			<div class="mobile-actions">
+				<button type="button" class="gbtn" data-fit>Fit</button>
+				<button type="button" class="gbtn primary" data-prove-open>Prove</button>
+			</div>
+		</aside>
+
+		<p id="status" class="status" aria-live="off"><span data-status-nodes></span><span data-status-edges></span><span data-status-calls></span><span data-status-frame></span></p>
+		<p class="hint">Drag to pan · scroll to zoom · click a node</p>
+
+		<aside id="prove" class="prove" hidden aria-labelledby="prove-title">
+			<div class="prove-head">
+				<span class="kicker" data-prove-kicker>Prove</span>
+				<button type="button" class="gbtn small" data-prove-close>Close</button>
+			</div>
+			<h2 id="prove-title">Your device vs. reference</h2>
+			<p class="prove-meta" data-prove-meta></p>
+			<table class="results">
+				<thead><tr><th scope="col">Measure</th><th scope="col">You</th><th scope="col">Reference</th></tr></thead>
+				<tbody data-prove-rows></tbody>
+			</table>
+			<div class="progress">
+				<div class="progress-text"><span data-prove-phase>Ready</span><span data-prove-percent></span></div>
+				<div class="bar-track"><i data-prove-bar></i></div>
+			</div>
+			<div class="prove-actions">
+				<button type="button" class="gbtn primary" data-prove-run>Run</button>
+				<button type="button" class="gbtn" data-prove-copy disabled>Copy result</button>
+			</div>
+			<p class="prove-meta">
+				Reference: {PROVE_REFERENCE_CONTEXT}. Treat it as a reference, not a score. Browser, GPU and pixel ratio change the
+				numbers. Nothing is uploaded.
+			</p>
+		</aside>
+
+		<dialog id="code-dialog" class="code-dialog" aria-labelledby="code-title">
+			<div class="prove-head">
+				<h2 id="code-title">Code for this scene</h2>
+				<div class="code-actions">
+					<button type="button" class="gbtn small" data-code-copy>Copy</button>
+					<button type="button" class="gbtn small" data-code-close>Close</button>
+				</div>
+			</div>
+			<pre class="code-block" data-code-body></pre>
+			<p class="prove-meta"><a href={`${base}get-started/`}>Get started</a> walks through it step by step.</p>
+		</dialog>
+	</main>
+</SiteLayout>
+
+<script>
+	import { startPlayground } from "../playground/app";
+
+	startPlayground();
+</script>
+

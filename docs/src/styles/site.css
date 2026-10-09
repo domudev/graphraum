@@ -1,0 +1,216 @@
+@import "@fontsource-variable/lexend";
+
+/* Home and playground: dark, outside Starlight. Tokens match the Claude Design "graphraum site" draft. */
+:root {
+	--ink: #040f0f;
+	--night: #06100f;
+	--panel: rgb(10 18 17 / 88%);
+	--sheet: #0a1716;
+	--paper: #fcfffc;
+	--mint: #73c7a5;
+	--green: #226f54;
+	--line: rgb(252 255 252 / 10%);
+	--muted: rgb(231 236 234 / 62%);
+	--soft: rgb(231 236 234 / 82%);
+	--code-bg: #0b1918;
+	--font: "Lexend Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	/* Version selector (injected into archived builds) reads these. */
+	--graphraum-border: var(--line);
+	--graphraum-muted: rgb(255 255 255 / 7%);
+	--graphraum-muted-foreground: var(--muted);
+	--graphraum-foreground: var(--paper);
+	--graphraum-card: rgb(255 255 255 / 12%);
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	background: var(--night);
+	color: var(--paper);
+	font-family: var(--font);
+	margin: 0;
+}
+
+a {
+	color: var(--mint);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+:focus-visible {
+	outline: 2px solid var(--mint);
+	outline-offset: 2px;
+}
+
+code,
+pre,
+.mono {
+	font-family: var(--mono);
+}
+
+.site-nav-bar {
+	align-items: center;
+	display: flex;
+	gap: 28px;
+	height: 64px;
+	padding: 0 40px;
+	position: relative;
+	z-index: 2;
+}
+
+.brand {
+	align-items: center;
+	color: var(--paper);
+	display: flex;
+	font-size: 19px;
+	font-weight: 600;
+	gap: 10px;
+	letter-spacing: -0.01em;
+}
+
+.brand:hover {
+	text-decoration: none;
+}
+
+.brand img {
+	height: 26px;
+	width: 26px;
+}
+
+.versioned-site-title {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+}
+
+.version-chip {
+	background: rgb(255 255 255 / 7%);
+	border-radius: 6px;
+	color: var(--muted);
+	font: 500 12px / 1 var(--mono);
+	padding: 5px 8px;
+}
+
+.nav-links {
+	display: flex;
+	font-size: 14px;
+	gap: 22px;
+}
+
+.nav-links a {
+	color: var(--muted);
+}
+
+.nav-links a:hover {
+	color: var(--paper);
+	text-decoration: none;
+}
+
+.grow {
+	flex: 1;
+}
+
+.btn {
+	align-items: center;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	cursor: pointer;
+	display: inline-flex;
+	font: 500 15px var(--font);
+	gap: 8px;
+	height: 44px;
+	justify-content: center;
+	padding: 0 20px;
+}
+
+.btn:hover {
+	text-decoration: none;
+}
+
+.btn-primary {
+	background: var(--green);
+	color: var(--paper);
+}
+
+.btn-primary:hover {
+	background: #2a8264;
+}
+
+.btn-ghost {
+	background: transparent;
+	border-color: var(--paper);
+	color: var(--paper);
+}
+
+.btn-ghost:hover {
+	background: rgb(255 255 255 / 6%);
+}
+
+.kicker {
+	color: var(--mint);
+	font: 500 12px / 1.2 var(--mono);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.code-block {
+	background: var(--code-bg);
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	color: #dfe9e5;
+	font: 400 13.5px / 1.75 var(--mono);
+	margin: 0;
+	overflow-x: auto;
+	padding: 24px 26px;
+	white-space: pre;
+}
+
+.code-block .k {
+	color: var(--mint);
+}
+
+.code-block .s {
+	color: #e9c58a;
+}
+
+.code-block .c {
+	color: #6f857e;
+}
+
+.code-block .f {
+	color: var(--paper);
+}
+
+.visually-hidden {
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+@media (max-width: 720px) {
+	.site-nav-bar {
+		gap: 16px;
+		height: 56px;
+		padding: 0 20px;
+	}
+
+	.nav-links a:not(.nav-keep) {
+		display: none;
+	}
+
+	.version-chip {
+		display: none;
+	}
+}

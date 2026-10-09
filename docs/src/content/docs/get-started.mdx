@@ -1,26 +1,29 @@
 ---
 title: Get started
-description: Install graphraum from GitHub Packages and render your first graph.
+description: Install graphraum, render your first graph, and click a node.
 ---
 
-import VersionReference from "../../components/VersionReference.astro";
+import GetStartedExample from "../../components/GetStartedExample.astro";
+import InstallCommand from "../../components/InstallCommand.astro";
 
-<VersionReference />
+Install the package, give graphraum a sized container and positioned nodes, and you have a graph you can pan, zoom and click.
 
 ## Install
 
-graphraum is currently published through the GitHub Packages npm registry. Configure the `@domudev` scope with a classic GitHub token that has `read:packages` permission:
+<InstallCommand />
+
+The package is on GitHub Packages. Add the `@domudev` scope to `.npmrc` with a classic GitHub token that can read packages:
 
 ```ini title=".npmrc"
 @domudev:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
 ```
 
-The exact Bun command in the version card pins the package documented by this site. Remove the version suffix only when you intentionally want the newest published release.
+The command pins the version these docs describe. Drop the version suffix only when you want the newest release.
 
 ## Render a graph
 
-The container must have a real width and height before graphraum is constructed.
+The container needs a real width and height before graphraum is constructed.
 
 ```ts
 import { Graphraum } from "@domudev/graphraum";
@@ -28,48 +31,56 @@ import { Graphraum } from "@domudev/graphraum";
 const container = document.querySelector<HTMLElement>("#graph");
 if (!container) throw new Error("Missing graph container");
 
-const graph = new Graphraum(container, {
-  mode: "2d",
-  viewportCulling: true,
-  viewportOverscan: 16,
-  maxVisibleEdges: 100_000,
-});
+const graph = new Graphraum(container, { mode: "2d" });
 
 graph.setData({
   nodes: [
     { id: "berlin", position: { x: -40, y: 0 } },
-    { id: "hamburg", position: { x: 40, y: 0 }, color: "#73c7a5" },
+    { id: "hamburg", position: { x: 40, y: -20 }, color: "#73c7a5" },
+    { id: "munich", position: { x: 10, y: 40 }, color: "#73c7a5" },
   ],
-  edges: [{ id: "rail", source: "berlin", target: "hamburg" }],
+  edges: [
+    { id: "rail-north", source: "berlin", target: "hamburg" },
+    { id: "rail-south", source: "berlin", target: "munich" },
+  ],
 });
 ```
 
-## Interact and clean up
+<GetStartedExample />
 
-Picking accepts viewport coordinates. Selection remains explicit application state.
+## Click and select
+
+Picking takes viewport coordinates and returns your node ID. Selection stays your state.
 
 ```ts
 container.addEventListener("click", (event) => {
   const nodeId = graph.pick(event.clientX, event.clientY);
   graph.setSelection(nodeId ? [nodeId] : []);
 });
+```
 
+## Update without rebuilding
+
+```ts
 graph.setMode("3d");
 graph.fitView();
 
-// Update existing node buffers and incident edge endpoints without rebuilding the graph:
+// Move or restyle existing nodes; incident edges follow.
 graph.updateNodes([
   { id: "berlin", position: { x: -20, y: 10 } },
   { id: "hamburg", color: "#fcfffc" },
 ]);
 
-// Merge streamed graph pages without fitting or resetting the camera:
+// Merge streamed pages without fitting or resetting the camera.
 graph.applyDataPatch({
-	addedNodes: [{ id: "munich", position: { x: 0, y: 40 } }],
-	addedEdges: [{ id: "branch", source: "berlin", target: "munich" }],
+  addedNodes: [{ id: "leipzig", position: { x: -10, y: 20 } }],
+  addedEdges: [{ id: "branch", source: "berlin", target: "leipzig" }],
 });
+```
 
-// When the surface unmounts:
+## Clean up
+
+```ts
 graph.destroy();
 ```
 

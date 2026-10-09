@@ -1,0 +1,67 @@
+---
+title: Camera and 3D
+description: Switch between 2D and 3D, frame the graph, and let the 3D camera orbit.
+---
+
+## 2D first
+
+The default orthographic camera makes the graph behave as a native 2D surface. The perspective camera is available on demand for structures where depth carries meaning. Both modes use the same node and edge contract.
+
+## Switch modes
+
+```ts
+graph.setMode("3d");
+graph.fitView();
+```
+
+`setMode()` replaces the camera and controls and fits the current graph. Data, selection and IDs do not change. `getMode()` returns the active mode.
+
+## Frame the graph
+
+`fitView()` fits the camera to every node. Pass `{ nodeIds }` to frame a subset, for example a highlighted path:
+
+```ts
+graph.fitView({ nodeIds: ["person:ada", "place:london"] });
+```
+
+Unknown IDs are ignored; an empty or unmatched list frames every node. In 2D it also resets wheel zoom. In 3D it returns to the front view and keeps every node, glow halos included, on the canvas.
+
+## Touch and mouse
+
+In 2D, drag pans and the wheel or a pinch zooms. One finger pans on touch screens. In 3D, drag rotates, and two fingers zoom and pan.
+
+## Auto-orbit
+
+```ts
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  graph.setMode("3d");
+  graph.setAutoOrbit({ speed: 0.07, resumeAfterMs: 3000 });
+}
+
+graph.setAutoOrbit(false);
+```
+
+`speed` is in radians per second (default `0.07`, about 90 seconds per turn; above 0 and at most 2) and holds at any frame rate. Pointer and wheel input on the canvas pause the orbit; it resumes after `resumeAfterMs` (default `3000`) without new input. A drag in progress keeps the camera still even if that delay passes. Pointer input on DOM overlays above the canvas, such as a toolbar or focus cards, does not pause it. The orbit also stops while the tab is hidden or the canvas is scrolled off screen, and resumes when visible again.
+
+While the orbit is active graphraum runs a frame loop instead of rendering only on change. Each active frame rotates the camera, renders once, and calls `onViewChange` listeners so overlays can follow. It does not repack node or edge instances: in 3D they do not depend on the camera angle, so there is no per-frame CPU repacking or buffer re-upload that grows with graph size. The GPU draw still scales with what is drawn. Paused and disabled orbits run no loop. graphraum does not read `prefers-reduced-motion`; check it before enabling the orbit, as above. `getDiagnostics().autoOrbit` reports `"off"`, `"active"` or `"paused"`.
+
+## Edge endpoints in 3D
+
+`theme.endpointAttach` (`"boundary"` by default) stops each edge at its node's outline, stroke included, with a small clearance; `"center"` joins node centers. The same trim is exported for hosts that draw their own edge geometry, such as overlays or exported paths:
+
+```ts
+import { attachPointOnOutline, trimEdgeEndpoints } from "@domudev/graphraum";
+
+const { source, target } = trimEdgeEndpoints({
+  source: { x: 0, y: 0, z: 0 },
+  target: { x: 30, y: 0, z: 40 },
+  sourceOutline: { size: 4 },
+  targetOutline: { shape: "pill", width: 12, height: 3 },
+  clearance: 0.75, // world units, the default
+  mode: "3d", // "2d" by default
+});
+
+const end = attachPointOnOutline(center, farPoint, { size: 4 }, 0.75, "3d");
+```
+
+Pass the renderer's mode. `"2d"` measures the outline in the xy plane and ignores `z`. `"3d"` stops one outline radius from each center along the 3D segment, because node billboards face the camera. The radius is taken along the edge's xy heading, so circles meet their outline from every view; other shapes are approximate in 3D and can end slightly inside or short of the outline, depending on the camera.

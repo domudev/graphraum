@@ -1,0 +1,30 @@
+---
+import logo from "../assets/logo-dark.svg";
+import { graphraumDocsVersion as version } from "../lib/docs-version";
+import { sitePath } from "../lib/site-path";
+
+interface Props {
+	/** The playground bar shows only the mark and keeps its own controls. */
+	compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+const base = sitePath();
+---
+
+<div class="versioned-site-title">
+	<a class="brand" href={base} aria-label="graphraum home">
+		<img src={logo.src} alt="" width="26" height="26" />
+		<span class:list={{ "visually-hidden": compact }}>graphraum</span>
+	</a>
+	{!compact && <a class="version-chip" href={version.referenceUrl} aria-label={`Documentation for ${version.display}`}>{version.display}</a>}
+</div>
+{
+	!compact && (
+		<nav class="nav-links" aria-label="Site">
+			<a class="nav-keep" href={`${base}get-started/`}>Docs</a>
+			<a class="nav-keep" href={`${base}playground/`}>Playground</a>
+			<a href="https://github.com/domudev/graphraum">GitHub</a>
+		</nav>
+	)
+}

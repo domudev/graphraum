@@ -1,0 +1,30 @@
+---
+import { sitePath } from "../lib/site-path";
+import "../styles/site.css";
+
+interface Props {
+	title: string;
+	description: string;
+	bodyClass?: string;
+}
+
+const { bodyClass, description, title } = Astro.props;
+const base = sitePath();
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta name="theme-color" content="#06100f" />
+		<link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+	</head>
+	<body class={bodyClass}>
+		<slot />
+	</body>
+</html>
