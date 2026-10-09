@@ -66,6 +66,7 @@ vi.mock("three/examples/jsm/controls/OrbitControls.js", async () => {
 	const { Vector3 } = await import("three");
 	class HeadlessControls {
 		readonly mouseButtons: Record<string, number> = {};
+		readonly touches: Record<string, number> = {};
 		readonly target = new Vector3();
 		enableDamping = true;
 		enableRotate = true;

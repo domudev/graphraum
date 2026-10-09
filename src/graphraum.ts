@@ -7,7 +7,6 @@ import {
 	type Material,
 	Matrix4,
 	MeshBasicMaterial,
-	MOUSE,
 	OrthographicCamera,
 	PerspectiveCamera,
 	Plane,
@@ -62,6 +61,7 @@ import {
 import { containsNodePoint } from "./node-shapes";
 import { resolveNodeStroke } from "./node-stroke";
 import { type PreparedNodeUpdate, prepareNodeUpdates } from "./node-updates";
+import { configureControlsForMode } from "./orbit-controls-mode";
 import { GraphraumOverlay } from "./overlay";
 import { type Bounds2D, SpatialGrid2D } from "./spatial-grid-2d";
 import { normalizeGraphraumBackground, resolveGraphraumTheme } from "./theme";
@@ -1151,12 +1151,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private createControls() {
 		const controls = new OrbitControls(this.camera, this.renderer.domElement);
 		controls.enableDamping = false;
-		controls.enableRotate = this.mode === "3d";
 		controls.screenSpacePanning = true;
-		if (this.mode === "2d") {
-			controls.minZoom = 0.01;
-			controls.mouseButtons.LEFT = MOUSE.PAN;
-		}
+		configureControlsForMode(controls, this.mode);
 		controls.addEventListener("change", this.handleViewChange);
 		return controls;
 	}
