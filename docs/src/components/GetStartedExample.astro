@@ -1,0 +1,63 @@
+---
+import { sitePath } from "../lib/site-path";
+---
+
+<figure class="example-result not-content">
+	<div id="get-started-graph" class="example-canvas" role="img" aria-label="The three-node graph from the code above, rendered live."></div>
+	<figcaption>
+		<span>This code, running</span>
+		<a href={`${sitePath("playground/")}`}>Open the playground</a>
+	</figcaption>
+</figure>
+
+<script>
+	import { Graphraum } from "@domudev/graphraum";
+
+	const container = document.querySelector<HTMLElement>("#get-started-graph");
+	if (container) {
+		const dark = () => document.documentElement.dataset.theme === "dark";
+		const graph = new Graphraum(container, { maxPixelRatio: 2, theme: dark() ? "dark" : "light" });
+		graph.setData({
+			nodes: [
+				{ id: "berlin", position: { x: -40, y: 0 }, size: 8 },
+				{ id: "hamburg", position: { x: 40, y: -20 }, color: "#73c7a5", size: 8 },
+				{ id: "munich", position: { x: 10, y: 40 }, color: "#73c7a5", size: 8 },
+			],
+			edges: [
+				{ id: "rail-north", source: "berlin", target: "hamburg" },
+				{ id: "rail-south", source: "berlin", target: "munich" },
+			],
+		});
+		container.addEventListener("click", (event) => {
+			const nodeId = graph.pick(event.clientX, event.clientY);
+			graph.setSelection(nodeId ? [nodeId] : []);
+		});
+		new MutationObserver(() => graph.setTheme(dark() ? "dark" : "light")).observe(document.documentElement, {
+			attributeFilter: ["data-theme"],
+		});
+		window.addEventListener("pagehide", () => graph.destroy(), { once: true });
+	}
+</script>
+
+<style>
+	.example-result {
+		border: 1px solid var(--graphraum-border);
+		border-radius: var(--graphraum-radius);
+		margin: 1.25rem 0 0;
+		overflow: hidden;
+	}
+
+	.example-canvas {
+		height: 14rem;
+		width: 100%;
+	}
+
+	figcaption {
+		border-top: 1px solid var(--graphraum-border);
+		color: var(--graphraum-muted-foreground);
+		display: flex;
+		font: 0.75rem / 1 var(--sl-font-mono);
+		justify-content: space-between;
+		padding: 0.7rem 0.9rem;
+	}
+</style>

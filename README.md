@@ -65,7 +65,7 @@ Publishing is automated with semantic-release after CI succeeds on `main`. Commi
 
 ## Documentation
 
-The [documentation](https://domudev.github.io/graphraum/), [API reference](https://domudev.github.io/graphraum/api-reference/), [visual language](https://domudev.github.io/graphraum/visual-language/), and executable [browser benchmark](https://domudev.github.io/graphraum/benchmark/) are published on GitHub Pages. Run them locally with:
+The [documentation](https://domudev.github.io/graphraum/), [API reference](https://domudev.github.io/graphraum/reference/api/), and the live [playground](https://domudev.github.io/graphraum/playground/) with the Prove benchmark are published on GitHub Pages. Run them locally with:
 
 ```sh
 bun install --cwd docs

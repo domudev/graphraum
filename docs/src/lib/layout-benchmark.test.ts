@@ -13,7 +13,7 @@ describe("layout benchmark helpers", () => {
 		).toEqual([0, 2, 1, 3]);
 	});
 
-	it("uses Explorer-sized progressive force batches", () => {
+	it("uses playground-sized progressive force batches", () => {
 		expect(progressiveForceBatchSize(1_000)).toBe(1_000);
 		expect(progressiveForceBatchSize(100_000)).toBe(12_500);
 	});

@@ -1,0 +1,93 @@
+---
+title: Theme
+description: The graphraum palette, node states, glow, and how to override the theme.
+---
+
+import BrandGraph from "../../../components/BrandGraph.astro";
+
+graphraum ships with an opinionated visual baseline so a first render is legible and recognizably graphraum before an application adds domain semantics.
+
+<BrandGraph />
+
+## Canonical palette
+
+<div class="palette-grid not-content">
+  <div class="palette-swatch palette-ink"><strong>Ink Black</strong><code>#040F0F</code><span>dark canvas / light selection</span></div>
+  <div class="palette-swatch palette-turf"><strong>Turf Green</strong><code>#226F54</code><span>nodes and edges</span></div>
+  <div class="palette-swatch palette-porcelain"><strong>Porcelain</strong><code>#FCFFFC</code><span>light canvas / dark selection</span></div>
+</div>
+
+Two immutable presets ship as `graphraumThemes.dark` and `graphraumThemes.light`. `graphraumTheme` remains the dark alias.
+
+Every color, in a theme or on a node or edge, is an sRGB value like a CSS color and is drawn exactly as specified, so `#226F54` on the canvas matches `#226F54` in your stylesheet. Translucent edges and halos blend over the background the way overlapping CSS colors do.
+
+```ts
+import { graphraumTheme, graphraumThemes } from "@domudev/graphraum";
+
+console.log(graphraumTheme.background); // "#040f0f"
+console.log(graphraumThemes.light.background); // "#fcfffc"
+```
+
+## Node states
+
+<div class="node-state-grid not-content">
+  <div><strong>Default</strong><span>Turf Green sphere</span><p>Inherits <code>theme.node</code> unless the node supplies <code>color</code>.</p></div>
+  <div><strong>Domain color</strong><span>Application color</span><p><code>node.color</code> carries product meaning and wins over the theme.</p></div>
+  <div><strong>Selected</strong><span>Porcelain sphere</span><p><code>theme.selectedNode</code> temporarily wins without changing graph data.</p></div>
+  <div><strong>Hidden</strong><span>Not materialized</span><p>Viewport culling removes off-screen 2D nodes from the active instance range.</p></div>
+</div>
+
+Selection is a color change inside the existing instanced node mesh. Selecting, hovering, or focusing a node never adds a halo mesh or another rendering pass, so the two-draw-call baseline stays true. The only exception is the opt-in [glow](#glow) below, which you enable per node and which adds a third draw call while it is visible.
+
+## Glow
+
+`glow` (0 to 1) is an opt-in soft halo for a sparse set of nodes that deserve attention, such as a search hit or an alert. It is the one documented exception to the two-draw-call baseline.
+
+```ts
+graph.updateNodes([{ id: "alert:42", glow: 0.8 }]);
+```
+
+- **Shape:** a camera-facing disc in the node's current color, including selected, hovered, focused, and dimmed state colors. Its radius is `extent × (1 + 2.4 × glow)` where `extent` is the node's half-extent `max(width, height)`, so `glow: 1` reaches 3.4× the node extent. Opacity fades quadratically from the center to 0 at the rim; peak opacity is `glow` on dark backgrounds and `0.6 × glow` on light ones.
+- **Blending:** on a dark solid background, and on transparent or pattern backgrounds, halos add light (additive blending). On a solid background with relative luminance of 0.5 or more, such as the light preset, additive light would vanish, so halos switch to a normal-blended tint. `setTheme` and `setBackground` switch the mode automatically.
+- **Order:** halos write no depth and render before edges and nodes in 2D and 3D, so they never hide a node or an edge. In 3D this means a halo sits under everything: a node farther from the camera can cover part of a nearer node's halo.
+- **Cost:** while no node glows, nothing changes: two draw calls and no extra per-frame work. While at least one visible node glows, graphraum adds exactly one batched draw call for all halos, so diagnostics report three draw calls. At most 256 halos render, highest `glow` first with ties broken by input order, and halos are skipped in the density LOD tier. `visibleGlowNodes` in diagnostics reports the rendered count.
+
+The extra draw call is a bounded trade-off: GPU halo work is capped at 256 instances regardless of graph size. CPU work is not capped in the same way: each viewport update sorts every visible glowing node to pick the top 256, and changing `glow` rescans the node list. Keep `glow` sparse; it is an emphasis tool, not a styling default for every node. Its GPU cost has not yet been measured in a real browser; the local benchmark lab (`bun run dev`) has a **Glowing nodes** control for that measurement.
+
+Edges have two host states. `setEdgeSelection(ids)` paints `theme.selectedEdge`; `setEdgeState("dimmed", ids)` recedes edges to `theme.dimmedEdge` at `theme.dimmedEdgeOpacity` (Turf-tinted and faint, but still readable as structure). Selection wins when an edge is in both sets. Both are color changes inside the existing edge batch, so they add no draw calls either.
+
+## Override without forking
+
+Pass a named preset, or override only the tokens your product owns. Switch at runtime with `setTheme` / `setBackground`.
+
+```ts
+const graph = new Graphraum(container, {
+  theme: "light", // or { node: "#6d5bd0", selectedNode: "#fcfffc" }
+});
+
+graph.setTheme("dark");
+graph.setBackground("transparent"); // host CSS color / gradient / pattern shows through
+graph.setBackground({
+  type: "pattern",
+  source: patternCanvas, // HTMLCanvasElement | HTMLImageElement | ImageBitmap | …
+  repeat: [4, 4],
+});
+```
+
+Use `"transparent"` / `null` when the product owns atmosphere (CSS grid, noise, brand gradient) behind the WebGL canvas. Use a pattern background (`type: "pattern"` with a `source`) when the pattern must live inside the WebGL scene.
+
+Per-node colors remain available for semantic categories:
+
+```ts
+graph.setData({
+  nodes: [
+    { id: "person:ada", position: { x: -20, y: 0 } },
+    { id: "place:london", position: { x: 20, y: 0 }, color: "#73c7a5" },
+  ],
+  edges: [{ id: "born-in", source: "person:ada", target: "place:london" }],
+});
+```
+
+## Theme tokens
+
+`edgeWidth` and `edgeOpacity` are the fallback width and opacity for edges that supply no `visual` and no direct `width` or `opacity` field. `dimmedEdge` and `dimmedEdgeOpacity` style edges passed to `setEdgeState("dimmed", ids)`; the opacity is a cap between 0 and 1 (an edge that is already fainter keeps its own opacity), and values outside that range fail with an actionable error. The presets keep dimmed edges faintly visible: `#315a51` at 0.25 on dark, `#9bb5ac` at 0.35 on light. `nodeStroke` is the fallback stroke color for a node that sets `strokeWidth` but no `strokeColor`.

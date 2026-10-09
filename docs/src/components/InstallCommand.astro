@@ -1,0 +1,8 @@
+---
+import { Code } from "@astrojs/starlight/components";
+import { graphraumDocsVersion as version } from "../lib/docs-version";
+
+const command = version.installCommand ?? "bun add @domudev/graphraum";
+---
+
+<Code code={command} lang="sh" />

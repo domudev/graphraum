@@ -1,0 +1,22 @@
+---
+type ChangelogModule = { Content: (props: Record<string, never>) => unknown };
+
+const months = Object.entries(import.meta.glob<ChangelogModule>("../../../changelogs/*.md", { eager: true }))
+	.sort(([left], [right]) => right.localeCompare(left))
+	.map(([path, module]) => ({ Content: module.Content, path }));
+---
+
+{
+	months.map(({ Content, path }) => (
+		<section class="changelog-month" data-source={path.split("/").pop()}>
+			<Content />
+		</section>
+	))
+}
+
+<style>
+	.changelog-month :global(h1) {
+		font-size: 1.6rem;
+		margin-top: 2.5rem;
+	}
+</style>

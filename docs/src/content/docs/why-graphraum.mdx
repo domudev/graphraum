@@ -7,7 +7,7 @@ I built graphraum because a graph is not just a scatterplot with lines added.
 
 In an interactive network, nodes and edges have identity. Edges must follow node updates. Picking must return stable graph IDs. Selection, focus, hover, labels, layouts, and level of detail all depend on graph topology. A general visualization engine can draw the primitives, but the application still has to build and maintain this graph-specific contract around it.
 
-graphraum makes that contract the product. It is a small, framework-neutral WebGL engine for interactive node-edge graphs in 2D and 3D—not a charting suite, map application, graph database, or complete analysis UI.
+graphraum makes that contract the product. It is a small, framework-neutral WebGL engine for interactive node-edge graphs in 2D and 3D. It is not a charting suite, map application, graph database, or complete analysis UI.
 
 ## What I needed
 
@@ -27,7 +27,7 @@ The package also provides a dimension-aware force simulation for applications th
 
 The baseline renderer uses one instanced node mesh and one edge line geometry: two draw calls. It updates affected buffers instead of building a component or scene object per entity. In 2D, viewport materialization and density LOD bound the visible node and edge work; diagnostics expose candidates, visible counts, LOD decisions, draw calls, CPU frame time, and GPU timing when the browser supports timer queries.
 
-These choices do not prove that graphraum is universally faster than another library. Performance depends on fixture topology, update frequency, node size, overdraw, pixel ratio, browser, and hardware. The [playground Prove protocol](../benchmark/) reports its method and lets the claim be tested on the machine that matters; the [Explorer](../explore/) is for live visual checks, not published scores.
+These choices do not prove that graphraum is universally faster than another library. Performance depends on fixture topology, update frequency, node size, overdraw, pixel ratio, browser, and hardware. [Prove in the playground](../playground/?scene=stress&prove=1) reports its method and lets you test the claim on the machine that matters. The playground scenes are for live visual checks, not published scores.
 
 ### Open source deliberately, under Apache-2.0
 

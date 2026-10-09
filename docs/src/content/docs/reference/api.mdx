@@ -1,0 +1,258 @@
+---
+title: API reference
+description: The graphraum constructor, graph contract, update paths, interaction methods, options, and diagnostics.
+---
+
+## Import
+
+```ts
+import {
+  Graphraum,
+  defineVisuals,
+  graphraumTheme,
+  type GraphraumData,
+  type GraphraumDataPatch,
+  type GraphraumDiagnostics,
+  type GraphraumLayoutPositions,
+  type GraphraumNodeUpdate,
+  type GraphraumOptions,
+} from "@domudev/graphraum";
+```
+
+## Constructor
+
+```ts
+new Graphraum(container: HTMLElement, options?: GraphraumOptions)
+```
+
+The container must have a non-zero width and height. graphraum appends one canvas, observes container resizing, creates the selected camera, and renders on demand.
+
+```ts
+interface GraphraumOptions {
+  mode?: "2d" | "3d";             // default: "2d"
+  antialias?: boolean;              // default: false
+  maxPixelRatio?: number;           // default: 2
+  maxVisibleEdges?: number;         // default: 100_000
+  maxVisibleNodes?: number;         // default: 100_000
+  viewportCulling?: boolean;        // default: true
+  viewportOverscan?: number;        // default: 16 world units
+  theme?: Partial<GraphraumTheme>;
+  visuals?: GraphraumVisualMapper<NodeAttributes, EdgeAttributes>;
+}
+```
+
+Invalid node and edge budgets, overscan values, positions, and node sizes fail at the boundary with an actionable error.
+
+## Graph data
+
+```ts
+interface GraphraumData<NodeAttributes = undefined, EdgeAttributes = undefined> {
+  nodes: readonly GraphraumNode<NodeAttributes>[];
+  edges: readonly GraphraumEdge<EdgeAttributes>[];
+}
+
+interface GraphraumDataPatch<NodeAttributes = undefined, EdgeAttributes = undefined> {
+  addedNodes?: readonly GraphraumNode<NodeAttributes>[];
+  addedEdges?: readonly GraphraumEdge<EdgeAttributes>[];
+  removedNodeIds?: readonly string[];
+  removedEdgeIds?: readonly string[];
+}
+
+interface GraphraumNode {
+  id: string;
+  position: { x: number; y: number; z?: number };
+  color?: string | number;
+  shape?: GraphraumNodeShape;
+  size?: number;               // shorthand; width/height default to size (then 4)
+  width?: number;
+  height?: number;
+  strokeWidth?: number;         // world units; 0 by default (no stroke)
+  strokeColor?: string | number; // defaults to theme.nodeStroke when strokeWidth > 0
+  glow?: number;                // 0..1, opt-in halo; 0 by default (no halo)
+}
+
+type GraphraumNodeShape =
+  | "circle"
+  | "square"
+  | "diamond"
+  | "hexagon"
+  | "triangle"
+  | "pill"
+  | "rounded";
+
+interface GraphraumEdge {
+  id: string;
+  source: string;
+  target: string;
+  color?: string | number;
+  width?: number;
+  opacity?: number;
+  style?: "solid" | "dashed" | "dotted";
+  marker?: "none" | "triangle";
+  markerSize?: number;
+  markerEnd?: "target" | "source" | "both";
+  path?: "straight" | "quadratic" | "cubic";
+  controlPoints?: readonly { x: number; y: number; z?: number }[];
+}
+```
+
+Node and edge IDs must be unique, every edge endpoint must exist, coordinates must be finite, and node `size`, `width`, and `height` must be positive when present. `strokeWidth` must be finite and non-negative. `glow` must be a finite number between 0 and 1. An unknown `shape` fails with the node ID in the error. Edge `width` and `markerSize` must be positive, and `opacity` must be between 0 and 1. Positions and sizes use world units.
+
+Supply generic attribute types and `defineVisuals()` to compile domain data into node color, shape, size (or independent width/height), stroke, glow, edge color, width, opacity, style, markers, and path, and immutable presentation metadata. See [Data and visuals](../../guide/data-and-visuals/) for the complete contract.
+
+## Edge visuals
+
+```ts
+interface GraphraumEdgeVisual {
+  color?: string | number;
+  width?: number;
+  opacity?: number;
+  style?: "solid" | "dashed" | "dotted";
+  marker?: "none" | "triangle";
+  markerSize?: number;
+  markerEnd?: "target" | "source" | "both";
+  path?: "straight" | "quadratic" | "cubic";
+  controlPoints?: readonly { x: number; y: number; z?: number }[];
+}
+```
+
+`defineVisuals()` maps typed edge attributes to this contract; direct edge fields use the same shape without a mapper. `style` selects a dash pattern, `marker` draws a triangle at `markerEnd` (`target` by default), and `markerSize` scales the triangle relative to `width`. `path` selects a polyline sampling of a straight, quadratic, or cubic curve; omit `controlPoints` for auto handles, or supply 1 (quadratic) / 2 (cubic) world-space points. Overview LOD collapses curves to a single straight segment. Endpoints always come from the source and target node positions. See [Data and visuals](../../guide/data-and-visuals/) for the full contract.
+
+### Edge endpoints
+
+`theme.endpointAttach` (`"boundary"` by default) stops each edge at its node's outline. `trimEdgeEndpoints()` and `attachPointOnOutline()` export the same trim; see [Camera and 3D](../../guide/camera-and-3d/#edge-endpoints-in-3d).
+
+## Data and updates
+
+<div class="api-grid not-content">
+  <div><code>setData(data)</code><p>Validates and replaces the complete topology, rebuilds canonical buffers, fits the camera, materializes the viewport, and schedules a render.</p></div>
+  <div><code>applyDataPatch(patch)</code><p>Merges streamed additions and removals without fitting the camera. Changes that stay within the preallocated capacity reuse existing GPU meshes; capacity growth falls back to one controlled rebuild.</p></div>
+  <div><code>updateNodes(updates)</code><p>Changes position, size, shape, or color for existing nodes and updates only the affected instance data and incident edge endpoints. Use <code>setData</code> when topology changes.</p></div>
+  <div><code>applyLayout(layout)</code><p>Applies a transferable XYZ position batch for existing nodes. Call it repeatedly as a worker produces progressive positions.</p></div>
+  <div><code>setSelection(nodeIds)</code><p>Applies the selected-node theme color without mutating source graph data. Missing and off-screen IDs are safe.</p></div>
+  <div><code>setEdgeSelection(edgeIds)</code><p>Highlights edges with <code>theme.selectedEdge</code>. Only the edges whose selection changed are repainted, so per-hover calls stay cheap on large graphs. Unknown IDs are ignored.</p></div>
+  <div><code>setEdgeState("dimmed", edgeIds)</code><p>Recedes edges with <code>theme.dimmedEdge</code> and <code>theme.dimmedEdgeOpacity</code>, mirroring <code>setNodeState("dimmed", ids)</code>. A selected edge stays selected. Unknown IDs are ignored and removed edges drop out of the state.</p></div>
+  <div><code>getNodePresentation(id)</code><p>Returns the compiled title, subtitle, properties, and action descriptors for a node, or <code>null</code>.</p></div>
+  <div><code>getEdgePresentation(id)</code><p>Returns the compiled presentation for an edge, or <code>null</code>.</p></div>
+  <div><code>render()</code><p>Schedules one render on the next animation frame. Repeated calls in the same frame are coalesced.</p></div>
+</div>
+
+```ts
+const updates: readonly GraphraumNodeUpdate[] = [
+  { id: "person:ada", position: { x: 20, y: 12 } },
+  { id: "place:london", color: "#73c7a5", shape: "square", size: 6 },
+];
+
+graph.updateNodes(updates);
+```
+
+`GraphraumLayoutPositions` carries node IDs and a transferable XYZ `Float32Array`. See [Layout](../../guide/layout/).
+
+## Force layout
+
+`computeForcePositions()`, `computeClusteredForcePositions()` and `createForceSimulation()` accept `ForceSettings` (defaults in `DEFAULT_FORCE_SETTINGS`). See [Layout](../../guide/layout/) for settings, live simulations and clusters.
+
+## Graphology binding
+
+Use `bindGraphology()` when Graphology owns the mutable graph. The adapter renders the current graph immediately, maps node visual attributes (`x`, `y`, `z`, `color`, `shape`, and `size`), preserves all attributes for `defineVisuals()`, and subscribes to later mutations.
+
+```ts
+import Graph from "graphology";
+import { Graphraum, bindGraphology } from "@domudev/graphraum";
+
+type NodeAttributes = {
+  kind: "person" | "place";
+  x?: number;
+  y?: number;
+};
+type EdgeAttributes = Record<string, never>;
+
+const source = new Graph<NodeAttributes, EdgeAttributes>();
+source.addNode("person:ada", { kind: "person" });
+source.addNode("place:london", { kind: "place", x: 20, y: 12 });
+source.addEdgeWithKey("born-in", "person:ada", "place:london");
+
+const container = document.querySelector<HTMLElement>("#graph");
+if (!container) throw new Error("Missing #graph container");
+const graph = new Graphraum<NodeAttributes, EdgeAttributes>(container);
+const unbind = bindGraphology(graph, source);
+
+source.mergeNodeAttributes("person:ada", { x: -20, y: 12 });
+
+// Stop Graphology mutations from reaching this renderer.
+unbind();
+graph.destroy();
+```
+
+Missing coordinates default to zero so layout does not block the first render. Mutations are coalesced into one snapshot replacement per microtask, which reruns `defineVisuals()` for changed domain attributes. The source graph and renderer remain application-owned; `unbind()` only removes the adapter's listeners.
+
+## Camera and interaction
+
+<div class="api-grid not-content">
+  <div><code>pick(clientX, clientY)</code><p>Returns the nearest node ID or <code>null</code>. Uses the spatial grid in 2D and instance raycasting in 3D.</p></div>
+  <div><code>setMode(mode)</code><p>Switches between orthographic 2D and perspective 3D, replaces controls, and fits the current graph.</p></div>
+  <div><code>getMode()</code><p>Returns the active <code>"2d"</code> or <code>"3d"</code> mode.</p></div>
+  <div><code>setAutoOrbit(options | false)</code><p>Slowly orbits the 3D camera around the graph. Off by default; pass <code>false</code> to stop. Throws in 2D, and switching to 2D turns it off.</p></div>
+  <div><code>setTheme(theme)</code><p>Applies a named preset (<code>"dark"</code> / <code>"light"</code>) or merges a partial palette, then rematerializes colors.</p></div>
+  <div><code>setBackground(background)</code><p>Sets a solid color, <code>"transparent"</code> / <code>null</code> for host CSS, or a <code>{'{ type: "pattern", source }'}</code> texture.</p></div>
+  <div><code>fitView(options?)</code><p>Fits the active camera to the complete graph and rematerializes the viewport. Pass <code>{'{ nodeIds }'}</code> to frame only those nodes, for example a highlighted path; unknown IDs are ignored, and when none match (or the list is empty) it frames every node. In 2D it frames every node and resets any wheel zoom. In 3D it returns to the front view and moves as close as it can while every node, including its glow halo, stays on the canvas, leaving a small margin on the tighter canvas axis for labels beside edge nodes.</p></div>
+  <div><code>resize()</code><p>Synchronizes the renderer and active camera immediately. A <code>ResizeObserver</code> already calls this for normal container changes.</p></div>
+  <div><code>destroy()</code><p>Disconnects observation and controls, cancels pending rendering, disposes GPU resources, and removes the canvas.</p></div>
+  <div><code>createOverlay(options)</code><p>Adds a bounded DOM layer for labels, a toolbar, and optional rich HTML focus cards. See <a href="../../guide/labels-and-focus/">Labels and focus</a>.</p></div>
+</div>
+
+### Auto-orbit
+
+`setAutoOrbit({ speed, resumeAfterMs })` orbits the 3D camera; see [Camera and 3D](../../guide/camera-and-3d/#auto-orbit).
+
+## Theme
+
+`graphraumThemes.dark` / `graphraumThemes.light` (and the `graphraumTheme` dark alias) are immutable. Constructor options and `setTheme` copy values per renderer.
+
+```ts
+const graph = new Graphraum(container, {
+  theme: "light", // or { ...graphraumTheme, edgeWidth: 2 }
+});
+
+graph.setTheme("dark");
+graph.setBackground("transparent");
+graph.setBackground({ type: "pattern", source: image, repeat: [2, 2] });
+```
+
+`background` accepts a CSS color, `"transparent"` / `null` (clear canvas for host CSS), or a pattern object as shown in the example above.
+
+See [Theme](../../guide/theme/#theme-tokens) for every token and the canonical palette.
+
+## Diagnostics
+
+```ts
+const diagnostics: GraphraumDiagnostics = graph.getDiagnostics();
+```
+
+```ts
+interface GraphraumDiagnostics {
+  aggregatedNodeClusters: number;
+  autoOrbit: "active" | "off" | "paused";
+  cpuFrameMilliseconds: number;
+  gpuFrameMilliseconds: number | null;
+  gpuDrawCalls: number;
+  gpuGeometries: number;
+  gpuTextures: number;
+  lodLevel: "density" | "detail" | "overview";
+  pickingStrategy: "raycaster-3d" | "spatial-grid-2d";
+  dimmedEdges: number;
+  selectedEdges: number;
+  selectedNodes: number;
+  totalEdges: number;
+  totalNodes: number;
+  visibleEdgeCandidates: number;
+  visibleEdgeMarkers: number;
+  visibleEdgeSegments: number;
+  visibleEdges: number;
+  visibleGlowNodes: number;
+  visibleNodes: number;
+  visibleNodeCandidates: number;
+}
+```
+
+Diagnostics describe the final rendered frame. GPU frame time is `null` when WebGL timer queries are unavailable. Node candidates and aggregate clusters expose density LOD decisions; total and visible counts expose the effective node and edge reductions without asking applications to re-derive them. `visibleEdgeSegments` counts rendered edge lines and `visibleEdges` is an alias for it; `visibleEdgeMarkers` counts rendered direction triangles, which the overview LOD tier drops first. `autoOrbit` is `"paused"` when the orbit is enabled but stopped by input, a hidden tab or an off-screen canvas. `visibleGlowNodes` counts rendered glow halos (at most 256, and 0 in the density LOD tier). `gpuDrawCalls` is 2 without halos and 3 while at least one halo is visible; see [Glow](../../guide/theme/#glow).

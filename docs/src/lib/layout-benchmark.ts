@@ -38,7 +38,7 @@ export function packIndexedForceEdges(edges: readonly { source: string; target: 
 	return result;
 }
 
-/** Matches Explorer auto batching: larger graphs stream fewer, bigger transferable batches. */
+/** Matches playground auto batching: larger graphs stream fewer, bigger transferable batches. */
 export function progressiveForceBatchSize(nodeCount: number): number {
 	return Math.max(1_000, Math.ceil(nodeCount / 8));
 }

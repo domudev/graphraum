@@ -1,0 +1,560 @@
+---
+import SiteNav from "../components/SiteNav.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { graphraumDocsVersion as version } from "../lib/docs-version";
+import { playgroundScenes } from "../lib/playground-scenes";
+import { sitePath } from "../lib/site-path";
+
+const base = sitePath();
+const playground = `${base}playground/`;
+const install = version.installCommand ?? "bun add @domudev/graphraum";
+const sceneCards = playgroundScenes.filter(({ id }) => id !== "stress");
+---
+
+<SiteLayout
+	title="graphraum: interactive graphs in WebGL"
+	description="A WebGL engine for interactive node-edge graphs in 2D and 3D. 100,000 nodes in two GPU draw calls."
+	bodyClass="home"
+>
+	<header class="hero">
+		<div id="hero-graph" class="hero-graph" aria-hidden="true"></div>
+		<div class="hero-veil" aria-hidden="true"></div>
+		<div class="site-nav-bar">
+			<SiteNav />
+			<div class="grow"></div>
+		</div>
+		<div class="hero-copy">
+			<span class="kicker">WebGL graph engine for 2D and 3D</span>
+			<h1>100,000 nodes on screen. Your product on top.</h1>
+			<p class="lede">
+				graphraum draws, picks and selects large node-edge graphs in two GPU draw calls. Labels, panels and what the
+				graph means stay in your code.
+			</p>
+			<div class="actions">
+				<a class="btn btn-primary" href={playground}>Open the playground</a>
+				<a class="btn btn-ghost" href={`${base}get-started/`}>Get started</a>
+			</div>
+			<code class="install"><span aria-hidden="true">$</span>{install}</code>
+		</div>
+	</header>
+
+	<main>
+		<section class="proof" aria-label="Reference numbers">
+			<div><strong>100k</strong><span>nodes, interactive</span></div>
+			<div><strong>300k</strong><span>edges</span></div>
+			<div><strong>2</strong><span>GPU draw calls</span></div>
+			<div>
+				<strong>8.3 ms</strong><span>median frame · <a href={`${playground}?prove=1`}>measure yours</a></span>
+			</div>
+		</section>
+
+		<section class="section three-calls">
+			<div>
+				<span class="kicker">Three calls</span>
+				<h2>Positions in, a live graph out.</h2>
+				<p>
+					Give it a container and positioned nodes. Picking returns your IDs, and selection stays your state. Switch to
+					3D with one call; the data does not change.
+				</p>
+			</div>
+			<pre
+				class="code-block"><span class="k">import</span> {"{"} Graphraum {"}"} <span class="k">from</span> <span class="s">"@domudev/graphraum"</span>;
+
+<span class="k">const</span> graph = <span class="k">new</span> <span class="f">Graphraum</span>(container, {"{"} mode: <span class="s">"2d"</span> {"}"});
+graph.<span class="f">setData</span>({"{"} nodes, edges {"}"});
+
+container.<span class="f">addEventListener</span>(<span class="s">"click"</span>, (e) =&gt; {"{"}
+  <span class="k">const</span> id = graph.<span class="f">pick</span>(e.clientX, e.clientY);
+  graph.<span class="f">setSelection</span>(id ? [id] : []);
+{"}"});
+
+graph.<span class="f">setMode</span>(<span class="s">"3d"</span>); <span class="c">// same data, now in 3D</span></pre>
+		</section>
+
+		<section class="section split" aria-label="What graphraum does and what you keep">
+			<div>
+				<h3>graphraum handles</h3>
+				<ul>
+					<li>Rendering 2D and 3D with the same data</li>
+					<li>Camera, picking, hover and selection feedback</li>
+					<li>Level of detail, culling and edge budgets</li>
+					<li>Incremental updates without rebuilding the graph</li>
+					<li>Diagnostics: draw calls, frame time, visible counts</li>
+				</ul>
+			</div>
+			<div class="yours">
+				<h3>You keep</h3>
+				<ul>
+					<li>Your data model and what each node means</li>
+					<li>Layout, from the built-in force helper or your own</li>
+					<li>Labels, panels, menus and actions</li>
+					<li>Accessibility and keyboard navigation</li>
+					<li>Your framework. graphraum needs none.</li>
+				</ul>
+			</div>
+		</section>
+
+		<section class="section scenes-section">
+			<div class="scenes-head">
+				<h2>Try it on real shapes of data</h2>
+				<a href={playground}>All scenes in the playground <span aria-hidden="true">→</span></a>
+			</div>
+			<div class="scenes">
+				{
+					sceneCards.map((scene) => (
+						<a class="scene" href={`${playground}?scene=${scene.id}`}>
+							<div class="scene-graph" data-scene-graph={scene.id} aria-hidden="true" />
+							<div class="scene-text">
+								<strong>{scene.title}</strong>
+								<span>{scene.description}</span>
+							</div>
+						</a>
+					))
+				}
+			</div>
+		</section>
+	</main>
+
+	<footer class="foot">
+		<span>Apache-2.0</span>
+		<a href="https://github.com/domudev/graphraum">GitHub</a>
+		<a href={`${base}reference/changelog/`}>Changelog</a>
+		<a href={`${base}why-graphraum/`}>Why graphraum</a>
+		<div class="grow"></div>
+		<span class="mono">{version.display}</span>
+	</footer>
+</SiteLayout>
+
+<script>
+	import { Graphraum } from "@domudev/graphraum";
+	import { createSceneUseCase, type DemoSceneId } from "../lib/playground-scenes";
+	import { focusNode, incidentEdgeIds } from "../lib/scene-focus";
+	import { demoVisuals } from "../lib/use-case-demos";
+
+	const theme = { background: "#06100f" };
+	const graphs: { destroy: () => void }[] = [];
+
+	function mountScene(container: HTMLElement, sceneId: DemoSceneId, contextNodes: number) {
+		const useCase = createSceneUseCase(sceneId, contextNodes);
+		const graph = new Graphraum(container, { maxPixelRatio: 2, theme, visuals: demoVisuals });
+		graph.setData(useCase.data);
+		graphs.push(graph);
+		return { graph, useCase };
+	}
+
+	const hero = document.querySelector<HTMLElement>("#hero-graph");
+	if (hero) {
+		const { graph, useCase } = mountScene(hero, "knowledge", 520);
+		const featured = useCase.data.nodes[0];
+		if (featured) {
+			const relations = incidentEdgeIds(useCase.data, featured.id).length;
+			const overlay = graph.createOverlay({
+				autoRichNodes: "selected",
+				maxRichNodes: 1,
+				richNodeClassName: "hero-card",
+				renderRichNode: ({ id, presentation }) => {
+					const card = document.createElement("div");
+					const title = document.createElement("strong");
+					title.textContent = presentation?.title ?? id;
+					const meta = document.createElement("span");
+					meta.textContent = `${featured.attributes.category} · ${relations} relations`;
+					card.append(title, meta);
+					return card;
+				},
+			});
+			graphs.push(overlay);
+			focusNode(graph, useCase.data, featured.id);
+		}
+	}
+
+	const cards = document.querySelectorAll<HTMLElement>("[data-scene-graph]");
+	const observer = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				if (!entry.isIntersecting) continue;
+				const container = entry.target as HTMLElement;
+				observer.unobserve(container);
+				mountScene(container, container.dataset.sceneGraph as DemoSceneId, 160);
+			}
+		},
+		{ rootMargin: "200px" },
+	);
+	for (const card of cards) observer.observe(card);
+
+	window.addEventListener("pagehide", () => {
+		for (const graph of graphs) graph.destroy();
+	});
+</script>
+
+<style>
+	.hero {
+		height: 760px;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.hero-graph {
+		inset: 0 0 0 30%;
+		pointer-events: none;
+		position: absolute;
+	}
+
+	.hero-veil {
+		background: linear-gradient(90deg, rgb(6 16 15 / 96%) 0%, rgb(6 16 15 / 82%) 36%, rgb(6 16 15 / 0%) 64%);
+		inset: 0;
+		pointer-events: none;
+		position: absolute;
+	}
+
+	.hero-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 28px;
+		left: 80px;
+		max-width: 600px;
+		position: absolute;
+		top: 150px;
+	}
+
+	h1 {
+		font-size: clamp(38px, 5vw, 64px);
+		font-weight: 600;
+		letter-spacing: -0.035em;
+		line-height: 1.02;
+		margin: 0;
+		text-wrap: balance;
+	}
+
+	.lede {
+		color: var(--soft);
+		font-size: 19px;
+		font-weight: 300;
+		line-height: 1.55;
+		margin: 0;
+		text-wrap: pretty;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+	}
+
+	.install {
+		align-items: center;
+		background: rgb(255 255 255 / 6%);
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		display: flex;
+		font-size: 13.5px;
+		gap: 12px;
+		min-height: 44px;
+		overflow-x: auto;
+		padding: 0 14px;
+		white-space: nowrap;
+	}
+
+	.install span {
+		color: var(--mint);
+	}
+
+	:global(.hero-card) {
+		background: rgb(10 18 17 / 92%);
+		border: 1px solid rgb(252 255 252 / 14%);
+		border-radius: 10px;
+		color: var(--paper);
+		display: grid;
+		font-size: 13px;
+		gap: 4px;
+		padding: 10px 14px;
+		pointer-events: none;
+		white-space: nowrap;
+	}
+
+	:global(.hero-card) span {
+		color: var(--muted);
+	}
+
+	.proof {
+		border-block: 1px solid var(--line);
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+
+	.proof div {
+		display: grid;
+		gap: 4px;
+		padding: 28px 40px;
+	}
+
+	.proof div + div {
+		border-left: 1px solid var(--line);
+	}
+
+	.proof strong {
+		font-size: 34px;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+	}
+
+	.proof span {
+		color: var(--muted);
+		font-size: 13px;
+	}
+
+	.section {
+		margin: 0 auto;
+		max-width: 1440px;
+		padding: 96px 80px 0;
+	}
+
+	h2 {
+		font-size: clamp(30px, 3.4vw, 40px);
+		font-weight: 600;
+		letter-spacing: -0.025em;
+		line-height: 1.1;
+		margin: 12px 0 16px;
+		text-wrap: balance;
+	}
+
+	.three-calls {
+		align-items: center;
+		display: grid;
+		gap: 64px;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+	}
+
+	.three-calls p {
+		color: rgb(231 236 234 / 78%);
+		font-size: 16.5px;
+		font-weight: 300;
+		line-height: 1.6;
+		margin: 0;
+	}
+
+	.split {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.split > div {
+		border: 1px solid var(--line);
+		padding: 32px 36px;
+	}
+
+	.split > div:first-child {
+		border-radius: 16px 0 0 16px;
+	}
+
+	.split > div + div {
+		border-left: 0;
+		border-radius: 0 16px 16px 0;
+	}
+
+	.split h3 {
+		font-size: 15px;
+		font-weight: 600;
+		margin: 0 0 18px;
+	}
+
+	.split ul {
+		color: var(--soft);
+		display: grid;
+		font-size: 15px;
+		font-weight: 300;
+		gap: 12px;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.split li {
+		display: flex;
+		gap: 12px;
+	}
+
+	.split li::before {
+		background: var(--mint);
+		content: "";
+		flex: none;
+		height: 8px;
+		margin-top: 7px;
+		width: 8px;
+	}
+
+	.split .yours li::before {
+		background: transparent;
+		border: 1.5px solid var(--muted);
+	}
+
+	.scenes-head {
+		align-items: baseline;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+		justify-content: space-between;
+		margin-bottom: 24px;
+	}
+
+	.scenes-head h2 {
+		margin: 0;
+	}
+
+	.scenes {
+		display: grid;
+		gap: 20px;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.scene {
+		background: #081413;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		color: var(--paper);
+		overflow: hidden;
+	}
+
+	.scene:hover {
+		border-color: rgb(115 199 165 / 50%);
+		text-decoration: none;
+	}
+
+	.scene-graph {
+		height: 220px;
+		pointer-events: none;
+	}
+
+	.scene-text {
+		display: grid;
+		gap: 6px;
+		padding: 18px 20px 20px;
+	}
+
+	.scene-text strong {
+		font-size: 16px;
+		font-weight: 600;
+	}
+
+	.scene-text span {
+		color: var(--muted);
+		font-size: 13.5px;
+		line-height: 1.5;
+	}
+
+	.foot {
+		border-top: 1px solid var(--line);
+		color: var(--muted);
+		display: flex;
+		flex-wrap: wrap;
+		font-size: 13px;
+		gap: 24px;
+		margin-top: 96px;
+		padding: 28px 80px;
+	}
+
+	.foot a {
+		color: var(--muted);
+	}
+
+	@media (max-width: 1000px) {
+		.hero-copy {
+			left: 40px;
+			right: 40px;
+		}
+
+		.section {
+			padding: 72px 40px 0;
+		}
+
+		.three-calls,
+		.split {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.three-calls {
+			gap: 32px;
+		}
+
+		.split > div:first-child {
+			border-radius: 16px 16px 0 0;
+		}
+
+		.split > div + div {
+			border-left: 1px solid var(--line);
+			border-radius: 0 0 16px 16px;
+			border-top: 0;
+		}
+
+		.scenes {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.foot {
+			padding: 28px 40px;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.hero {
+			height: auto;
+			min-height: 600px;
+			padding-bottom: 28px;
+		}
+
+		.hero-graph {
+			inset: 0 0 auto 0;
+			height: 360px;
+		}
+
+		.hero-veil {
+			background: linear-gradient(180deg, rgb(6 16 15 / 0%) 30%, rgb(6 16 15 / 96%) 62%);
+		}
+
+		.hero-copy {
+			gap: 18px;
+			left: auto;
+			margin: 220px 20px 0;
+			position: relative;
+			right: auto;
+			top: auto;
+		}
+
+		.lede {
+			font-size: 16px;
+		}
+
+		.install {
+			display: none;
+		}
+
+		.proof {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.proof div {
+			border-bottom: 1px solid var(--line);
+			padding: 18px 20px;
+		}
+
+		.proof div:nth-child(3) {
+			border-left: 0;
+		}
+
+		.proof strong {
+			font-size: 26px;
+		}
+
+		.section {
+			padding: 56px 20px 0;
+		}
+
+		.split > div {
+			padding: 24px;
+		}
+
+		.foot {
+			gap: 16px;
+			padding: 24px 20px;
+		}
+	}
+</style>
