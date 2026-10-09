@@ -920,6 +920,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		return edgeId ? { kind: "edge", id: edgeId } : null;
 	}
 
+	/** Frames every node, or only `nodeIds`; unknown ids are ignored and no match frames all nodes. */
 	fitView(options?: { nodeIds?: readonly string[] }) {
 		if (!this.nodeMesh || this.data.nodes.length === 0) {
 			this.requestRender();
