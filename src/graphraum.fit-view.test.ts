@@ -156,4 +156,51 @@ describe("fitView", () => {
 		camera.updateProjectionMatrix();
 		expect(camera.projectionMatrix.equals(fittedProjection)).toBe(true);
 	});
+
+	test("2D frames only the requested nodes", () => {
+		const graph = createGraph(800, 600, "2d");
+		const data: GraphraumData = {
+			nodes: [
+				{ id: "a", position: { x: 0, y: 0, z: 0 }, size: 4 },
+				{ id: "b", position: { x: 100, y: 0, z: 0 }, size: 4 },
+				{ id: "far", position: { x: 5000, y: 5000, z: 0 }, size: 4 },
+			],
+			edges: [],
+		};
+		graph.setData(data);
+		const all = cameraOf(graph) as OrthographicCamera;
+		const allHeight = all.top - all.bottom;
+		graph.fitView({ nodeIds: ["a", "b"] });
+		const subset = cameraOf(graph) as OrthographicCamera;
+		expect(subset.top - subset.bottom).toBeLessThan(allHeight / 10);
+		expect(subset.position.x).toBeCloseTo(50, 0);
+		expect(subset.position.y).toBeCloseTo(0, 0);
+	});
+
+	test("3D frames only the requested nodes", () => {
+		const graph = createGraph(800, 600, "3d");
+		const data: GraphraumData = {
+			nodes: [
+				{ id: "a", position: { x: 0, y: 0, z: 0 }, size: 4 },
+				{ id: "b", position: { x: 100, y: 0, z: 0 }, size: 4 },
+				{ id: "far", position: { x: 5000, y: 5000, z: 0 }, size: 4 },
+			],
+			edges: [],
+		};
+		graph.setData(data);
+		const allZ = (cameraOf(graph) as PerspectiveCamera).position.z;
+		graph.fitView({ nodeIds: ["a", "b"] });
+		const camera = cameraOf(graph) as PerspectiveCamera;
+		expect(camera.position.z).toBeLessThan(allZ / 10);
+		expect(camera.position.x).toBeCloseTo(50, 0);
+	});
+
+	test("unknown node ids fall back to framing everything", () => {
+		const graph = createGraph(800, 600, "2d");
+		graph.setData(wideSheet());
+		const all = cameraOf(graph) as OrthographicCamera;
+		const allTop = all.top;
+		graph.fitView({ nodeIds: ["nope"] });
+		expect((cameraOf(graph) as OrthographicCamera).top).toBe(allTop);
+	});
 });

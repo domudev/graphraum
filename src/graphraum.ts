@@ -920,16 +920,19 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		return edgeId ? { kind: "edge", id: edgeId } : null;
 	}
 
-	fitView() {
+	fitView(options?: { nodeIds?: readonly string[] }) {
 		if (!this.nodeMesh || this.data.nodes.length === 0) {
 			this.requestRender();
 			return;
 		}
+		const wanted = options?.nodeIds ? new Set(options.nodeIds) : null;
+		const subset = wanted ? this.data.nodes.filter((node) => wanted.has(node.id)) : this.data.nodes;
+		const nodes = subset.length > 0 ? subset : this.data.nodes;
 
 		const width = Math.max(this.container.clientWidth, 1);
 		const height = Math.max(this.container.clientHeight, 1);
-		if (this.camera instanceof OrthographicCamera) this.fitOrthographic(this.camera, width / height);
-		else this.fitPerspectiveCamera(this.camera, width, height);
+		if (this.camera instanceof OrthographicCamera) this.fitOrthographic(this.camera, width / height, nodes);
+		else this.fitPerspectiveCamera(this.camera, width, height, nodes);
 
 		this.camera.updateProjectionMatrix();
 		this.controls.update();
@@ -937,11 +940,15 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.requestRender();
 	}
 
-	private fitOrthographic(camera: OrthographicCamera, aspect: number) {
+	private fitOrthographic(
+		camera: OrthographicCamera,
+		aspect: number,
+		nodes: GraphraumData<NodeAttributes, EdgeAttributes>["nodes"],
+	) {
 		const bounds = new Box3();
 		const minimum = new Vector3();
 		const maximum = new Vector3();
-		for (const node of this.data.nodes) {
+		for (const node of nodes) {
 			const { height, width } = resolveNodeAxes({
 				height: node.height,
 				nodeId: node.id,
@@ -968,9 +975,13 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	}
 
 	/** Resets to the front view at the closest distance that frames every node (issue #124). */
-	private fitPerspectiveCamera(camera: PerspectiveCamera, width: number, height: number) {
+	private fitPerspectiveCamera(
+		camera: PerspectiveCamera,
+		width: number,
+		height: number,
+		nodes: GraphraumData<NodeAttributes, EdgeAttributes>["nodes"],
+	) {
 		applyPerspectiveContainerAspect(camera, width, height);
-		const nodes = this.data.nodes;
 		const fit = fitPerspective(
 			{ aspect: camera.aspect, fill: PERSPECTIVE_FIT_FILL, fovDegrees: camera.fov },
 			{
