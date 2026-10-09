@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, copyFile, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,11 +14,15 @@ import {
 	parseReleaseTags,
 	type ReleaseMetadata,
 	type RevisionMetadata,
+	selectArchivedReleases,
 } from "../src/lib/release-archive";
 
 const docsRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repositoryRoot = resolve(docsRoot, "..");
 const outputRoot = join(repositoryRoot, ".pages");
+/** Raw release builds, reused across runs: a release tag never changes, so its docs never need rebuilding. */
+const releaseCacheRoot = join(repositoryRoot, ".cache", "release-docs");
+const cacheCompleteMarker = ".complete";
 const selectorRoot = join(docsRoot, "versioning");
 
 async function run(command: readonly string[], cwd: string, environment: Record<string, string> = {}) {
@@ -96,27 +100,48 @@ async function injectNavigation(directory: string) {
 	}
 }
 
-async function buildRelease(version: string, temporaryRoot: string) {
-	const releaseOutput = join(outputRoot, version);
-	if (!(await releaseHasDocs(version))) {
-		await mkdir(releaseOutput, { recursive: true });
-		await writeFile(join(releaseOutput, "index.html"), createReleaseFallback(version));
-		return;
-	}
+async function exists(path: string): Promise<boolean> {
+	return access(path).then(
+		() => true,
+		() => false,
+	);
+}
 
-	const checkout = join(temporaryRoot, version);
-	await run(["git", "worktree", "add", "--detach", checkout, version], repositoryRoot);
-	try {
-		await run(["bun", "install", "--cwd", "docs", "--frozen-lockfile"], checkout);
-		await run(
-			["bun", "run", "--cwd", "docs", "build", "--", "--outDir", releaseOutput, "--base", `${docsBasePath}${version}`],
-			checkout,
-			{ GRAPHRAUM_DOCS_VERSION: version },
-		);
-		await injectNavigation(releaseOutput);
-	} finally {
-		await run(["git", "worktree", "remove", "--force", checkout], repositoryRoot);
+/** Builds a release's docs into the cache unless a complete build is already there. */
+async function buildCachedRelease(version: string, temporaryRoot: string): Promise<string> {
+	const cached = join(releaseCacheRoot, version);
+	if (await exists(join(cached, cacheCompleteMarker))) {
+		console.log(`Reusing cached docs for ${version}`);
+		return cached;
 	}
+	await rm(cached, { force: true, recursive: true });
+	await mkdir(cached, { recursive: true });
+	if (!(await releaseHasDocs(version))) {
+		await writeFile(join(cached, "index.html"), createReleaseFallback(version));
+	} else {
+		const checkout = join(temporaryRoot, version);
+		await run(["git", "worktree", "add", "--detach", checkout, version], repositoryRoot);
+		try {
+			await run(["bun", "install", "--cwd", "docs", "--frozen-lockfile"], checkout);
+			await run(
+				["bun", "run", "--cwd", "docs", "build", "--", "--outDir", cached, "--base", `${docsBasePath}${version}`],
+				checkout,
+				{ GRAPHRAUM_DOCS_VERSION: version },
+			);
+		} finally {
+			await run(["git", "worktree", "remove", "--force", checkout], repositoryRoot);
+		}
+	}
+	await writeFile(join(cached, cacheCompleteMarker), "");
+	return cached;
+}
+
+async function buildRelease(version: string, temporaryRoot: string) {
+	const cached = await buildCachedRelease(version, temporaryRoot);
+	const releaseOutput = join(outputRoot, version);
+	await cp(cached, releaseOutput, { recursive: true, filter: (source) => !source.endsWith(cacheCompleteMarker) });
+	// Navigation is injected after copying, so the cache holds plain builds and selector changes apply to every release.
+	await injectNavigation(releaseOutput);
 }
 
 async function buildNext(revision: string) {
@@ -148,7 +173,9 @@ async function createLatestAliases(latest: string) {
 }
 
 async function main() {
-	const versions = parseReleaseTags(await output(["git", "tag", "--list", "v*"], repositoryRoot));
+	const versions = selectArchivedReleases(
+		parseReleaseTags(await output(["git", "tag", "--list", "v*"], repositoryRoot)),
+	);
 	const latest = versions[0];
 	if (!latest) throw new Error("No stable Graphraum release tags were found");
 	const releases: readonly ReleaseMetadata[] = await Promise.all(

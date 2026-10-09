@@ -8,6 +8,7 @@ import {
 	injectVersionNavigation,
 	parseReleaseTags,
 	type ReleaseMetadata,
+	selectArchivedReleases,
 } from "./release-archive";
 
 const releases: readonly ReleaseMetadata[] = [
@@ -32,6 +33,21 @@ describe("release archive", () => {
 			"v0.2.2",
 			"v0.2.0",
 		]);
+	});
+
+	test("keeps the newest release of each line, at most ten", () => {
+		const tags = parseReleaseTags(
+			["v1.2.0", "v1.0.1", "v0.33.2", "v0.33.1", "v0.33.0", "v0.32.3", "v0.32.0", "v0.31.0"].join("\n"),
+		);
+
+		expect(selectArchivedReleases(tags)).toEqual(["v1.2.0", "v0.33.2", "v0.32.3", "v0.31.0"]);
+		expect(selectArchivedReleases(tags, 2)).toEqual(["v1.2.0", "v0.33.2"]);
+	});
+
+	test("caps the archive at ten release lines", () => {
+		const tags = parseReleaseTags(Array.from({ length: 14 }, (_, minor) => `v0.${minor}.0`).join("\n"));
+
+		expect(selectArchivedReleases(tags)).toEqual(tags.slice(0, 10));
 	});
 
 	test("injects shared version navigation once", () => {
