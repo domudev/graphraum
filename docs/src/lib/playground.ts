@@ -1,5 +1,6 @@
 import type {
 	GraphraumData,
+	GraphraumEdge,
 	GraphraumEdgeMarker,
 	GraphraumEdgeMarkerEnd,
 	GraphraumEdgePath,
@@ -73,14 +74,79 @@ export const defaultPlaygroundAppearance = (): PlaygroundAppearance => ({
 	scoreSize: 4,
 });
 
+/** Nodes per community in the stress fixture; about the size of one readable cluster. */
+export const PLAYGROUND_CLUSTER_SIZE = 60;
+/** One edge in this many leaves its community, so clusters stay connected but distinct. */
+const BRIDGE_EVERY = 12;
+
+/** Nodes per community for a fixture of this size; communities are contiguous index ranges. */
+export function playgroundClusterSpan(nodeCount: number, clusterSize = PLAYGROUND_CLUSTER_SIZE) {
+	return Math.ceil(nodeCount / Math.max(1, Math.round(nodeCount / clusterSize)));
+}
+
+/** Community index per node, matching {@link createPlaygroundFixture}; seeds the force layout. */
+export function playgroundClusters(nodeCount: number, clusterSize = PLAYGROUND_CLUSTER_SIZE): Uint32Array {
+	const span = playgroundClusterSpan(nodeCount, clusterSize);
+	return Uint32Array.from({ length: nodeCount }, (_, index) => Math.floor(index / span));
+}
+
+/** Deterministic integer hash (xorshift-multiply), so the fixture is identical on every run. */
+function hash(value: number) {
+	let h = Math.imul(value ^ (value >>> 16), 0x45d9f3b);
+	h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+	return (h ^ (h >>> 16)) >>> 0;
+}
+
+/**
+ * A clustered stress fixture: contiguous communities of about {@link PLAYGROUND_CLUSTER_SIZE} nodes,
+ * each a tree around its first node plus random links inside the community, and one in
+ * {@link BRIDGE_EVERY} edges bridging to one of the next three communities. Three edges per node, as before.
+ * A random graph without communities lays out as a uniform hairball at any force setting.
+ */
 export function createPlaygroundFixture(
 	nodeCount: number,
+	clusterSize = PLAYGROUND_CLUSTER_SIZE,
 ): GraphraumData<PlaygroundNodeAttributes, PlaygroundEdgeAttributes> {
 	if (!Number.isSafeInteger(nodeCount) || nodeCount < 2) {
 		throw new Error("A playground fixture needs at least two nodes.");
 	}
-	const edgeCount = nodeCount * 3;
+	const span = playgroundClusterSpan(nodeCount, clusterSize);
+	const clusterCount = Math.ceil(nodeCount / span);
+	const clusterStart = (cluster: number) => cluster * span;
 	const columns = Math.ceil(Math.sqrt(nodeCount));
+
+	const edges: GraphraumEdge<PlaygroundEdgeAttributes>[] = [];
+	for (let index = 0; index < nodeCount; index += 1) {
+		const cluster = Math.floor(index / span);
+		const start = clusterStart(cluster);
+		const size = Math.min(span, nodeCount - start);
+		const local = index - start;
+		const parent =
+			local > 0
+				? start + ((local - 1) >> 1)
+				: cluster > 0
+					? clusterStart(hash(cluster) % cluster)
+					: Math.min(1, nodeCount - 1);
+		const inCluster = (salt: number) => {
+			if (size < 2) return parent;
+			const target = start + (hash(index * 3 + salt) % size);
+			return target === index ? start + ((local + 1) % size) : target;
+		};
+		const bridge = (index + 1) % BRIDGE_EVERY === 0 && clusterCount > 1;
+		const third = bridge
+			? clusterStart((cluster + 1 + (hash(index) % Math.min(3, clusterCount - 1))) % clusterCount)
+			: inCluster(2);
+		for (const [slot, target] of [parent, inCluster(1), third].entries()) {
+			const edgeIndex = index * 3 + slot;
+			edges.push({
+				attributes: { kind: edgeIndex % 4 === 0 ? "mentions" : "related" },
+				id: `edge-${edgeIndex}`,
+				source: `node-${index}`,
+				target: `node-${target}`,
+			});
+		}
+	}
+
 	return {
 		nodes: Array.from({ length: nodeCount }, (_, index) => {
 			const kind = playgroundNodeKinds[index % playgroundNodeKinds.length];
@@ -94,12 +160,7 @@ export function createPlaygroundFixture(
 				},
 			};
 		}),
-		edges: Array.from({ length: edgeCount }, (_, index) => ({
-			attributes: { kind: index % 4 === 0 ? "mentions" : "related" },
-			id: `edge-${index}`,
-			source: `node-${index % nodeCount}`,
-			target: `node-${(index * 97 + 13) % nodeCount}`,
-		})),
+		edges,
 	};
 }
 

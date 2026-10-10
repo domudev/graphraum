@@ -151,10 +151,18 @@ body.playground {
 	z-index: 4;
 }
 
+.settings-head {
+	align-items: center;
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
+	margin: 0 0 12px;
+}
+
 .settings-note {
 	color: var(--muted);
 	font-size: 12.5px;
-	margin: 0 0 12px;
+	margin: 0;
 }
 
 .settings-grid {
@@ -637,8 +645,40 @@ article.playground-overlay-rich span {
 		right: 0;
 	}
 
+	.settings {
+		border-radius: 18px 18px 0 0;
+		bottom: 0;
+		left: 0;
+		max-height: 70dvh;
+		padding: 16px 18px 24px;
+		right: 0;
+		top: auto;
+		width: auto;
+		z-index: 6;
+	}
+
 	.settings-grid {
-		grid-template-columns: minmax(0, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.settings select {
+		min-height: 44px;
+	}
+}
+
+@media (max-width: 480px) {
+	/* Scene, size and dimension controls share one row on the stress scene. */
+	.bar {
+		gap: 6px;
+		padding: 0 8px;
+	}
+
+	.seg {
+		padding: 3px;
+	}
+
+	.seg button {
+		padding: 0 8px;
 	}
 }
 

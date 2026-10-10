@@ -1,9 +1,12 @@
 import { computeForcePositions, createForceSimulation, type ForceSettings } from "../../../src/force-layout";
+import { normalizeExtent, spreadClusters } from "./stress-layout";
 
 type LayoutName = "circle" | "force" | "force-live" | "grid";
 
 type LayoutRequest = {
 	batchSize: number;
+	/** Community index per node; seeds force nodes around cluster centres. */
+	clusters?: Uint32Array;
 	dimensions: 2 | 3;
 	edges?: Uint32Array;
 	iterations?: number;
@@ -38,6 +41,7 @@ function stopLiveLayout() {
 
 function startLiveLayout(request: LayoutRequest) {
 	const simulation = createForceSimulation({
+		clusters: request.clusters,
 		dimensions: request.dimensions,
 		edges: request.edges ?? new Uint32Array(),
 		nodeCount: request.nodeCount,
@@ -112,12 +116,14 @@ workerScope.addEventListener("message", ({ data }) => {
 		if (data.layout === "force") {
 			const computeStartedAt = performance.now();
 			positions = computeForcePositions({
+				clusters: data.clusters,
 				dimensions: data.dimensions,
 				edges: data.edges ?? new Uint32Array(),
 				iterations: data.iterations,
 				nodeCount: data.nodeCount,
 				settings: data.settings,
 			});
+			if (data.clusters) normalizeExtent(spreadClusters(positions, data.clusters), data.nodeCount);
 			computeMilliseconds = performance.now() - computeStartedAt;
 		}
 		activeLayout = {

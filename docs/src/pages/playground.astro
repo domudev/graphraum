@@ -197,14 +197,17 @@ const selects = [
 			<div class="grow"></div>
 			<div class="bar-actions">
 				<button type="button" class="gbtn" data-fit>Fit</button>
-				<button type="button" class="gbtn" id="settings-button" aria-expanded="false" aria-controls="settings">Settings</button>
+				<button type="button" class="gbtn" data-settings-open aria-expanded="false" aria-controls="settings">Settings</button>
 				<button type="button" class="gbtn" id="code-button">View code</button>
 				<button type="button" class="gbtn primary" data-prove-open>Prove on this device</button>
 			</div>
 		</header>
 
 		<form id="settings" class="settings" hidden aria-label="Stress settings">
-			<p class="settings-note">Layout and appearance for the stress scene.</p>
+			<div class="settings-head">
+				<p class="settings-note">Layout and appearance for the stress scene.</p>
+				<button type="button" class="gbtn small" data-settings-close>Close</button>
+			</div>
 			<div class="settings-grid">
 				{
 					selects.map((field) => (
@@ -255,6 +258,7 @@ const selects = [
 			</p>
 			<div class="mobile-actions">
 				<button type="button" class="gbtn" data-fit>Fit</button>
+				<button type="button" class="gbtn" data-settings-open aria-expanded="false" aria-controls="settings">Settings</button>
 				<button type="button" class="gbtn primary" data-prove-open>Prove</button>
 			</div>
 		</aside>
