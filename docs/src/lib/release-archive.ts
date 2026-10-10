@@ -30,6 +30,28 @@ export function parseReleaseTags(output: string): readonly string[] {
 		.map(({ tag }) => tag);
 }
 
+/** How many release versions keep a published docs build. */
+export const archivedReleaseLimit = 10;
+
+/**
+ * Keeps the newest release of each release line, newest first, up to `limit`.
+ * A line is the major version, or the minor version while the major is 0 (where minors break the API).
+ * Expects tags sorted newest first, as `parseReleaseTags` returns them.
+ */
+export function selectArchivedReleases(tags: readonly string[], limit = archivedReleaseLimit): readonly string[] {
+	const seenLines = new Set<string>();
+	return tags
+		.filter((tag) => {
+			const match = releaseTagPattern.exec(tag);
+			if (!match) return false;
+			const line = match[1] === "0" ? `0.${match[2]}` : String(match[1]);
+			if (seenLines.has(line)) return false;
+			seenLines.add(line);
+			return true;
+		})
+		.slice(0, limit);
+}
+
 export function injectVersionNavigation(html: string): string {
 	if (html.includes(`data-${navigationMarker}`)) return html;
 	return html
