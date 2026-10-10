@@ -51,7 +51,8 @@ export default defineConfig({
 			],
 		}),
 	],
-	markdown: { remarkPlugins: [remarkMermaid] },
+	// GFM (tables, strikethrough, autolinks) is not on by default in this Astro/Starlight setup.
+	markdown: { gfm: true, remarkPlugins: [remarkMermaid] },
 	vite: {
 		resolve: {
 			alias: {
