@@ -20,7 +20,7 @@ import { PlaygroundStage } from "./stage";
 export function startPlayground() {
 	const root = requireElement(document, ".app");
 	const settings = requireElement<HTMLFormElement>(root, "#settings");
-	const settingsButton = requireElement<HTMLButtonElement>(root, "#settings-button");
+	const settingsButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-settings-open]")];
 	const sceneSelect = requireElement<HTMLSelectElement>(root, "#scene-select");
 	const codeDialog = requireElement<HTMLDialogElement>(root, "#code-dialog");
 	const codeBody = requireElement(codeDialog, "[data-code-body]");
@@ -106,7 +106,8 @@ export function startPlayground() {
 		for (const button of root.querySelectorAll<HTMLButtonElement>("[data-mode-button]")) {
 			button.setAttribute("aria-pressed", String(button.dataset.modeButton === state.mode));
 		}
-		settingsButton.hidden = state.scene !== "stress";
+		// Settings drive the generated stress graph only, so the button is absent on curated scenes.
+		for (const button of settingsButtons) button.hidden = state.scene !== "stress";
 		if (state.scene !== "stress") toggleSettings(false);
 		prove.hidden = !state.prove;
 		root.classList.toggle("proving", state.prove);
@@ -148,7 +149,7 @@ export function startPlayground() {
 
 	function toggleSettings(open = settings.hidden) {
 		settings.hidden = !open;
-		settingsButton.setAttribute("aria-expanded", String(open));
+		for (const button of settingsButtons) button.setAttribute("aria-expanded", String(open));
 	}
 
 	function resetProve() {
@@ -256,7 +257,8 @@ export function startPlayground() {
 		setTimeout(() => (proveCopy.textContent = "Copy result"), 1200);
 	});
 
-	settingsButton.addEventListener("click", () => toggleSettings());
+	for (const button of settingsButtons) button.addEventListener("click", () => toggleSettings());
+	requireElement(settings, "[data-settings-close]").addEventListener("click", () => toggleSettings(false));
 	settings.addEventListener("change", () => {
 		if (state.scene === "stress" && !proving) mount();
 	});
