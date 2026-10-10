@@ -15,6 +15,7 @@ import {
 	defaultPlaygroundAppearance,
 	type PlaygroundEdgeAttributes,
 	type PlaygroundNodeAttributes,
+	playgroundClusters,
 } from "../lib/playground";
 import { readPlaygroundForceControls } from "../lib/playground-force";
 import { createPlaygroundOverlayOptions } from "../lib/playground-overlay";
@@ -120,11 +121,14 @@ export class PlaygroundStage {
 		this.layout = resolveStressLayout(formValue(settings, "layout") as StressLayoutChoice, size);
 		if (this.layout !== "grid") {
 			const force = readPlaygroundForceControls(settings, size);
-			const edges = this.layout === "force" || this.layout === "force-live" ? packEdges(data.edges) : undefined;
+			const isForce = this.layout === "force" || this.layout === "force-live";
+			const edges = isForce ? packEdges(data.edges) : undefined;
+			const clusters = isForce ? playgroundClusters(size) : undefined;
 			this.onLayoutProgress(`Computing ${this.layout} layout`);
 			this.layoutWorker().postMessage(
 				{
 					batchSize: force.batchSize,
+					clusters,
 					dimensions: mode === "2d" ? 2 : 3,
 					edges,
 					iterations: force.iterations,
@@ -135,7 +139,7 @@ export class PlaygroundStage {
 					settings: force.settings,
 					type: "start",
 				},
-				edges ? [edges.buffer] : [],
+				edges && clusters ? [edges.buffer, clusters.buffer] : [],
 			);
 		}
 		return this.current;
