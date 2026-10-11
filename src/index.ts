@@ -53,6 +53,7 @@ export type {
 	GraphraumEdgeState,
 	GraphraumEdgeStyle,
 	GraphraumEdgeVisual,
+	GraphraumFlyToOptions,
 	GraphraumLabelCandidate,
 	GraphraumLayoutPositions,
 	GraphraumMode,
