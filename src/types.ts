@@ -277,6 +277,16 @@ export interface GraphraumAutoOrbitOptions {
 	resumeAfterMs?: number;
 }
 
+/** Options for `Graphraum.flyTo`. */
+export interface GraphraumFlyToOptions {
+	/** Nodes to frame, as `fitView({ nodeIds })` frames them. Unknown IDs are ignored. */
+	nodeIds: readonly string[];
+	/** Flight time in milliseconds. 0 jumps. Defaults to 1200. */
+	durationMs?: number;
+	/** Multiplies the fitted 3D camera distance or 2D visible height; above 1 leaves air around the nodes. Defaults to 1. */
+	distanceScale?: number;
+}
+
 /** `off`: not enabled. `active`: orbiting with a running frame loop. `paused`: enabled but stopped by interaction, a hidden tab or an off-screen canvas. */
 export type GraphraumAutoOrbitStatus = "active" | "off" | "paused";
 

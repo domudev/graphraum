@@ -25,6 +25,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { autoRotateSpeedFor, resolveAutoOrbitOptions } from "./auto-orbit";
 import { AutoOrbitLoop } from "./auto-orbit-loop";
 import { applyPerspectiveContainerAspect, containerAspect } from "./camera-aspect";
+import { easeInOutCubic, flightProgress, interpolateScale, resolveFlyToOptions } from "./camera-flight";
 import { compileGraph } from "./compile-graph";
 import { dataPatchFitsCapacity, isAppendOnlyDataPatch, type MergedGraphData, mergeDataPatch } from "./data-patch";
 import { edgeTierFromDiagnosticsLod, packEdgeInstances } from "./edge-materialize";
@@ -44,7 +45,7 @@ import {
 	patchVisibleEdgePaint,
 	type VisibleEdgeLayout,
 } from "./edge-viewport-patch";
-import { fitPerspective } from "./fit-3d";
+import { fitPerspective, type PerspectiveFit } from "./fit-3d";
 import { markInstanceColorSlots } from "./instance-color-ranges";
 import { prepareLayoutPositions } from "./layout-positions";
 import { resolveNodeAxes } from "./node-axes";
@@ -73,6 +74,7 @@ import type {
 	GraphraumDataPatch,
 	GraphraumDiagnostics,
 	GraphraumEdgeState,
+	GraphraumFlyToOptions,
 	GraphraumLabelCandidate,
 	GraphraumLayoutPositions,
 	GraphraumMode,
@@ -94,6 +96,34 @@ const SELECTED_LABEL_IMPORTANCE_BOOST = 1000;
 const PERSPECTIVE_FIT_FILL = 0.92;
 
 type GraphraumCamera = OrthographicCamera | PerspectiveCamera;
+type GraphraumNodes<NodeAttributes> = GraphraumData<NodeAttributes, unknown>["nodes"];
+
+/** Where a 2D fit puts the orthographic camera: centre, unzoomed visible height and camera z. */
+interface OrthographicFit {
+	cameraZ: number;
+	center: Vector3;
+	visibleHeight: number;
+}
+
+/** One planned camera move. `step` places the camera at an eased progress; `arrive` settles it. */
+interface CameraFlight {
+	arrive(): void;
+	step(eased: number): void;
+}
+
+interface ActiveCameraFlight extends CameraFlight {
+	readonly durationMs: number;
+	resolve(arrived: boolean): void;
+	startMs: number | null;
+}
+
+function prefersReducedMotion(): boolean {
+	return (
+		typeof window !== "undefined" &&
+		typeof window.matchMedia === "function" &&
+		window.matchMedia("(prefers-reduced-motion: reduce)").matches
+	);
+}
 type GraphraumGraphObjects = {
 	edgeMesh: InstancedMesh;
 	nodeMesh: InstancedMesh;
@@ -118,6 +148,9 @@ interface GpuTimer {
 function disposeMaterial(material: Material | Material[]) {
 	for (const item of Array.isArray(material) ? material : [material]) item.dispose();
 }
+
+/** Canvas input that cancels a running `flyTo`, so people take over the camera at once. */
+const FLIGHT_CANCEL_EVENTS = ["keydown", "pointerdown", "wheel"] as const;
 
 const EDGE_INSTANCE_ATTRIBUTES = [
 	"instanceKind",
@@ -194,6 +227,8 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	private mode: GraphraumMode;
 	private frameRequest: number | null = null;
 	private autoOrbit: AutoOrbitLoop | null = null;
+	private flight: ActiveCameraFlight | null = null;
+	private readonly flightDirection = new Vector3();
 	/** True only during the orbit's own `controls.update(dt)`; see `handleViewChange`. */
 	private orbitUpdating = false;
 	private destroyed = false;
@@ -236,6 +271,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.container.append(this.renderer.domElement);
 		this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
 		this.renderer.domElement.addEventListener("pointerleave", this.handlePointerLeave);
+		for (const type of FLIGHT_CANCEL_EVENTS) this.renderer.domElement.addEventListener(type, this.cancelFlight);
 
 		this.camera = this.createCamera();
 		this.controls = this.createControls();
@@ -739,6 +775,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	setMode(mode: GraphraumMode) {
 		if (mode === this.mode) return;
+		this.cancelFlight();
 		this.stopAutoOrbit();
 		this.mode = mode;
 		this.controls.removeEventListener("change", this.handleViewChange);
@@ -920,20 +957,33 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		return edgeId ? { kind: "edge", id: edgeId } : null;
 	}
 
-	/** Frames every node, or only `nodeIds`; unknown ids are ignored and no match frames all nodes. */
+	/** Frames every node, or only `nodeIds`; unknown ids are ignored and no match frames all nodes. Cancels a running `flyTo`. */
 	fitView(options?: { nodeIds?: readonly string[] }) {
+		this.cancelFlight();
 		if (!this.nodeMesh || this.data.nodes.length === 0) {
 			this.requestRender();
 			return;
 		}
-		const wanted = options?.nodeIds ? new Set(options.nodeIds) : null;
-		const subset = wanted ? this.data.nodes.filter((node) => wanted.has(node.id)) : this.data.nodes;
+		const subset = this.nodesWithIds(options?.nodeIds);
 		const nodes = subset.length > 0 ? subset : this.data.nodes;
 
 		const width = Math.max(this.container.clientWidth, 1);
 		const height = Math.max(this.container.clientHeight, 1);
-		if (this.camera instanceof OrthographicCamera) this.fitOrthographic(this.camera, width / height, nodes);
-		else this.fitPerspectiveCamera(this.camera, width, height, nodes);
+		if (this.camera instanceof OrthographicCamera) {
+			const aspect = width / height;
+			const fit = orthographicFit(aspect, nodes);
+			setOrthographicFrustum(this.camera, aspect, fit.visibleHeight);
+			this.camera.position.set(fit.center.x, fit.center.y, fit.cameraZ);
+			this.camera.lookAt(fit.center);
+			this.controls.target.copy(fit.center);
+		} else {
+			const fit = this.perspectiveFit(this.camera, width, height, nodes);
+			this.camera.near = fit.near;
+			this.camera.far = fit.far;
+			this.camera.position.set(fit.target.x, fit.target.y, fit.cameraZ);
+			this.controls.target.set(fit.target.x, fit.target.y, fit.target.z);
+			this.camera.lookAt(this.controls.target);
+		}
 
 		this.camera.updateProjectionMatrix();
 		this.controls.update();
@@ -941,49 +991,56 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 		this.requestRender();
 	}
 
-	private fitOrthographic(
-		camera: OrthographicCamera,
-		aspect: number,
-		nodes: GraphraumData<NodeAttributes, EdgeAttributes>["nodes"],
-	) {
-		const bounds = new Box3();
-		const minimum = new Vector3();
-		const maximum = new Vector3();
-		for (const node of nodes) {
-			const { height, width } = resolveNodeAxes({
-				height: node.height,
-				nodeId: node.id,
-				size: node.size,
-				width: node.width,
-			});
-			const radius = Math.max(width, height);
-			const z = node.position.z ?? 0;
-			bounds.expandByPoint(minimum.set(node.position.x - radius, node.position.y - radius, z - radius));
-			bounds.expandByPoint(maximum.set(node.position.x + radius, node.position.y + radius, z + radius));
+	/**
+	 * Animates the camera to frame `nodeIds` as `fitView({ nodeIds })` would, with an ease-in-out
+	 * over `durationMs`. In 3D the camera and the orbit target move together and keep the current
+	 * view direction, so a running auto-orbit carries on around the new target, at the fitted
+	 * distance times `distanceScale`. In 2D it pans and zooms. Resolves `true` on arrival and
+	 * `false` when cancelled by canvas pointer, wheel or key input, another `flyTo`, `fitView`,
+	 * `setData`, `setMode`, a 2D resize or `destroy()`. Unknown IDs are ignored; when none match,
+	 * or after `destroy()`, it resolves `false` without moving. With `prefers-reduced-motion:
+	 * reduce` or a zero duration it jumps. Throws for an invalid duration or distance scale.
+	 */
+	flyTo(options: GraphraumFlyToOptions): Promise<boolean> {
+		const { distanceScale, durationMs } = resolveFlyToOptions(options);
+		this.cancelFlight();
+		if (this.destroyed || !this.nodeMesh) return Promise.resolve(false);
+		const nodes = this.nodesWithIds(options.nodeIds);
+		if (nodes.length === 0) return Promise.resolve(false);
+		const width = Math.max(this.container.clientWidth, 1);
+		const height = Math.max(this.container.clientHeight, 1);
+		const flight =
+			this.camera instanceof OrthographicCamera
+				? this.planOrthographicFlight(this.camera, width / height, nodes, distanceScale)
+				: this.planPerspectiveFlight(this.camera, width, height, nodes, distanceScale);
+		if (durationMs === 0 || prefersReducedMotion()) {
+			flight.step(1);
+			flight.arrive();
+			this.requestRender();
+			return Promise.resolve(true);
 		}
-		const center = bounds.getCenter(new Vector3());
-		const size = bounds.getSize(new Vector3());
-		const visibleHeight = Math.max(size.y, size.x / aspect, 1) * 1.15;
-		camera.left = (-visibleHeight * aspect) / 2;
-		camera.right = (visibleHeight * aspect) / 2;
-		camera.top = visibleHeight / 2;
-		camera.bottom = -visibleHeight / 2;
-		// Wheel zoom scales `camera.zoom`; the frustum above frames the graph only at zoom 1.
-		camera.zoom = 1;
-		camera.position.set(center.x, center.y, center.z + Math.max(size.z, 1000));
-		camera.lookAt(center);
-		this.controls.target.copy(center);
+		return new Promise((resolve) => {
+			this.flight = { ...flight, durationMs, resolve, startMs: null };
+			this.requestRender();
+		});
 	}
 
-	/** Resets to the front view at the closest distance that frames every node (issue #124). */
-	private fitPerspectiveCamera(
+	/** Nodes whose id is in `nodeIds`, in graph order; every node when `nodeIds` is omitted. */
+	private nodesWithIds(nodeIds: readonly string[] | undefined): GraphraumNodes<NodeAttributes> {
+		if (!nodeIds) return this.data.nodes;
+		const wanted = new Set(nodeIds);
+		return this.data.nodes.filter((node) => wanted.has(node.id));
+	}
+
+	/** The closest front-view camera that frames `nodes` (issue #124); applies the container aspect. */
+	private perspectiveFit(
 		camera: PerspectiveCamera,
 		width: number,
 		height: number,
-		nodes: GraphraumData<NodeAttributes, EdgeAttributes>["nodes"],
-	) {
+		nodes: GraphraumNodes<NodeAttributes>,
+	): PerspectiveFit {
 		applyPerspectiveContainerAspect(camera, width, height);
-		const fit = fitPerspective(
+		return fitPerspective(
 			{ aspect: camera.aspect, fill: PERSPECTIVE_FIT_FILL, fovDegrees: camera.fov },
 			{
 				count: nodes.length,
@@ -1002,12 +1059,126 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				},
 			},
 		);
-		camera.near = fit.near;
-		camera.far = fit.far;
-		camera.position.set(fit.target.x, fit.target.y, fit.cameraZ);
-		this.controls.target.set(fit.target.x, fit.target.y, fit.target.z);
-		camera.lookAt(this.controls.target);
 	}
+
+	/**
+	 * A 3D flight keeps the view direction it reads from the camera every frame, so an orbit step
+	 * between frames turns the flight with it. The destination distance is the front-view fit
+	 * distance; near and far span both ends while flying, and the far plane at arrival still holds
+	 * the whole graph so the rest of it stays visible around the framed nodes.
+	 */
+	private planPerspectiveFlight(
+		camera: PerspectiveCamera,
+		width: number,
+		height: number,
+		nodes: GraphraumNodes<NodeAttributes>,
+		distanceScale: number,
+	): CameraFlight {
+		const fit = this.perspectiveFit(camera, width, height, nodes);
+		const fromTarget = this.controls.target.clone();
+		const toTarget = new Vector3(fit.target.x, fit.target.y, fit.target.z);
+		const fromDistance = Math.max(camera.position.distanceTo(fromTarget), Number.EPSILON);
+		const toDistance = (fit.cameraZ - fit.target.z) * distanceScale;
+		const near = fit.near * Math.min(distanceScale, 1);
+		const far = Math.max(fit.far * distanceScale, (toDistance + this.graphRadiusAround(toTarget)) * 1.1);
+		camera.near = Math.min(camera.near, near);
+		camera.far = Math.max(camera.far, far);
+		camera.updateProjectionMatrix();
+		return {
+			arrive: () => {
+				camera.near = near;
+				camera.far = far;
+				camera.updateProjectionMatrix();
+				this.materializeViewport();
+			},
+			step: (eased) => {
+				const direction = this.flightDirection.subVectors(camera.position, this.controls.target);
+				if (direction.lengthSq() === 0) direction.set(0, 0, 1);
+				direction.normalize();
+				this.controls.target.lerpVectors(fromTarget, toTarget, eased);
+				camera.position
+					.copy(this.controls.target)
+					.addScaledVector(direction, interpolateScale(fromDistance, toDistance, eased));
+				camera.lookAt(this.controls.target);
+			},
+		};
+	}
+
+	/**
+	 * A 2D flight switches to the destination frustum up front with a zoom that keeps the current
+	 * view, then pans and eases the zoom back to 1, so it lands exactly on the fitted frustum.
+	 */
+	private planOrthographicFlight(
+		camera: OrthographicCamera,
+		aspect: number,
+		nodes: GraphraumNodes<NodeAttributes>,
+		distanceScale: number,
+	): CameraFlight {
+		const fit = orthographicFit(aspect, nodes);
+		const fromVisibleHeight = (camera.top - camera.bottom) / camera.zoom;
+		const toVisibleHeight = fit.visibleHeight * distanceScale;
+		setOrthographicFrustum(camera, aspect, toVisibleHeight);
+		const fromZoom = toVisibleHeight / fromVisibleHeight;
+		camera.zoom = fromZoom;
+		camera.updateProjectionMatrix();
+		const fromPosition = camera.position.clone();
+		const toPosition = new Vector3(fit.center.x, fit.center.y, fit.cameraZ);
+		const fromTarget = this.controls.target.clone();
+		return {
+			arrive: () => this.materializeViewport(),
+			step: (eased) => {
+				camera.zoom = interpolateScale(fromZoom, 1, eased);
+				camera.position.lerpVectors(fromPosition, toPosition, eased);
+				this.controls.target.lerpVectors(fromTarget, fit.center, eased);
+				camera.updateProjectionMatrix();
+			},
+		};
+	}
+
+	/** Largest distance from `center` to any node's far edge. */
+	private graphRadiusAround(center: Vector3): number {
+		let radius = 0;
+		for (const node of this.data.nodes) {
+			const axes = resolveNodeAxes({ height: node.height, nodeId: node.id, size: node.size, width: node.width });
+			const distance = Math.hypot(
+				node.position.x - center.x,
+				node.position.y - center.y,
+				(node.position.z ?? 0) - center.z,
+			);
+			radius = Math.max(radius, distance + Math.max(axes.width, axes.height));
+		}
+		return radius;
+	}
+
+	/** Steps a running flight to the frame time; settles and resolves it at the end. */
+	private advanceFlight(nowMs: number) {
+		const flight = this.flight;
+		if (!flight) return;
+		flight.startMs ??= nowMs;
+		const progress = flightProgress(nowMs - flight.startMs, flight.durationMs);
+		try {
+			flight.step(easeInOutCubic(progress));
+			if (progress < 1) {
+				// 2D culls to the viewport, so a moving 2D camera repacks; 3D instances do not depend on the camera.
+				if (this.mode === "2d") this.materializeViewport();
+				this.requestRender();
+				return;
+			}
+			this.flight = null;
+			flight.arrive();
+		} catch (error) {
+			this.cancelFlight();
+			throw error;
+		}
+		flight.resolve(true);
+	}
+
+	private readonly cancelFlight = () => {
+		const flight = this.flight;
+		if (!flight) return;
+		this.flight = null;
+		flight.resolve(false);
+	};
 
 	setTheme(theme: Partial<GraphraumTheme> | GraphraumThemeName) {
 		this.theme = typeof theme === "string" ? resolveGraphraumTheme(theme) : resolveGraphraumTheme(theme, this.theme);
@@ -1038,10 +1209,12 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	destroy() {
 		this.destroyed = true;
+		this.cancelFlight();
 		this.stopAutoOrbit();
 		this.resizeObserver.disconnect();
 		this.renderer.domElement.removeEventListener("pointermove", this.handlePointerMove);
 		this.renderer.domElement.removeEventListener("pointerleave", this.handlePointerLeave);
+		for (const type of FLIGHT_CANCEL_EVENTS) this.renderer.domElement.removeEventListener(type, this.cancelFlight);
 		this.controls.removeEventListener("change", this.handleViewChange);
 		this.controls.dispose();
 		if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
@@ -1056,8 +1229,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 
 	private readonly requestRender = () => {
 		if (this.frameRequest !== null) return;
-		this.frameRequest = requestAnimationFrame(() => {
+		this.frameRequest = requestAnimationFrame((nowMs) => {
 			this.frameRequest = null;
+			this.advanceFlight(nowMs);
 			this.renderFrame();
 		});
 	};
@@ -1094,7 +1268,9 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 	 * One orbit frame. `autoRotate` is on only for this `update(dt)` call: OrbitControls also calls
 	 * `update()` without a delta from wheel and key handlers and `fitView`, which would otherwise add
 	 * a fixed per-call rotation. A moved camera emits `change` (a render request only, see
-	 * `handleViewChange`); flushing that request renders this frame instead of the next one. A
+	 * `handleViewChange`); flushing that request renders this frame instead of the next one. During
+	 * a `flyTo` the orbit still turns the camera but leaves the pending frame to the flight, which
+	 * steps from the turned direction before it renders. A
 	 * throwing update, render or view listener turns the orbit off rather than leaving it enabled
 	 * without a loop.
 	 */
@@ -1108,7 +1284,7 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 				this.controls.autoRotate = false;
 				this.orbitUpdating = false;
 			}
-			this.flushRender();
+			if (this.flight === null) this.flushRender();
 		} catch (error) {
 			this.stopAutoOrbit();
 			throw error;
@@ -1608,6 +1784,42 @@ export class Graphraum<NodeAttributes = undefined, EdgeAttributes = undefined> {
 			this.edgeMesh = null;
 		}
 	}
+}
+
+/** The 2D fit: the nodes' padded bounds, framed with 15% slack on the tighter axis. */
+function orthographicFit<NodeAttributes>(aspect: number, nodes: GraphraumNodes<NodeAttributes>): OrthographicFit {
+	const bounds = new Box3();
+	const minimum = new Vector3();
+	const maximum = new Vector3();
+	for (const node of nodes) {
+		const { height, width } = resolveNodeAxes({
+			height: node.height,
+			nodeId: node.id,
+			size: node.size,
+			width: node.width,
+		});
+		const radius = Math.max(width, height);
+		const z = node.position.z ?? 0;
+		bounds.expandByPoint(minimum.set(node.position.x - radius, node.position.y - radius, z - radius));
+		bounds.expandByPoint(maximum.set(node.position.x + radius, node.position.y + radius, z + radius));
+	}
+	const center = bounds.getCenter(new Vector3());
+	const size = bounds.getSize(new Vector3());
+	return {
+		cameraZ: center.z + Math.max(size.z, 1000),
+		center,
+		visibleHeight: Math.max(size.y, size.x / aspect, 1) * 1.15,
+	};
+}
+
+/** Sets a frustum that shows `visibleHeight` world units at zoom 1 and resets the zoom. */
+function setOrthographicFrustum(camera: OrthographicCamera, aspect: number, visibleHeight: number) {
+	camera.left = (-visibleHeight * aspect) / 2;
+	camera.right = (visibleHeight * aspect) / 2;
+	camera.top = visibleHeight / 2;
+	camera.bottom = -visibleHeight / 2;
+	// Wheel zoom scales `camera.zoom`; the frustum frames the graph only at zoom 1.
+	camera.zoom = 1;
 }
 
 function hasNodeGlow(node: { glow?: number }): boolean {
